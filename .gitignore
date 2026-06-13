@@ -6,6 +6,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Turborepo
+.turbo/
+
 # Logs
 *.log
 npm-debug.log*
