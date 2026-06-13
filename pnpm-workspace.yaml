@@ -1,0 +1,8 @@
+# AgentSpace monorepo workspaces (see BLUEPRINT.md §2).
+# apps/* (Expo client) and modules/* (SpacetimeDB module) are added with their
+# M0.2 / M0.3 spike PRs.
+packages:
+  - packages/*
+  - services/*
+  - apps/*
+  - modules/*
