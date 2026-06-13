@@ -14,9 +14,11 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 ## Current state
 
 *2026-06-13.* In **M0**. Done: doc suite, monorepo + CI (M0.1), RN↔STDB spike +
-Expo probe (M0.2/M0.2b — bundles clean; device run is `VERIFICATION.md` V-1).
-Working under the autonomous build loop (CLAUDE.md §4). Next: **M0.3** — the
-AgentSpace SpacetimeDB module + access-control (Views) spike.
+Expo probe (M0.2/M0.2b), SpacetimeDB module + access-control spike (M0.3 —
+reducers gate writes, per-user Views gate reads). Working under the autonomous
+build loop (CLAUDE.md §4). Open device checks: `VERIFICATION.md` V-1 (RN connect),
+V-2 (non-member view scoping). Next: **M0.4** — orchestrator as a trusted
+SpacetimeDB client (OIDC service identity), then **M0.5** auth.
 
 ---
 
@@ -36,10 +38,12 @@ client; and the three spikes are decided and recorded as DEC entries.
   lints, and bundles for Android via Metro (561 modules) — DEC-014. Live device
   connect is `VERIFICATION.md` V-1 (founder). Bindings vendored from the example
   until M0.3.*
-- **M0.3 — Spike: module language & access control (DEC-007).** Stand up a TS
-  module with `users`/`threads`/`thread_members`/`messages`; prove per-user
-  `ViewContext` Views hide non-member rows from a subscribing client. Record
-  findings.
+- **M0.3 — Module + access control (DEC-007).** ✓ *Done (2026-06-13):
+  `modules/spacetime` (users/threads/thread_members/messages + reducers + per-user
+  Views) builds, publishes locally, generates bindings; `tsc`/`eslint` green.
+  Membership write-gating + positive Views read-path verified via CLI
+  (`.audit/spike-stdb-access-control-2026-06-13.md`); non-member negative case is
+  `VERIFICATION.md` V-2.*
 - **M0.4 — Spike: orchestrator as trusted client (DEC-008).** Node/TS service
   connects via an OIDC service identity, subscribes to messages, and writes a row
   via a reducer. Confirm the service identity is stable.

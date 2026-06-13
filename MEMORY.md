@@ -13,22 +13,24 @@
 
 *Last refreshed: 2026-06-13.*
 
-**Executing M0 — Foundations & spikes** (autonomous build loop now in force —
-DEC-013: plan-per-chunk in Plan Mode → build → PR auto-merges on green → next
-chunk; on-device checks batched in `VERIFICATION.md`). Merged: docs (PR #2),
-monorepo+CI (PR #3), RN↔STDB spike (PR #4). **M0.2b done:** `apps/mobile` Expo
-**connectivity probe** typechecks, lints, and **bundles for Android via Metro**
-(561 modules, ~1.9 MB Hermes) — the SpacetimeDB TS client works under RN. Only
-the live on-device connect remains (`VERIFICATION.md` V-1).
+**Executing M0 — Foundations & spikes** (autonomous build loop — DEC-013:
+plan-per-chunk in Plan Mode → build → **AI merges green PRs via API** (DEC-016) →
+next chunk; on-device/manual checks batched in `VERIFICATION.md`). Merged: docs
+(PR #2), monorepo+CI (PR #3), RN↔STDB spike (PR #4), Expo probe (PR #5). **M0.3
+done:** `modules/spacetime` (users/threads/thread_members/messages + reducers +
+per-user **Views**) builds, publishes locally, generates bindings; CI 16/16.
+Verified via CLI: reducers reject non-members; a member's `my_threads` View
+returns only their thread (DEC-015). Non-member negative case → `VERIFICATION.md`
+V-2.
 
-- **Active branch:** `claude/agentspace-m0-expo-probe`.
+- **Active branch:** `claude/agentspace-m0-stdb-module`.
 - **Stack (decided):** RN + Expo (SDK 52) client · SpacetimeDB (TypeScript module)
   · self-hosted Node/TS Orchestrator + Vercel-AI-SDK Model Gateway (BYOK) ·
-  Postgres + pgvector. pnpm `node-linker=hoisted` (DEC-014, for Metro).
-- **Top risk (cleared on AI side):** RN↔STDB bundles clean; only the device run
-  is open (OT-003 → V-1).
-- **Next:** M0.3 — AgentSpace SpacetimeDB module + access-control (Views) spike →
-  M0.4 orchestrator-as-trusted-client → M0.5 auth.
+  Postgres + pgvector. pnpm `node-linker=hoisted` (DEC-014).
+- **Open device/manual checks:** V-1 (RN on-device connect), V-2 (Views hide
+  non-members). Not blocking.
+- **Next:** M0.4 — orchestrator as a trusted SpacetimeDB client (OIDC service
+  identity) → M0.5 auth.
 
 ---
 
@@ -163,6 +165,25 @@ transitive deps like `expo-modules-core`), and **`unstable_enablePackageExports`
 `expo export -p android` (561 modules, ~1.9 MB Hermes). The probe's bindings are
 **vendored from the example module**, temporary until M0.3 generates ours.
 
+### DEC-015 — Realtime-core module + Views access control (M0.3)
+*2026-06-13.* `modules/spacetime` (TypeScript) models the realtime core: private
+`thread`/`thread_member`/`message` + public `user`; reducers gate every write by
+`ctx.sender` membership; per-user `ViewContext` Views (`my_threads`,
+`my_thread_messages`, `my_thread_members`) — built from indexed membership lookups
+— are the only client read surface (generated as subscribable tables). Verified on
+the AI side via the `spacetime` CLI: `send_message` to a non-member thread is
+rejected; a member's `my_threads` returns only their thread. Confirms DEC-007
+(TS module + Views over RLS). Agent/run/knowledge tables deferred to M1+. Non-
+member negative read case → `VERIFICATION.md` V-2. Artifact: `.audit/spike-stdb-
+access-control-2026-06-13.md`.
+
+### DEC-016 — AI merges green PRs via the GitHub API (supersedes auto-merge assumption)
+*2026-06-13.* Repo-level "allow auto-merge" only *permits* auto-merge; it isn't
+enabled per-PR, so API-created PRs sat green-but-unmerged. Founder's decision: the
+**AI merges each PR itself via the API once CI is green** (squash), with `main`
+branch-protected as the gate. Refines the DEC-013 loop (the "auto-merges" step is
+really "AI merges on green"). `CLAUDE.md` §6 updated.
+
 ---
 
 ## Session Journal (append-only)
@@ -207,6 +228,15 @@ transitive deps like `expo-modules-core`), and **`unstable_enablePackageExports`
   bundle exports clean** (561 modules). Live device run is `VERIFICATION.md` V-1.
 - **Next:** M0.3 — AgentSpace SpacetimeDB module (users/threads/members/messages)
   + per-user Views access-control spike.
+
+### 2026-06-13 — M0.3 module + access-control spike
+- Merged PR #5 via API (DEC-016: AI now drives merges on green; updated CLAUDE §6).
+- Built `modules/spacetime` (TS): tables + membership-gating reducers + per-user
+  Views. `spacetime build`/`publish --server local`/`generate` all succeed; CI
+  16/16. CLI checks: non-member `send_message` rejected; member `my_threads`
+  scoped correctly (DEC-015). Non-member negative case → V-2.
+- **Next:** M0.4 — orchestrator connects as a trusted STDB client (OIDC service
+  identity), subscribes to messages, and writes a reply via a reducer.
 
 ---
 

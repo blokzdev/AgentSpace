@@ -50,3 +50,26 @@ Notes: <founder fills: device + OS + result>
   (in order): a missing/extra polyfill, the `unstable_conditionNames` Metro
   setting, or (worst case) a thin WS bridge — see `.audit/spike-rn-stdb-2026-06-13.md`.
 - **Notes (founder):** _device + OS + Expo SDK + result →_
+
+---
+
+### V-2 — SpacetimeDB Views hide non-members' data  ·  added 2026-06-13 · M0.3
+- **Why:** completes the access-control spike. AI-side checks proved write-gating
+  (reducers reject non-members) and the *positive* read path (a member's
+  `my_threads` returns their thread). This is the *negative* case, which needs a
+  second live identity (`.audit/spike-stdb-access-control-2026-06-13.md`).
+- **Setup:** `spacetime start`; from `modules/spacetime`:
+  `spacetime publish agentspace -p . --server local --yes`. Have **two** distinct
+  identities (e.g. two devices/emulators, or `spacetime logout` + reconnect for a
+  fresh anonymous identity).
+- **Steps:**
+  1. As **identity A**: `spacetime call -s local agentspace create_group '"A's room"'`
+     and `send_message` into it.
+  2. As **identity B** (not a member): subscribe to the Views, e.g.
+     `spacetime subscribe -s local agentspace "SELECT * FROM my_threads" "SELECT * FROM my_thread_messages" --num-updates 1`.
+- **Pass when:** identity B's subscription to `my_threads` / `my_thread_messages`
+  returns **none** of A's threads/messages (B sees only rooms B belongs to). A
+  member of the room *does* see them.
+- **If it fails (B sees A's rows):** the Views aren't scoping by `ctx.sender` as
+  expected — revisit the view definitions / consider RLS. Tell me.
+- **Notes (founder):** _result →_

@@ -175,11 +175,12 @@ Protocol §3.2** run.
   at natural checkpoints otherwise.
 - **Branch hygiene:** one branch **per chunk**, cut off the latest `main`; never
   push to `main` directly.
-- **Auto-merge + auto-delete-branch are enabled** on the repo. Open the PR as
-  ready-for-review; CI is the gate. The AI watches CI and **fixes until green**;
-  the PR then auto-merges and the branch is deleted. The AI does not poll for
-  merges — it proceeds to plan the next chunk, and a CI-failure webhook will
-  interrupt if a fix is needed.
+- **`main` is branch-protected (CI required); auto-delete-branch is on.** The AI
+  opens the PR ready-for-review, watches CI, and **fixes until green** — then
+  **merges the PR itself via the GitHub API** (squash) and the branch is deleted
+  (founder decision: repo-level "allow auto-merge" only *permits* it and isn't
+  enabled per-PR, so the AI drives the merge). A CI-failure webhook interrupts if
+  a fix is needed; otherwise the AI merges on green and proceeds to the next chunk.
 - The active branch is recorded in `MEMORY.md`'s Snapshot.
 
 ---
@@ -242,17 +243,24 @@ AgentSpace/
 │   └── gateway/               # Model Gateway interface + stub (M1.4 fills in)
 ├── services/
 │   └── orchestrator/          # Agent Orchestrator skeleton
+├── modules/
+│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3)
+│       · src/index.ts · bindings/ (generated, committed)
 └── examples/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 in progress).** Monorepo + CI exist and are green (M0.1). `gateway`
-is a stub, `orchestrator` wires the graph but does no real work yet. `apps/mobile`
-(M0.2b) is the Expo **connectivity probe**: it typechecks, lints, and **bundles
-for Android via Metro** (`npx expo export -p android` → ~1.9 MB Hermes bundle,
-561 modules) — strong evidence the SpacetimeDB TS client works under RN; the
-runtime connect is the on-device check `V-1` in `VERIFICATION.md`. **Not yet
-created:** `modules/spacetime` (M0.3). See `BLUEPRINT.md` §2 for the module graph.
+**Status (M0 in progress).** Monorepo + CI exist and are green (M0.1, 16/16).
+`gateway` is a stub, `orchestrator` wires the graph but does no real work yet.
+`apps/mobile` (M0.2b) is the Expo **connectivity probe**: it typechecks, lints,
+and **bundles for Android via Metro** (`npx expo export -p android` → ~1.9 MB
+Hermes bundle, 561 modules) — strong evidence the SpacetimeDB TS client works
+under RN; the runtime connect is `V-1` in `VERIFICATION.md`. `modules/spacetime`
+(M0.3) is the realtime-core module (users/threads/members/messages + reducers +
+per-user **Views**): it builds, publishes locally, and `tsc`/`eslint` pass;
+membership write-gating + the positive Views read-path are verified (`.audit/
+spike-stdb-access-control-2026-06-13.md`); the non-member negative case is `V-2`.
+See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs
@@ -262,6 +270,8 @@ the SDK's `spacetimedb/react` subpath.
 Workspace commands (from repo root): `pnpm install`, then `pnpm run ci`
 (= lint · typecheck · build · test), or `pnpm run {lint,typecheck,build,test}`.
 Mobile: `pnpm --filter @agentspace/mobile {start,android,export:android}`.
+Module (needs local `spacetime` CLI; not in CI): `pnpm --filter
+@agentspace/spacetime-module {spacetime:build,spacetime:publish:local,spacetime:generate}`.
 
 ### Toolchain (verified present in the dev container)
 
