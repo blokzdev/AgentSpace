@@ -36,15 +36,15 @@ the single source of truth for its topic and wins any conflict about it.
 |-----|------|-------|---------------|
 | `MEMORY.md` | Continuity ledger: snapshot, decision log, session journal, open threads, glossary | Append-only / living | Starting a session; recording a decision; closing a session |
 | `CLAUDE.md` (this file) | Operating manual + code reality | Descriptive ("what is") | You need to know how we work, or what the code actually does today |
-| `ROADMAP.md` *(planned)* | Sequencing: milestones, phases, tasks, acceptance bars, strategic skips | Forward-looking | Deciding what to build next; closing a phase/milestone |
-| `PRD.md` *(planned)* | Product surface: vision, audience, moats | Aspirational | Questioning *why* a feature exists |
-| `SPEC.md` *(planned)* | Behavioral contracts: state machines, grammars, protocols | Prescriptive | Implementing a contract between components |
-| `BLUEPRINT.md` *(planned)* | Architecture & data model: module graph, schemas, dependency rules | Prescriptive | Adding a module; touching the data model |
-| `BACKLOG.md` *(planned)* | Carryover queue: tactical deferrals with revisit triggers + launch gates | Forward-looking | Deferring work; checking launch readiness |
+| `ROADMAP.md` | Sequencing: milestones, phases, tasks, acceptance bars, strategic skips | Forward-looking | Deciding what to build next; closing a phase/milestone |
+| `PRD.md` | Product surface: vision, audience, moats | Aspirational | Questioning *why* a feature exists |
+| `SPEC.md` | Behavioral contracts: state machines, grammars, protocols | Prescriptive | Implementing a contract between components |
+| `BLUEPRINT.md` | Architecture & data model: module graph, schemas, dependency rules | Prescriptive | Adding a module; touching the data model |
+| `BACKLOG.md` | Carryover queue: tactical deferrals with revisit triggers + launch gates | Forward-looking | Deferring work; checking launch readiness |
 
-*(planned)* docs do not exist yet. They are created when the project earns
-them — `ROADMAP.md` first, once the founder shares project direction. Do not
-pre-create empty docs; a doc is born when it has something to own.
+The full doc suite now exists (authored 2026-06-13 alongside the ratified plan).
+A doc is still born only when it has something to own — do not add new doc types
+speculatively.
 
 **Conflict rule.** Each topic has exactly one owner doc; that doc wins for its
 topic. The code-reality doc (`CLAUDE.md`) wins for facts about the code today.
@@ -183,8 +183,8 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 ## 8. Code conventions
 
 - **TypeScript strict.** Prefer `as const` and discriminated unions over `any`.
-- **One-way dependency rules** between layers; document them in BLUEPRINT when
-  it exists. Lower layers must not import higher ones.
+- **One-way dependency rules** between layers (defined in `BLUEPRINT.md` §2).
+  Lower layers must not import higher ones.
 - **File naming by layer:** PascalCase for components, lowercase for lib modules.
 - **Comment policy:** none by default. Write a one-liner only when the *why* is
   non-obvious; never narrate the *what*.
@@ -204,12 +204,17 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 > Updated 2026-06-13. Keep this section honest; it is the whole point of a
 > code-reality doc.
 
-### Repository layout
+### Repository layout (today)
 
 ```
 AgentSpace/
-├── CLAUDE.md                  # this operating manual
+├── CLAUDE.md                  # this operating manual + code reality
 ├── MEMORY.md                  # durable memory ledger (read first each session)
+├── ROADMAP.md                 # milestones/phases/acceptance bars (M0…M6)
+├── PRD.md                     # product surface: vision, audience, moats
+├── BLUEPRINT.md               # architecture + data model + dependency rules
+├── SPEC.md                    # contracts: message/run state machines, gateway
+├── BACKLOG.md                 # deferrals + launch gates
 ├── .gitignore                 # root ignores (node_modules, dist, env, target…)
 └── examples/
     └── chat-react-ts/         # SpacetimeDB chat reference app (scaffolded)
@@ -218,6 +223,13 @@ AgentSpace/
         ├── src/module_bindings/  # generated client bindings
         └── spacetime.json     # project / deploy config
 ```
+
+**No product code exists yet.** The doc suite is authored and the plan is
+ratified, but the application (the monorepo below) is not built — we are at the
+start of M0. The planned structure (introduced in M0) is `apps/mobile`,
+`services/orchestrator`, `packages/gateway`, `packages/shared`,
+`modules/spacetime` — see `BLUEPRINT.md` §2 for the module graph and one-way
+dependency rules.
 
 ### Toolchain (verified present in the dev container)
 
