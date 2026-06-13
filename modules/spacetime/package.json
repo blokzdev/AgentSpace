@@ -1,0 +1,19 @@
+{
+  "name": "@agentspace/spacetime-module",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "spacetime:build": "spacetime build",
+    "spacetime:publish:local": "spacetime publish agentspace --project-path . --server local --yes",
+    "spacetime:generate": "spacetime generate --lang typescript --out-dir bindings --module-path ."
+  },
+  "dependencies": {
+    "spacetimedb": "2.5.*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
