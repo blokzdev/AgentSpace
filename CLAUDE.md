@@ -208,28 +208,30 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 
 ```
 AgentSpace/
-├── CLAUDE.md                  # this operating manual + code reality
-├── MEMORY.md                  # durable memory ledger (read first each session)
-├── ROADMAP.md                 # milestones/phases/acceptance bars (M0…M6)
-├── PRD.md                     # product surface: vision, audience, moats
-├── BLUEPRINT.md               # architecture + data model + dependency rules
-├── SPEC.md                    # contracts: message/run state machines, gateway
-├── BACKLOG.md                 # deferrals + launch gates
-├── .gitignore                 # root ignores (node_modules, dist, env, target…)
+├── CLAUDE.md · MEMORY.md · ROADMAP.md · PRD.md       # operating + vision docs
+│   · BLUEPRINT.md · SPEC.md · BACKLOG.md · README.md
+├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
+│   · tsconfig.base.json · eslint.config.mjs · .nvmrc
+├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
+├── .audit/                    # committed spike / drift-sweep artifacts
+├── packages/
+│   ├── shared/                # typed contracts (lowest layer) — built
+│   └── gateway/               # Model Gateway interface + stub (M1.4 fills in)
+├── services/
+│   └── orchestrator/          # Agent Orchestrator skeleton
 └── examples/
-    └── chat-react-ts/         # SpacetimeDB chat reference app (scaffolded)
-        ├── src/               # React + TypeScript client
-        ├── spacetimedb/       # SpacetimeDB server module (TypeScript)
-        ├── src/module_bindings/  # generated client bindings
-        └── spacetime.json     # project / deploy config
+    └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**No product code exists yet.** The doc suite is authored and the plan is
-ratified, but the application (the monorepo below) is not built — we are at the
-start of M0. The planned structure (introduced in M0) is `apps/mobile`,
-`services/orchestrator`, `packages/gateway`, `packages/shared`,
-`modules/spacetime` — see `BLUEPRINT.md` §2 for the module graph and one-way
-dependency rules.
+**Status (M0 in progress).** The monorepo + CI exist and are green (M0.1). Two
+product packages are skeletons (`gateway` is a stub; `orchestrator` wires the
+graph but does no real work yet). **Not yet created:** `apps/mobile` (Expo,
+M0.2b) and `modules/spacetime` (M0.3) — see `BLUEPRINT.md` §2 for the full module
+graph + one-way dependency rules. The RN↔SpacetimeDB spike (M0.2) concluded GO
+with two polyfills (`.audit/spike-rn-stdb-2026-06-13.md`, DEC-012).
+
+Workspace commands (from repo root): `pnpm install`, then `pnpm run ci`
+(= lint · typecheck · build · test), or `pnpm run {lint,typecheck,build,test}`.
 
 ### Toolchain (verified present in the dev container)
 
