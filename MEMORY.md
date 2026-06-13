@@ -13,24 +13,23 @@
 
 *Last refreshed: 2026-06-13.*
 
-**M0 — Foundations & spikes: all three risky spikes cleared.** Autonomous loop
-(DEC-013/016: plan-per-chunk → build → **AI merges green PRs via API** → next).
-Merged: PRs #2–#6 (docs, monorepo+CI, RN↔STDB spike, Expo probe, module). **M0.4
-done (this branch):** `services/orchestrator` connects to SpacetimeDB as a stable
-identity, subscribes to `my_thread_messages`, and replies via a reducer — proven
-end-to-end by the local integration (echo round-trip; DEC-017,
-`.audit/spike-orchestrator-client-2026-06-13.md`). CI 16/16 with the orchestrator
-fully strict. Bindings live in `packages/stdb-bindings` (consumed as source —
-TS2742 blocks a clean `.d.ts`; BL-009).
+**M0 closed; in M1.** All three M0 spikes cleared (RN↔STDB, module+Views,
+orchestrator); merged PRs #2–#7. **M1.1 done (this branch):** `apps/mobile` is now
+a realtime **chat MVP** on the `agentspace` module — `ThreadList` + `Thread`
+screens (my_threads / my_thread_messages / send_message / add_member / presence),
+regenerated bindings from our module. Typechecks, lints, and **bundles clean for
+Android** (Metro, ~1.9 MB Hermes); on-device behavior is `V-4` (DEC-018). Identity
+is anonymous-token until **M1.2 (SpacetimeAuth OIDC login**, was M0.5). Autonomous
+loop (DEC-013/016): plan-per-chunk → build → AI merges green PRs via API → next.
 
-- **Active branch:** `claude/agentspace-m0-orchestrator`.
+- **Active branch:** `claude/agentspace-m1-mobile-chat`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK Model Gateway (BYOK) · Postgres + pgvector. pnpm
   `node-linker=hoisted` (DEC-014).
-- **Open device/manual checks:** V-1 (RN on-device connect), V-2 (Views hide
-  non-members). Not blocking.
-- **Next:** **M0.5** — wire the OIDC auth provider (device login + a real
-  orchestrator service account), close M0, then **M1** (realtime chat + Agent MVP).
+- **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
+  (mobile chat). Not blocking.
+- **Next:** **M1.2** — SpacetimeAuth OIDC login (replace anonymous identity) →
+  M1.4 Model Gateway v1 → M1.5 Agent Studio → M1.6 agent replies.
 
 ---
 
@@ -197,6 +196,16 @@ usable `.d.ts`; the resulting leniency is confined to `stdb-bindings` +
 `orchestrator` (other packages stay strict). Tracked as **BL-009**. Real OIDC
 service-account auth is deferred to M0.5 (anonymous token suffices for the spike).
 
+### DEC-018 — Close M0; lead M1 with the mobile chat MVP; auth → M1.2
+*2026-06-13.* Founder ratified: **close M0** (all spikes cleared) and **fold auth
+into M1** using **SpacetimeAuth (built-in OIDC)** rather than a standalone M0.5.
+M1.1 turns `apps/mobile` from the probe into a real human↔human **chat MVP** on the
+`agentspace` module (anonymous identity for now); **SpacetimeAuth OIDC login** (ID
+token → `withToken`, via `expo-auth-session`) is its own chunk **M1.2** because
+the redirect flow is inherently device-verified. M0.5 in ROADMAP is relocated to
+M1.2. (M0 milestone-close drift sweep deferred — docs kept current per-PR; run
+`/audit` on demand.)
+
 ---
 
 ## Session Journal (append-only)
@@ -261,6 +270,17 @@ service-account auth is deferred to M0.5 (anonymous token suffices for the spike
   confined to 2 packages, BL-009 logged.
 - **Next:** M0.5 — OIDC auth provider (device login + orchestrator service
   account), close M0, then M1 (realtime chat + Agent MVP).
+
+### 2026-06-13 — M0 close + M1.1 mobile chat MVP
+- Merged PR #7 (M0.4). Founder ratified closing M0 + folding auth into M1.2
+  (DEC-018). **M0 retro:** the three risky unknowns (RN↔STDB, STDB access-control,
+  orchestrator client) all cleared with verifiable evidence; the autonomous
+  plan→build→merge loop + VERIFICATION.md batching worked well; the one friction
+  was generated-bindings typing under hoisted pnpm (BL-009).
+- Built M1.1: regenerated `apps/mobile` bindings from our module; `ThreadList` +
+  `Thread` chat screens (threads/messages/presence/add-member). CI 16/16; Android
+  bundle clean. On-device behavior → `V-4`.
+- **Next:** M1.2 — SpacetimeAuth OIDC login.
 
 ---
 

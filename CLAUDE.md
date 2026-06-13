@@ -236,8 +236,9 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) connectivity probe — M0.2b
-│       · module_bindings/     # vendored from the example (temporary, M0.3 swap)
+│   └── mobile/                # Expo (RN) chat app — M1.1 (was the M0.2b probe)
+│       · App.tsx · src/screens/{ThreadList,Thread}.tsx
+│       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
 │   ├── gateway/               # Model Gateway interface + stub (M1.4 fills in)
@@ -251,16 +252,17 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 nearly complete; M0.5 auth remains).** Monorepo + CI green (M0.1,
-16/16). `apps/mobile` (M0.2b) is the Expo **probe** — bundles for Android via
-Metro (561 modules; runtime connect is `V-1`). `modules/spacetime` (M0.3) is the
-realtime-core module with reducers + per-user **Views**; write-gating + positive
-read-path verified (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
-**M0.4:** `services/orchestrator` connects to SpacetimeDB as a stable identity,
-subscribes to `my_thread_messages`, and replies via a reducer — proven end-to-end
-by `pnpm --filter @agentspace/orchestrator integration` (echo round-trip;
-`.audit/spike-orchestrator-client-…`). The Model Gateway is still a stub (M1.4).
-See `BLUEPRINT.md` §2 for the module graph.
+**Status (M0 closed; in M1).** Monorepo + CI green (16/16). `modules/spacetime`
+(M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
+reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
+`services/orchestrator` (M0.4) connects as a stable identity, subscribes to
+`my_thread_messages`, and replies via a reducer — proven end-to-end (echo) by
+`pnpm --filter @agentspace/orchestrator integration`. **M1.1:** `apps/mobile` is
+now a **realtime chat MVP** on the `agentspace` module (thread list + thread view
++ composer + presence; `ThreadList`/`Thread` screens) — it typechecks, lints, and
+**bundles clean for Android** (Metro, ~1.9 MB Hermes); on-device behavior is `V-4`.
+Identity is anonymous-token for now; **SpacetimeAuth (OIDC) login is M1.2**. The
+Model Gateway is still a stub (M1.4). See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

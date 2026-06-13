@@ -11,7 +11,10 @@ import {
 } from "spacetimedb";
 
 export default __t.row({
-  identity: __t.identity().primaryKey(),
-  displayName: __t.option(__t.string()).name("display_name"),
-  online: __t.bool(),
+  id: __t.u64().primaryKey(),
+  threadId: __t.u64().name("thread_id"),
+  sender: __t.identity(),
+  text: __t.string(),
+  sent: __t.timestamp(),
+  streamState: __t.string().name("stream_state"),
 });
