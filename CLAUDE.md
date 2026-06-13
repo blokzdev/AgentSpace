@@ -259,9 +259,10 @@ AgentSpace/
 │   │   · src/{index,providers,credentials}.ts · scripts/smoke.ts
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
-│   └── orchestrator/          # Agent Orchestrator — connects to STDB (M0.4)
+│   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6)
+│       · src/{index,replyLoop,prompt,spacetime}.ts · scripts/integration.ts
 ├── modules/
-│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3)
+│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6)
 │       · src/index.ts · bindings/ (generated, committed)
 └── examples/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
@@ -296,11 +297,23 @@ tool-calling** on the **Vercel AI SDK v6** over a provider registry (`anthropic`
 seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
 and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.
-The orchestrator builds the gateway with `envResolver()`; its echo reply loop is
-unchanged (streaming a real LLM reply into STDB is M1.6). 16 gateway tests cover
-the BYOK crypto + stream normalization (AI SDK `MockLanguageModelV3`); a real
-provider round-trip is the founder smoke (`V-6`, key via `SETUP.md` S-4). See
-`BLUEPRINT.md` §2 for the module graph.
+16 gateway tests cover the BYOK crypto + stream normalization (AI SDK
+`MockLanguageModelV3`); a real provider round-trip is the founder smoke (`V-6`, key
+via `SETUP.md` S-4). **M1.6:** the orchestrator now **streams real agent replies
+into STDB**. `modules/spacetime` gained a private **`run`** table + `message.runId`
++ three reducers — `agent_reply_begin`/`agent_reply_append`/`agent_reply_finish`
+(write a `streaming` message row that flips to `complete`/`failed`, keyed by a
+client-owned `runId`; each re-checks the sender is the `agent` member). The
+orchestrator's `replyLoop.ts` reacts to a human's `complete` message in a thread it's
+an `agent` member of, builds the prompt (`prompt.ts`: `buildPrompt`/`newRunId`/a
+~50ms coalescing `createBatcher`), calls `gateway.stream`, and flushes batched
+`agent_reply_append` UPDATEs, then `agent_reply_finish` with token usage. Mobile
+renders a streaming cursor (`▍`) on `streaming` rows — partial text already arrives
+live via `useTable`. Proven **headlessly end-to-end** by the rewritten
+`scripts/integration.ts` (a **mock gateway** streams a reply through a real local
+STDB; asserts `streaming`→`complete` + live UPDATEs) — no key needed; a real LLM
+reply on-device is `V-7`. The publish script uses `spacetime publish agentspace -p .`
+(`--project-path` was wrong for CLI 2.5.0). See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

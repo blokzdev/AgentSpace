@@ -7,7 +7,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint src",
     "spacetime:build": "spacetime build",
-    "spacetime:publish:local": "spacetime publish agentspace --project-path . --server local --yes",
+    "spacetime:publish:local": "spacetime publish agentspace -p . --server local --yes",
     "spacetime:generate": "spacetime generate --lang typescript --out-dir bindings --module-path ."
   },
   "dependencies": {

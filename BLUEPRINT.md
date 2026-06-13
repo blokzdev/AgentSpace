@@ -97,8 +97,8 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | `agent_versions` | `id` (PK), `agent_id`, `version`, `system_prompt`, `model_ref`, `params` | private (orchestrator + owner) | immutable; pinned per run |
 | `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by` | View: members only | |
 | `thread_members` | `(thread_id, member_ref)` , `role` (human\|agent), `member_kind` | View: members only | membership is the authz spine |
-| `messages` | `id` (PK), `thread_id`, `sender_ref`, `body`, `stream_state`, `sent`, `updated` | View: thread members | streamed via UPDATE (see §5) |
-| `runs` | `id` (PK), `thread_id`, `agent_id`, `message_id`, `status`, `model_ref`, `tokens`, `cost`, `error` | View: thread members (subset) | one agent turn |
+| `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | streamed via UPDATE (§5); `run_id`=`''` for humans (M1.6) |
+| `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6). `cost`/`error` deferred |
 | `attachments` | `id` (PK), `message_id`, `kind`, `uri`, `meta` | View: thread members | blobs out-of-band |
 | `presence` | `identity`/`agent_id`, `state`, `typing_in_thread` | View: co-members | humans + agents |
 | `provider_keys` | `id` (PK), `owner`, `provider`, `secret_ref`, `label` | private; never raw key | **reference** to the encrypted store |

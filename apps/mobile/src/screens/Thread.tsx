@@ -31,6 +31,7 @@ export function Thread({
 
   const [text, setText] = useState('');
   const [member, setMember] = useState('');
+  const [addRole, setAddRole] = useState<'human' | 'agent'>('human');
 
   const messages = useMemo(
     () =>
@@ -56,7 +57,7 @@ export function Thread({
     const hex = member.trim();
     if (hex.length === 0) return;
     try {
-      void addMember({ threadId, member: Identity.fromString(hex), role: 'human' });
+      void addMember({ threadId, member: Identity.fromString(hex), role: addRole });
       setMember('');
     } catch {
       // invalid identity hex — ignored (validated on the device)
@@ -82,6 +83,14 @@ export function Thread({
           value={member}
           onChangeText={setMember}
         />
+        <Pressable
+          style={styles.roleBtn}
+          onPress={() => {
+            setAddRole((r) => (r === 'human' ? 'agent' : 'human'));
+          }}
+        >
+          <Text style={styles.roleBtnText}>{addRole === 'agent' ? '🤖 Agent' : '🧑 Human'}</Text>
+        </Pressable>
         <Pressable style={styles.addBtn} onPress={onAdd}>
           <Text style={styles.addBtnText}>Add</Text>
         </Pressable>
@@ -97,7 +106,10 @@ export function Thread({
           return (
             <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
               {!mine ? <Text style={styles.sender}>{nameOf(item.sender)}</Text> : null}
-              <Text style={styles.body}>{item.text}</Text>
+              <Text style={styles.body}>
+                {item.text}
+                {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
+              </Text>
               <Text style={styles.time}>{fmtTime(item.sent)}</Text>
             </View>
           );
@@ -143,6 +155,8 @@ const styles = StyleSheet.create({
   },
   addBtn: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
   addBtnText: { color: colors.dim, fontWeight: '600' },
+  roleBtn: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, justifyContent: 'center' },
+  roleBtnText: { color: colors.dim, fontWeight: '600', fontSize: 12 },
   list: { flex: 1, paddingHorizontal: 12 },
   empty: { color: colors.faint, textAlign: 'center', marginTop: 24 },
   bubble: { maxWidth: '82%', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 4 },
@@ -150,6 +164,7 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start', backgroundColor: colors.panel },
   sender: { color: colors.accent, fontSize: 12, fontWeight: '600', marginBottom: 2 },
   body: { color: colors.text, fontSize: 15 },
+  cursor: { color: colors.accent },
   time: { color: colors.faint, fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   composer: { flexDirection: 'row', gap: 8, padding: 12, borderTopColor: colors.border, borderTopWidth: 1 },
   input: {

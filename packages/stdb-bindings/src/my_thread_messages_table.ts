@@ -17,4 +17,5 @@ export default __t.row({
   text: __t.string(),
   sent: __t.timestamp(),
   streamState: __t.string().name("stream_state"),
+  runId: __t.string().name("run_id"),
 });

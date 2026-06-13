@@ -35,6 +35,9 @@ import {
 
 // Import all reducer arg schemas
 import AddMemberReducer from "./add_member_reducer";
+import AgentReplyAppendReducer from "./agent_reply_append_reducer";
+import AgentReplyBeginReducer from "./agent_reply_begin_reducer";
+import AgentReplyFinishReducer from "./agent_reply_finish_reducer";
 import CreateDmReducer from "./create_dm_reducer";
 import CreateGroupReducer from "./create_group_reducer";
 import LeaveThreadReducer from "./leave_thread_reducer";
@@ -90,6 +93,9 @@ const tablesSchema = __schema({
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
   __reducerSchema("add_member", AddMemberReducer),
+  __reducerSchema("agent_reply_append", AgentReplyAppendReducer),
+  __reducerSchema("agent_reply_begin", AgentReplyBeginReducer),
+  __reducerSchema("agent_reply_finish", AgentReplyFinishReducer),
   __reducerSchema("create_dm", CreateDmReducer),
   __reducerSchema("create_group", CreateGroupReducer),
   __reducerSchema("leave_thread", LeaveThreadReducer),

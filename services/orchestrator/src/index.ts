@@ -34,7 +34,10 @@ export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orches
 
 export async function main(): Promise<void> {
   const { conn, identity } = await connectOrchestrator();
+  const orchestrator = createOrchestrator();
   console.info(`[orchestrator] connected as ${identity.toHexString()}`);
-  console.info(createOrchestrator().describe());
-  startReplyLoop(conn, identity);
+  console.info(orchestrator.describe());
+  startReplyLoop(conn, identity, orchestrator.config.gateway, {
+    model: orchestrator.config.defaultModel,
+  });
 }

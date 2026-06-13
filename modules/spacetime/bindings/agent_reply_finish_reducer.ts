@@ -10,12 +10,10 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default __t.row({
-  id: __t.u64().primaryKey(),
-  threadId: __t.u64().name("thread_id"),
-  sender: __t.identity(),
+export default {
+  runId: __t.string(),
   text: __t.string(),
-  sent: __t.timestamp(),
-  streamState: __t.string().name("stream_state"),
-  runId: __t.string().name("run_id"),
-});
+  ok: __t.bool(),
+  inputTokens: __t.u64(),
+  outputTokens: __t.u64(),
+};

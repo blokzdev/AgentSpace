@@ -33,8 +33,9 @@ A message row moves through a small state machine. Human messages are created
 **Contract:** consumers (the mobile client) must render `streaming` bodies as
 live/partial and only treat `complete` as final. The orchestrator MUST end every
 stream it starts in `complete` or `failed` (no dangling `streaming`). Producers:
-`modules/spacetime` reducers `send_message`, `agent_stream_update`,
-`agent_stream_finish`. Consumer: `apps/mobile` thread view. Cite both sides.
+`modules/spacetime` reducers `send_message`, `agent_reply_begin`,
+`agent_reply_append`, `agent_reply_finish`. Consumer: `apps/mobile` thread view
+(renders a streaming cursor on `streaming` rows). Cite both sides.
 
 ---
 
@@ -152,11 +153,17 @@ tool registry + MCP client + the agent loop (cite all).
 ## 6. Orchestrator ⇄ SpacetimeDB protocol (summary)
 
 - **Read:** orchestrator subscribes (as a service identity) to the work surface —
-  new `messages` in threads with an agent member, and due `workflow_schedules`.
-- **Write:** only via reducers — `agent_run_claim`, `agent_stream_update`,
-  `agent_stream_finish`, `run_finish`. No direct table writes; `ctx.sender` is the
-  service identity.
-- **Streaming cadence:** batched UPDATEs, ~50ms / N-token windows (BLUEPRINT §5).
+  new `messages` in threads with an agent member (`my_thread_messages` +
+  `my_thread_members`), and (later) due `workflow_schedules`.
+- **Write:** only via reducers. **Implemented (M1.6):** `agent_reply_begin(threadId,
+  runId, model)` (insert a `streaming` message + a `running` `run`),
+  `agent_reply_append(runId, text)` (UPDATE cumulative text), `agent_reply_finish(
+  runId, text, ok, inputTokens, outputTokens)` (final message state + run
+  status/tokens). Correlation is a **client-owned `runId`** (no row-id round-trip);
+  each reducer re-checks `ctx.sender` is the `agent` member / owns the row. No direct
+  table writes.
+- **Streaming cadence:** batched UPDATEs, ~50ms windows (BLUEPRINT §5) — a coalescing
+  batcher flushes the latest cumulative text.
 
 Any change to these reducers is a coupled change across `modules/spacetime` and
 `services/orchestrator` — update and cite both sides.

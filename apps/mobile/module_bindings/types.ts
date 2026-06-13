@@ -17,6 +17,7 @@ export const Message = __t.object("Message", {
   text: __t.string(),
   sent: __t.timestamp(),
   streamState: __t.string(),
+  runId: __t.string(),
 });
 export type Message = __Infer<typeof Message>;
 
@@ -28,6 +29,20 @@ export type MyThreadMessages = __Infer<typeof MyThreadMessages>;
 
 export const MyThreads = __t.object("MyThreads", {});
 export type MyThreads = __Infer<typeof MyThreads>;
+
+export const Run = __t.object("Run", {
+  id: __t.u64(),
+  runId: __t.string(),
+  threadId: __t.u64(),
+  agent: __t.identity(),
+  model: __t.string(),
+  status: __t.string(),
+  inputTokens: __t.u64(),
+  outputTokens: __t.u64(),
+  startedAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type Run = __Infer<typeof Run>;
 
 export const Thread = __t.object("Thread", {
   id: __t.u64(),

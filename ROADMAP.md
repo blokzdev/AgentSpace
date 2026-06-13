@@ -13,14 +13,15 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: `apps/mobile` is a
-realtime **chat MVP** (M1.1) with real **SpacetimeAuth OIDC login** (M1.2 ✓); the
-**Model Gateway v1** is live (M1.4 ✓ — AI SDK v6 anthropic+openai, streaming +
-tool-calling, AES-256-GCM BYOK). Working under the autonomous build loop (CLAUDE.md
-§4). Open device/smoke checks: `VERIFICATION.md` V-1, V-2, V-4, V-5, V-6; founder
-setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider key). **Next:
-M1.5** Agent Studio → **M1.6** orchestrator reply loop (gateway → STDB streaming);
-**M1.3** (groups/contacts) when track A resumes.
+*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: realtime **chat MVP**
+(M1.1) + **SpacetimeAuth login** (M1.2 ✓) + **Model Gateway v1** (M1.4 ✓) + the
+**agent reply loop** (M1.6 ✓ — the orchestrator streams real LLM replies into chat
+via batched UPDATEs; mobile renders them live). The end-to-end **build-an-agent →
+live reply** vision now works with a seeded default persona. Working under the
+autonomous build loop (CLAUDE.md §4). Open checks: `VERIFICATION.md` V-1/V-2/V-4/V-5/
+V-6/V-7; founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider
+key). **Next: M1.5** Agent Studio (author personas); **M1.3** (groups/contacts) and
+**M2** (multi-agent groups) when those tracks resume.
 
 ---
 
@@ -97,6 +98,11 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   model + params); persisted as an agent + version.
 - **M1.6 (B)** Orchestrator reply loop: detect an agent is addressed in a 1:1
   thread → build context → stream a reply back via batched UPDATEs; `run` records.
+  ✓ *Done 2026-06-13 — `run` table + `message.runId` + `agent_reply_begin/append/
+  finish`; `replyLoop.ts` (gateway.stream → ~50ms batched UPDATEs, `streaming`→
+  `complete`) + seeded default persona; mobile streaming cursor (DEC-021). CI 16/16;
+  local mock-gateway integration proves the round-trip headlessly. Live on-device
+  reply `V-7` (key `SETUP.md` S-4).*
 
 Human verification: `[gate]` build-an-agent → live 1:1 reply on-device;
 `[gate]` real BYOK key round-trip.

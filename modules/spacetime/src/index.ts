@@ -51,7 +51,10 @@ const threadMember = table(
 const message = table(
   {
     name: 'message',
-    indexes: [{ accessor: 'by_thread', algorithm: 'btree', columns: ['threadId'] }],
+    indexes: [
+      { accessor: 'by_thread', algorithm: 'btree', columns: ['threadId'] },
+      { accessor: 'by_run', algorithm: 'btree', columns: ['runId'] },
+    ],
   },
   {
     id: t.u64().primaryKey().autoInc(),
@@ -60,10 +63,33 @@ const message = table(
     text: t.string(),
     sent: t.timestamp(),
     streamState: t.string(), // 'streaming' | 'complete' | 'failed' (SPEC §1)
+    runId: t.string(), // agent reply correlation key ('' for human messages) — SPEC §6
   }
 );
 
-const spacetimedb = schema({ user, thread, threadMember, message });
+// Agent runs — the ledger for a single agent turn (private; orchestrator-owned).
+// Keyed by a client-supplied runId so the orchestrator streams without an id
+// round-trip. Tokens/cost feed metering (M5). SPEC §2.
+const run = table(
+  {
+    name: 'run',
+    indexes: [{ accessor: 'by_run', algorithm: 'btree', columns: ['runId'] }],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    runId: t.string(),
+    threadId: t.u64(),
+    agent: t.identity(),
+    model: t.string(),
+    status: t.string(), // 'queued'|'running'|'succeeded'|'failed'|'cancelled' (SPEC §2)
+    inputTokens: t.u64(),
+    outputTokens: t.u64(),
+    startedAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+const spacetimedb = schema({ user, thread, threadMember, message, run });
 export default spacetimedb;
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -135,7 +161,82 @@ export const send_message = spacetimedb.reducer(
       text,
       sent: ctx.timestamp,
       streamState: 'complete',
+      runId: '',
     });
+  }
+);
+
+// ── Agent reply streaming (SPEC §6) ──────────────────────────────────────────
+// The orchestrator (an `agent`-role member) writes a reply as a live message row:
+// begin (empty `streaming` row + run) → append* (cumulative text) → finish
+// (`complete`/`failed`). Correlation is the client-owned `runId`, so no row id is
+// round-tripped. Each reducer re-checks `ctx.sender` owns the work.
+
+export const agent_reply_begin = spacetimedb.reducer(
+  { threadId: t.u64(), runId: t.string(), model: t.string() },
+  (ctx, { threadId, runId, model }) => {
+    if (!runId) throw new SenderError('runId must not be empty');
+    const membership = [...ctx.db.threadMember.by_thread_member.filter([threadId, ctx.sender])];
+    if (membership.length === 0 || !membership.some((m) => m.role === 'agent')) {
+      throw new SenderError('Not an agent member of this thread');
+    }
+    if ([...ctx.db.run.by_run.filter(runId)].length > 0) throw new SenderError('Duplicate runId');
+    ctx.db.run.insert({
+      id: 0n,
+      runId,
+      threadId,
+      agent: ctx.sender,
+      model,
+      status: 'running',
+      inputTokens: 0n,
+      outputTokens: 0n,
+      startedAt: ctx.timestamp,
+      updatedAt: ctx.timestamp,
+    });
+    ctx.db.message.insert({
+      id: 0n,
+      threadId,
+      sender: ctx.sender,
+      text: '',
+      sent: ctx.timestamp,
+      streamState: 'streaming',
+      runId,
+    });
+  }
+);
+
+export const agent_reply_append = spacetimedb.reducer(
+  { runId: t.string(), text: t.string() },
+  (ctx, { runId, text }) => {
+    const msg = [...ctx.db.message.by_run.filter(runId)].find((m) => m.sender.isEqual(ctx.sender));
+    if (!msg) throw new SenderError('No streaming reply for this runId');
+    if (msg.streamState !== 'streaming') throw new SenderError('Reply already finished');
+    ctx.db.message.id.update({ ...msg, text });
+  }
+);
+
+export const agent_reply_finish = spacetimedb.reducer(
+  {
+    runId: t.string(),
+    text: t.string(),
+    ok: t.bool(),
+    inputTokens: t.u64(),
+    outputTokens: t.u64(),
+  },
+  (ctx, { runId, text, ok, inputTokens, outputTokens }) => {
+    const msg = [...ctx.db.message.by_run.filter(runId)].find((m) => m.sender.isEqual(ctx.sender));
+    if (!msg) throw new SenderError('No streaming reply for this runId');
+    ctx.db.message.id.update({ ...msg, text, streamState: ok ? 'complete' : 'failed' });
+    const r = [...ctx.db.run.by_run.filter(runId)].find((x) => x.agent.isEqual(ctx.sender));
+    if (r) {
+      ctx.db.run.id.update({
+        ...r,
+        status: ok ? 'succeeded' : 'failed',
+        inputTokens,
+        outputTokens,
+        updatedAt: ctx.timestamp,
+      });
+    }
   }
 );
 
