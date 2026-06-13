@@ -7,6 +7,9 @@ import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
 import AddMemberReducer from "../add_member_reducer";
+import AgentReplyAppendReducer from "../agent_reply_append_reducer";
+import AgentReplyBeginReducer from "../agent_reply_begin_reducer";
+import AgentReplyFinishReducer from "../agent_reply_finish_reducer";
 import CreateDmReducer from "../create_dm_reducer";
 import CreateGroupReducer from "../create_group_reducer";
 import LeaveThreadReducer from "../leave_thread_reducer";
@@ -14,6 +17,9 @@ import SendMessageReducer from "../send_message_reducer";
 import SetDisplayNameReducer from "../set_display_name_reducer";
 
 export type AddMemberParams = __Infer<typeof AddMemberReducer>;
+export type AgentReplyAppendParams = __Infer<typeof AgentReplyAppendReducer>;
+export type AgentReplyBeginParams = __Infer<typeof AgentReplyBeginReducer>;
+export type AgentReplyFinishParams = __Infer<typeof AgentReplyFinishReducer>;
 export type CreateDmParams = __Infer<typeof CreateDmReducer>;
 export type CreateGroupParams = __Infer<typeof CreateGroupReducer>;
 export type LeaveThreadParams = __Infer<typeof LeaveThreadReducer>;

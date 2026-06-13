@@ -155,3 +155,32 @@ Notes: <founder fills: device + OS + result>
   serve `claude-opus-4-8` (use that provider's model, or set `ANTHROPIC_API_KEY`).
   Tell me which.
 - **Notes (founder):** _provider + result →_
+
+---
+
+### V-7 — Live agent reply streams into a chat on-device  ·  added 2026-06-13 · M1.6
+- **Why:** the reply loop is proven headlessly with a **mock** gateway (local STDB
+  integration); this exercises it with a **real LLM** end-to-end — a human message
+  produces a token-by-token agent reply rendered live in the mobile thread. Depends
+  on **`SETUP.md` S-4** (a provider key) and a published module + a running orchestrator.
+- **Setup:**
+  1. Publish the module to your target server (local: `pnpm --filter
+     @agentspace/spacetime-module spacetime:publish:local` with `spacetime start`; or
+     Maincloud per S-3).
+  2. Run the orchestrator against that server with a key:
+     `ANTHROPIC_API_KEY=sk-ant-… AGENTSPACE_STDB_HOST=ws://<host>:3000
+     AGENTSPACE_STDB_DB=<db> pnpm --filter @agentspace/orchestrator start`. Note the
+     printed **orchestrator identity** hex.
+  3. In the mobile app (V-4 setup), create a thread, paste the orchestrator’s
+     identity hex into the add-member field, **toggle the role chip to `🤖 Agent`**,
+     and tap **Add**. *(Authoring named agents is M1.5; for V-7 the orchestrator
+     identity is the stand-in agent.)*
+- **Steps:** send a message in that thread.
+- **Pass when:** an agent reply appears as a **streaming** bubble (cursor `▍`) whose
+  text **grows token-by-token**, then settles to a final (`complete`) reply — no
+  dangling streaming bubble, no error.
+- **If it fails:** no reply at all → the orchestrator isn’t an `agent` member of the
+  thread, or its key/host is wrong (check its logs); a reply that never completes →
+  a gateway/provider error (the loop marks it `failed`). Capture the orchestrator
+  logs and tell me.
+- **Notes (founder):** _host (local/Maincloud) + provider + result →_

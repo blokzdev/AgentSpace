@@ -13,9 +13,15 @@
 
 *Last refreshed: 2026-06-13.*
 
-**M0 closed; in M1.** All three M0 spikes cleared; merged PRs #2–#9. **M1.1** chat
-MVP, **M1.2** SpacetimeAuth login (merged). **M1.4 done (this branch):** the
-**Model Gateway is real** — `packages/gateway` implements `createModelGateway` with
+**M0 closed; in M1.** All three M0 spikes cleared; merged PRs #2–#10. **M1.1** chat
+MVP, **M1.2** SpacetimeAuth login, **M1.4** Model Gateway (merged). **M1.6 done
+(this branch):** **agents now stream real replies into chat** — `modules/spacetime`
+gained a `run` table + `message.runId` + `agent_reply_begin/append/finish`; the
+orchestrator's `replyLoop.ts` reacts to a human message in a thread it's an `agent`
+member of, calls `gateway.stream`, and flushes ~50ms batched UPDATEs (`streaming`→
+`complete`); mobile shows a streaming cursor (DEC-021). Proven headlessly by the
+mock-gateway integration (real local STDB); live LLM reply on-device is `V-7`. CI
+16/16. **M1.4 recap:** the **Model Gateway is real** — `packages/gateway` implements `createModelGateway` with
 **streaming + tool-calling** on the **Vercel AI SDK v6** (provider registry:
 `anthropic` + `openai` live; `google`/`openai-compatible` inert) + **AES-256-GCM
 BYOK** key store + injected resolver (DEC-020). `embed`→M3.1; real LLM reply into
@@ -38,12 +44,12 @@ ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous l
   `node-linker=hoisted` (DEC-014).
 - **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
   (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
-- **Open device checks:** + V-6 (gateway smoke — real provider key).
+- **Open device checks:** + V-6 (gateway smoke), V-7 (live agent reply on-device).
 - **Open founder setup:** `SETUP.md` S-1/S-2/S-3 (SpacetimeAuth + Maincloud, before
-  V-5); S-4 (a provider API key, before V-6).
-- **Next:** **M1.5** Agent Studio (persona create/edit) → **M1.6** orchestrator
-  reply loop (gateway.stream → batched STDB UPDATEs); M1.3 (groups/contacts) when
-  track A resumes.
+  V-5); S-4 (a provider API key, before V-6 **and V-7**).
+- **Next:** **M1.5** Agent Studio (author personas: system prompt + model, persisted
+  as agents) — then richer multi-agent/group behavior is M2; M1.3 (groups/contacts)
+  when track A resumes.
 
 ---
 
@@ -261,6 +267,25 @@ round-trip is the founder smoke (V-6, key via SETUP.md S-4). Orchestrator builds
 gateway with `envResolver()`; the echo reply loop is untouched (real LLM reply into
 STDB is M1.6).
 
+### DEC-021 — Agent reply loop: client-owned runId, streaming reducers, seeded persona
+*2026-06-13.* M1.6 makes agents actually reply. **Choices:** (1) The orchestrator
+writes a reply as a **live message row** via three reducers —
+`agent_reply_begin`/`agent_reply_append`/`agent_reply_finish` — correlated by a
+**client-owned `runId`** (not the autoInc row id), so the orchestrator never needs a
+round-trip to learn the row id (avoids a correlation race). `message` gains a
+`runId` column (`''` for humans) + `by_run` index; a private **`run`** table records
+status/model/tokens. (2) The reply loop reacts to a human's `complete` message in a
+thread where the orchestrator is an **`agent`-role** member; loop-guarded by an
+in-flight `Set` + the `runId !== ''` / `sender == self` filters. (3) Streaming uses
+a **~50ms coalescing batcher** that flushes the latest cumulative text (BLUEPRINT
+§5). (4) v1 ships a **single seeded default persona** (system prompt + `DEFAULT_MODEL`
+in the orchestrator); authoring personas is M1.5. (5) Verified **headlessly**: the
+rewritten `scripts/integration.ts` injects a **mock gateway** and asserts a real
+local STDB round-trip (`streaming`→`complete` + live UPDATEs) — no API key; a real
+LLM reply on-device is `V-7`. (6) Mobile renders a streaming cursor; partial text
+already arrives via `useTable` (no other client change). Coupled SPEC §1/§6 +
+BLUEPRINT §3 updated. Fixed the publish script flag (`-p`, not `--project-path`).
+
 ---
 
 ## Session Journal (append-only)
@@ -369,6 +394,20 @@ STDB is M1.6).
   Real provider round-trip → `V-6`; provider key → `SETUP.md` S-4.
 - **Next:** **M1.5** Agent Studio, then **M1.6** wires `gateway.stream` into the
   orchestrator reply loop (streaming UPDATEs into STDB).
+
+### 2026-06-13 — M1.6 agent reply loop (gateway → streamed STDB reply)
+- Closed the agent loop: `modules/spacetime` gained a private `run` table +
+  `message.runId` + `agent_reply_begin/append/finish` (client-owned runId; agent-
+  membership gated). Rebuilt/published the module locally, regenerated bindings, and
+  synced them into `packages/stdb-bindings` + `apps/mobile/module_bindings` (DEC-021).
+- Orchestrator `replyLoop.ts` rewrite (gateway-driven + ~50ms coalescing batcher) +
+  pure `prompt.ts` helpers; mobile streaming cursor. Fixed the publish flag (`-p`).
+- **Verified:** CI 16/16 (6 orchestrator tests incl. batcher/prompt); **local
+  headless integration passed** — a mock gateway streamed "Hello, world!" through a
+  real local STDB, asserted `streaming`→`complete` + live UPDATEs; Android bundle
+  clean (609 modules). Live LLM reply on-device → `V-7`.
+- **Next:** **M1.5** Agent Studio (author personas) so users build their own agents
+  beyond the seeded default.
 
 ---
 

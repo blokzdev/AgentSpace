@@ -1,24 +1,106 @@
-// The subscribe -> react -> reduce loop agent replies will use (SPEC §6). For
-// M0.4 the "reply" is a literal echo — the Model Gateway (real LLM reply) lands
-// in M1.4. The orchestrator only ever sees threads it's a member of, via the
-// membership-scoped my_thread_messages View.
+// Agent reply loop (SPEC §6): when a human posts to a thread the orchestrator is
+// an `agent`-role member of, build context, stream a reply from the Model Gateway,
+// and write it into STDB as a live message row (begin → append* → finish) via
+// batched UPDATEs (BLUEPRINT §5). Correlation is a client-owned runId.
 import { Identity } from 'spacetimedb';
+import type { ModelGateway } from '@agentspace/gateway';
+import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
 import { DbConnection } from '@agentspace/stdb-bindings';
+import { buildPrompt, createBatcher, newRunId, type PromptRow } from './prompt';
 
-const ECHO_PREFIX = '(orchestrator echo)';
+const FLUSH_MS = 50;
 
-export function startReplyLoop(conn: DbConnection, self: Identity): void {
+export interface ReplyLoopOptions {
+  model?: ModelRef;
+  flushMs?: number;
+  systemPrompt?: string;
+}
+
+export function startReplyLoop(
+  conn: DbConnection,
+  self: Identity,
+  gateway: ModelGateway,
+  opts: ReplyLoopOptions = {},
+): void {
+  const model = opts.model ?? DEFAULT_MODEL;
+  const flushMs = opts.flushMs ?? FLUSH_MS;
+  const active = new Set<bigint>(); // threads with a reply in flight (loop guard)
+
   conn
     .subscriptionBuilder()
     .onApplied(() => {
-      console.info('[orchestrator] subscribed to my_thread_messages');
+      console.info('[orchestrator] reply loop subscribed');
     })
-    .subscribe(['SELECT * FROM my_thread_messages']);
+    .subscribe(['SELECT * FROM my_thread_messages', 'SELECT * FROM my_thread_members']);
 
   conn.db.my_thread_messages.onInsert((_ctx, msg) => {
-    if (msg.sender.isEqual(self)) return; // never echo ourselves
-    if (msg.streamState !== 'complete') return; // ignore in-flight streams
-    if (msg.text.startsWith(ECHO_PREFIX)) return; // belt-and-suspenders loop guard
-    conn.reducers.sendMessage({ threadId: msg.threadId, text: `${ECHO_PREFIX} ${msg.text}` });
+    if (msg.sender.isEqual(self)) return; // our own writes
+    if (msg.streamState !== 'complete') return; // an in-flight stream
+    if (msg.runId !== '') return; // another agent's reply
+    if (active.has(msg.threadId)) return; // already replying in this thread
+    if (!isAgentMemberOf(conn, self, msg.threadId)) return; // we're not the agent here
+    void handleReply(conn, self, gateway, model, flushMs, opts.systemPrompt, msg.threadId, active);
   });
+}
+
+function isAgentMemberOf(conn: DbConnection, self: Identity, threadId: bigint): boolean {
+  for (const m of conn.db.my_thread_members.iter()) {
+    if (m.threadId === threadId && m.member.isEqual(self) && m.role === 'agent') return true;
+  }
+  return false;
+}
+
+async function handleReply(
+  conn: DbConnection,
+  self: Identity,
+  gateway: ModelGateway,
+  model: ModelRef,
+  flushMs: number,
+  systemPrompt: string | undefined,
+  threadId: bigint,
+  active: Set<bigint>,
+): Promise<void> {
+  active.add(threadId);
+  const runId = newRunId(self.toHexString());
+  let acc = '';
+  const batcher = createBatcher({
+    intervalMs: flushMs,
+    onFlush: (text) => conn.reducers.agentReplyAppend({ runId, text }),
+  });
+
+  try {
+    const rows: PromptRow[] = [];
+    for (const m of conn.db.my_thread_messages.iter()) {
+      if (m.threadId === threadId) {
+        rows.push({ isAgent: m.sender.isEqual(self), text: m.text, sentMicros: m.sent.microsSinceUnixEpoch });
+      }
+    }
+    const messages = buildPrompt(rows, systemPrompt);
+
+    conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
+
+    let usage = { inputTokens: 0, outputTokens: 0 };
+    for await (const delta of gateway.stream({ model, credentialRef: model.provider, messages })) {
+      if (delta.type === 'text') {
+        acc += delta.text;
+        batcher.push(acc);
+      } else if (delta.type === 'finish') {
+        usage = delta.usage;
+      }
+    }
+    batcher.stop();
+    conn.reducers.agentReplyFinish({
+      runId,
+      text: acc,
+      ok: true,
+      inputTokens: BigInt(usage.inputTokens),
+      outputTokens: BigInt(usage.outputTokens),
+    });
+  } catch (err) {
+    batcher.stop();
+    console.warn('[orchestrator] reply failed:', err instanceof Error ? err.message : err);
+    conn.reducers.agentReplyFinish({ runId, text: acc, ok: false, inputTokens: 0n, outputTokens: 0n });
+  } finally {
+    active.delete(threadId);
+  }
 }
