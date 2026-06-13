@@ -31,4 +31,5 @@ target/
 
 # Local env overrides (commit *.env.example instead)
 .env
-.env.*.local
+.env.local
+.env*.local

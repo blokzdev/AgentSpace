@@ -12,7 +12,13 @@ import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { reducers, tables } from '../../module_bindings';
 import { colors, shortId } from '../chat';
 
-export function ThreadList({ onOpen }: { onOpen: (id: bigint) => void }): React.JSX.Element {
+export function ThreadList({
+  onOpen,
+  onSignOut,
+}: {
+  onOpen: (id: bigint) => void;
+  onSignOut: () => void;
+}): React.JSX.Element {
   const { identity } = useSpacetimeDB();
   const [threads] = useTable(tables.my_threads);
   const [users] = useTable(tables.user);
@@ -32,7 +38,12 @@ export function ThreadList({ onOpen }: { onOpen: (id: bigint) => void }): React.
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>AgentSpace</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>AgentSpace</Text>
+          <Pressable onPress={onSignOut} hitSlop={8}>
+            <Text style={styles.signOut}>Sign out</Text>
+          </Pressable>
+        </View>
         <Text style={styles.you}>You: {myName}</Text>
         {identity ? <Text selectable style={styles.id}>{identity.toHexString()}</Text> : null}
       </View>
@@ -96,7 +107,9 @@ export function ThreadList({ onOpen }: { onOpen: (id: bigint) => void }): React.
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
   header: { marginBottom: 16 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.text, fontSize: 22, fontWeight: '700' },
+  signOut: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   you: { color: colors.dim, marginTop: 4 },
   id: { color: colors.faint, fontSize: 11, marginTop: 2 },
   row: { flexDirection: 'row', gap: 8, marginBottom: 10 },

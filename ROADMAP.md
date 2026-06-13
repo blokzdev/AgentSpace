@@ -13,13 +13,13 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: `apps/mobile` is now a
-realtime **chat MVP** on the `agentspace` module (M1.1 — thread list + thread view
-+ composer + presence; typechecks/lints/bundles for Android; behavior = `V-4`).
-M0.5 (auth) was folded into M1 as **M1.2** (SpacetimeAuth OIDC login). Working under
-the autonomous build loop (CLAUDE.md §4). Open device checks: `VERIFICATION.md`
-V-1, V-2, V-4. **Next: M1.2** — SpacetimeAuth login (replace anonymous identity);
-then M1.4 Model Gateway + M1.5 Agent Studio + M1.6 agent replies.
+*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: `apps/mobile` is a
+realtime **chat MVP** (M1.1) with real **SpacetimeAuth OIDC login** (M1.2 ✓ —
+`expo-auth-session` code+PKCE → `withToken`; CI green, Android bundle clean).
+Working under the autonomous build loop (CLAUDE.md §4). Open device checks:
+`VERIFICATION.md` V-1, V-2, V-4, V-5; founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth
+client_id + redirect + Maincloud publish). **Next: M1.3** (groups/contacts) or
+**M1.4** (Model Gateway v1) → M1.5 Agent Studio → M1.6 agent replies.
 
 ---
 
@@ -78,8 +78,11 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   presence, create group + add-member. ✓ *Done 2026-06-13 — typechecks/lints/
   bundles for Android; on-device behavior `V-4`. Anonymous identity until M1.2.*
 - **M1.2 (A)** **SpacetimeAuth** login (OIDC via `expo-auth-session`): real device
-  login → ID token → stable `Identity`; orchestrator service account; replaces the
-  anonymous token. (Was M0.5.)
+  login → ID token → stable `Identity`; replaces the anonymous token. ✓ *Done
+  2026-06-13 — `src/auth.ts` (code+PKCE, SecureStore refresh-token persistence) +
+  `Login` screen + `App.tsx` `.withToken()` gate (DEC-019). CI 16/16; Android bundle
+  clean. Founder setup `SETUP.md` S-1…S-3; on-device login `V-5`. Orchestrator
+  service account deferred to `OT-007` (was bundled here).*
 - **M1.3 (A)** Group/membership management + contacts/user-search (beyond
   add-by-identity-hex).
 - **M1.4 (B)** Model Gateway v1: Vercel AI SDK with **two providers** (Anthropic +

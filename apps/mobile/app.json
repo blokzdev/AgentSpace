@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "AgentSpace Probe",
+    "name": "AgentSpace",
     "slug": "agentspace-probe",
+    "scheme": "agentspace",
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
