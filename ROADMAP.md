@@ -13,9 +13,10 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* Plan ratified; doc suite authored. Entering **M0**. Only the
-reference app (`examples/chat-react-ts`) and the operating harness exist. The
-top open risk is RN↔SpacetimeDB compatibility (OT-003).
+*2026-06-13.* In **M0**. Done: doc suite, monorepo + CI (M0.1), RN↔STDB spike +
+Expo probe (M0.2/M0.2b — bundles clean; device run is `VERIFICATION.md` V-1).
+Working under the autonomous build loop (CLAUDE.md §4). Next: **M0.3** — the
+AgentSpace SpacetimeDB module + access-control (Views) spike.
 
 ---
 
@@ -29,11 +30,12 @@ client; and the three spikes are decided and recorded as DEC entries.
 - **M0.1 — Monorepo & CI.** pnpm workspaces (+ Turborepo); packages per the
   BLUEPRINT layout; TS strict; CI workflow (lint/typecheck/build/test, with
   concurrency-cancel). *Separate scaffold PR(s) from execution PRs.*
-- **M0.2 — Spike: RN ↔ SpacetimeDB (OT-003).** ◑ *Static analysis done
-  (2026-06-13): **GO**, two polyfills, no bridge — DEC-012,
-  `.audit/spike-rn-stdb-2026-06-13.md`.* Remaining: **M0.2b** scaffold the Expo
-  probe (polyfills + connect/subscribe/reducer screen) for the on-device `[gate]`
-  (no Android device in CI).
+- **M0.2 — Spike: RN ↔ SpacetimeDB (OT-003).** ✓ *Done (2026-06-13): **GO**,
+  two polyfills, no bridge — DEC-012, `.audit/spike-rn-stdb-2026-06-13.md`.*
+- **M0.2b — Expo connectivity probe.** ✓ *Done: `apps/mobile` probe typechecks,
+  lints, and bundles for Android via Metro (561 modules) — DEC-014. Live device
+  connect is `VERIFICATION.md` V-1 (founder). Bindings vendored from the example
+  until M0.3.*
 - **M0.3 — Spike: module language & access control (DEC-007).** Stand up a TS
   module with `users`/`threads`/`thread_members`/`messages`; prove per-user
   `ViewContext` Views hide non-member rows from a subscribing client. Record

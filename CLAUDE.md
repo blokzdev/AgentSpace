@@ -108,17 +108,29 @@ Every session runs in a fresh container; the **git repo is the only memory**.
 
 ---
 
-## 4. Plan / execute / review separation
+## 4. Plan / execute / review separation — the autonomous build loop
 
-Three distinct turns; never collapse them:
+Work proceeds in **chunks** (a phase or a coherent slice of one). Each chunk runs
+the same loop:
 
-1. **Plan** — a write-plan, ratified by the founder before code starts.
-2. **Execute** — code edits + commits, narrated tersely.
-3. **Review** — PR opened, CI green, merge.
+1. **Plan** — present a write-plan **in Plan Mode** for the chunk; the founder
+   ratifies (or redlines) before any code.
+2. **Execute** — on approval, build autonomously: code + tests + docs, narrated
+   tersely. Surface only decisions that genuinely need founder input, and **mark a
+   recommended option** when you do.
+3. **Review** — open a PR. **Auto-merge + auto-delete-branch are enabled**, so the
+   AI watches CI and **fixes failures until green**; the PR then merges itself
+   (§6). On merge, return to step 1 (Plan Mode) for the next chunk.
 
-**Plan-overhead threshold.** A write-plan is required when a phase has **>3
-tasks OR >1 working day** of effort. Below that, execute inline against the
-ROADMAP/MEMORY checklist — no ceremony.
+The founder has granted autonomy: proceed through the loop without waiting for
+per-step nods, pausing only for the Plan-Mode ratification and for surfaced
+decisions. Test everything testable on the AI side at every checkpoint; **assume
+things are fine and keep moving unless the founder reports a problem** (e.g. an
+on-device issue from `VERIFICATION.md`).
+
+**Plan-overhead threshold.** A full write-plan is expected per chunk under this
+loop. Truly trivial fixes (typo, one-liner) may skip the ceremony and go straight
+to a PR.
 
 **Five-field write-plan template** (restate in this order):
 
@@ -129,10 +141,13 @@ ROADMAP/MEMORY checklist — no ceremony.
    build, tests).
 5. **Out of scope** — what we are NOT doing, even if tempting.
 
-Plus a separate **Human Verification** list (§ below) for anything code can't
-check — tagged `[gate]` (blocks merge), `[smoke]` (this phase), `[spot-check]`
-(when convenient). The AI never self-ticks a human-verification item; only an
-explicit "verified" line from the founder closes one.
+**Human / on-device verification → `VERIFICATION.md`.** Anything code can't check
+(on-device behavior, real-world flows, native quirks) is **batched into the
+founder-owned `VERIFICATION.md`** as a numbered item (`V-1`, `V-2`, …) with exact
+run steps and pass/fail criteria. The AI **never self-ticks** these and **never
+blocks the loop** on them — it records the item, assumes green, and continues.
+The founder works through `VERIFICATION.md` independently and raises any failure;
+only the founder marks an item done.
 
 ---
 
@@ -158,9 +173,14 @@ Protocol §3.2** run.
 - Reference the phase ID in the commit body (`Closes M1.4.`) once roadmaps exist.
 - One commit per phase when work is small/coherent (≤3 files); multiple commits
   at natural checkpoints otherwise.
-- **Branch hygiene:** feature branch per session; never push to `main` from an
-  agent session; open a PR and let CI gate the merge.
-- This repo's active development branch is recorded in `MEMORY.md`'s Snapshot.
+- **Branch hygiene:** one branch **per chunk**, cut off the latest `main`; never
+  push to `main` directly.
+- **Auto-merge + auto-delete-branch are enabled** on the repo. Open the PR as
+  ready-for-review; CI is the gate. The AI watches CI and **fixes until green**;
+  the PR then auto-merges and the branch is deleted. The AI does not poll for
+  merges — it proceeds to plan the next chunk, and a CI-failure webhook will
+  interrupt if a fix is needed.
+- The active branch is recorded in `MEMORY.md`'s Snapshot.
 
 ---
 
@@ -211,9 +231,12 @@ AgentSpace/
 ├── CLAUDE.md · MEMORY.md · ROADMAP.md · PRD.md       # operating + vision docs
 │   · BLUEPRINT.md · SPEC.md · BACKLOG.md · README.md
 ├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
-│   · tsconfig.base.json · eslint.config.mjs · .nvmrc
+│   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc · VERIFICATION.md
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
+├── apps/
+│   └── mobile/                # Expo (RN) connectivity probe — M0.2b
+│       · module_bindings/     # vendored from the example (temporary, M0.3 swap)
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
 │   └── gateway/               # Model Gateway interface + stub (M1.4 fills in)
@@ -223,15 +246,22 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 in progress).** The monorepo + CI exist and are green (M0.1). Two
-product packages are skeletons (`gateway` is a stub; `orchestrator` wires the
-graph but does no real work yet). **Not yet created:** `apps/mobile` (Expo,
-M0.2b) and `modules/spacetime` (M0.3) — see `BLUEPRINT.md` §2 for the full module
-graph + one-way dependency rules. The RN↔SpacetimeDB spike (M0.2) concluded GO
-with two polyfills (`.audit/spike-rn-stdb-2026-06-13.md`, DEC-012).
+**Status (M0 in progress).** Monorepo + CI exist and are green (M0.1). `gateway`
+is a stub, `orchestrator` wires the graph but does no real work yet. `apps/mobile`
+(M0.2b) is the Expo **connectivity probe**: it typechecks, lints, and **bundles
+for Android via Metro** (`npx expo export -p android` → ~1.9 MB Hermes bundle,
+561 modules) — strong evidence the SpacetimeDB TS client works under RN; the
+runtime connect is the on-device check `V-1` in `VERIFICATION.md`. **Not yet
+created:** `modules/spacetime` (M0.3). See `BLUEPRINT.md` §2 for the module graph.
+
+**pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
+resolve transitive deps under the workspace; Metro also needs
+`unstable_enablePackageExports` (set in `apps/mobile/metro.config.js`) to resolve
+the SDK's `spacetimedb/react` subpath.
 
 Workspace commands (from repo root): `pnpm install`, then `pnpm run ci`
 (= lint · typecheck · build · test), or `pnpm run {lint,typecheck,build,test}`.
+Mobile: `pnpm --filter @agentspace/mobile {start,android,export:android}`.
 
 ### Toolchain (verified present in the dev container)
 

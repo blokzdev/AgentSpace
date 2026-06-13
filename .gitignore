@@ -9,6 +9,10 @@ build/
 # Turborepo
 .turbo/
 
+# Expo
+.expo/
+*.expo/
+
 # Logs
 *.log
 npm-debug.log*

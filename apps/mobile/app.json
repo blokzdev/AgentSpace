@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "AgentSpace Probe",
+    "slug": "agentspace-probe",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.agentspace.probe"
+    }
+  }
+}
