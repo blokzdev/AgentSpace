@@ -1,0 +1,127 @@
+import { useState } from 'react';
+import {
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
+import { reducers, tables } from '../../module_bindings';
+import { colors, shortId } from '../chat';
+
+export function ThreadList({ onOpen }: { onOpen: (id: bigint) => void }): React.JSX.Element {
+  const { identity } = useSpacetimeDB();
+  const [threads] = useTable(tables.my_threads);
+  const [users] = useTable(tables.user);
+  const setDisplayName = useReducer(reducers.setDisplayName);
+  const createGroup = useReducer(reducers.createGroup);
+
+  const [name, setName] = useState('');
+  const [title, setTitle] = useState('');
+
+  const me = identity ? users.find((u) => u.identity.isEqual(identity)) : undefined;
+  const myName = me?.displayName ?? (identity ? shortId(identity) : '—');
+
+  const sorted = [...threads].sort((a, b) =>
+    a.createdAt.microsSinceUnixEpoch < b.createdAt.microsSinceUnixEpoch ? 1 : -1,
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>AgentSpace</Text>
+        <Text style={styles.you}>You: {myName}</Text>
+        {identity ? <Text selectable style={styles.id}>{identity.toHexString()}</Text> : null}
+      </View>
+
+      <View style={styles.row}>
+        <TextInput
+          style={styles.input}
+          placeholder="Set display name"
+          placeholderTextColor={colors.faint}
+          value={name}
+          onChangeText={setName}
+        />
+        <Pressable
+          style={styles.btn}
+          onPress={() => {
+            if (name.trim().length === 0) return;
+            void setDisplayName({ name: name.trim() });
+            setName('');
+          }}
+        >
+          <Text style={styles.btnText}>Save</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.row}>
+        <TextInput
+          style={styles.input}
+          placeholder="New group title"
+          placeholderTextColor={colors.faint}
+          value={title}
+          onChangeText={setTitle}
+        />
+        <Pressable
+          style={styles.btn}
+          onPress={() => {
+            if (title.trim().length === 0) return;
+            void createGroup({ title: title.trim() });
+            setTitle('');
+          }}
+        >
+          <Text style={styles.btnText}>Create</Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.section}>Threads</Text>
+      <FlatList
+        data={sorted}
+        keyExtractor={(t) => t.id.toString()}
+        ListEmptyComponent={<Text style={styles.empty}>No threads yet — create a group above.</Text>}
+        renderItem={({ item }) => (
+          <Pressable style={styles.thread} onPress={() => onOpen(item.id)}>
+            <Text style={styles.threadTitle}>{item.title ?? `${item.kind} #${item.id.toString()}`}</Text>
+            <Text style={styles.threadMeta}>{item.kind}</Text>
+          </Pressable>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
+  header: { marginBottom: 16 },
+  title: { color: colors.text, fontSize: 22, fontWeight: '700' },
+  you: { color: colors.dim, marginTop: 4 },
+  id: { color: colors.faint, fontSize: 11, marginTop: 2 },
+  row: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  input: {
+    flex: 1,
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: colors.text,
+    height: 42,
+  },
+  btn: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, justifyContent: 'center' },
+  btnText: { color: '#06101d', fontWeight: '700' },
+  section: { color: colors.dim, marginTop: 12, marginBottom: 6, fontSize: 13, textTransform: 'uppercase' },
+  empty: { color: colors.faint, marginTop: 16 },
+  thread: {
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 8,
+  },
+  threadTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  threadMeta: { color: colors.faint, fontSize: 12, marginTop: 2 },
+});

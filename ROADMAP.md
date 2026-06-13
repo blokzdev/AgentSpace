@@ -13,23 +13,28 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* In **M0**, nearly complete. Done: doc suite, monorepo + CI (M0.1),
-RN↔STDB spike + Expo probe (M0.2/M0.2b), module + access-control (M0.3),
-orchestrator as a trusted client (M0.4 — connect → subscribe → reduce, proven
-end-to-end). All three risky spikes cleared on the AI side. Working under the
-autonomous build loop (CLAUDE.md §4). Open device/manual checks: `VERIFICATION.md`
-V-1 (RN connect), V-2 (non-member view scoping). **Next: M0.5** — choose + wire the
-OIDC auth provider (device login + a real orchestrator service account), then
-close M0 and open **M1** (realtime chat + Agent MVP).
+*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: `apps/mobile` is now a
+realtime **chat MVP** on the `agentspace` module (M1.1 — thread list + thread view
++ composer + presence; typechecks/lints/bundles for Android; behavior = `V-4`).
+M0.5 (auth) was folded into M1 as **M1.2** (SpacetimeAuth OIDC login). Working under
+the autonomous build loop (CLAUDE.md §4). Open device checks: `VERIFICATION.md`
+V-1, V-2, V-4. **Next: M1.2** — SpacetimeAuth login (replace anonymous identity);
+then M1.4 Model Gateway + M1.5 Agent Studio + M1.6 agent replies.
 
 ---
 
-## M0 — Foundations & spikes
+## M0 — Foundations & spikes  ✓ CLOSED (2026-06-13)
 
 **Acceptance bar:** the monorepo builds in CI (lint + typecheck + build + test
 green); an Expo app connects to a published SpacetimeDB module from a device/
 emulator and renders a live row; the orchestrator writes a row as a trusted
 client; and the three spikes are decided and recorded as DEC entries.
+
+*Outcome: monorepo + CI (M0.1), RN↔STDB GO + Expo probe (M0.2/M0.2b), module +
+Views access-control (M0.3), orchestrator round-trip (M0.4), doc suite (M0.6) — all
+done; the three risky spikes cleared on the AI side. M0.5 (auth) relocated to M1.2.
+Device checks V-1/V-2 pending (non-blocking). Drift-sweep deferred (docs kept
+current per-PR; run `/audit` on demand).*
 
 - **M0.1 — Monorepo & CI.** pnpm workspaces (+ Turborepo); packages per the
   BLUEPRINT layout; TS strict; CI workflow (lint/typecheck/build/test, with
@@ -52,12 +57,12 @@ client; and the three spikes are decided and recorded as DEC entries.
   round-trip) by the local integration script —
   `.audit/spike-orchestrator-client-2026-06-13.md`. Uses a persisted anonymous
   token; real OIDC service account is M0.5.*
-- **M0.5 — Auth wiring.** Choose + wire the OIDC provider (SpacetimeAuth built-in
-  vs Auth0/Clerk); device login → stable `Identity`.
-- **M0.6 — Doc suite & code-reality.** (this PR) ROADMAP/PRD/BLUEPRINT/SPEC/
-  BACKLOG + CLAUDE.md §9 + MEMORY updated.
+- **M0.5 — Auth wiring.** → **relocated to M1.2** (founder DEC: close M0, fold auth
+  into M1 with SpacetimeAuth built-in OIDC).
+- **M0.6 — Doc suite & code-reality.** ✓ *Done — the doc suite + per-PR code-reality
+  updates.*
 
-Human verification: `[gate]` Expo app connects to STDB on a real Android device.
+Human verification: V-1 (Expo connect on a real Android device).
 
 ---
 
@@ -67,11 +72,16 @@ Human verification: `[gate]` Expo app connects to STDB on a real Android device.
 streamed 1:1 conversation with it on-device; the same app supports human↔human
 1:1 and group threads with presence.
 
-- **M1.1 (A)** Data model v1 + reducers: users, threads, thread_members, messages,
-  presence; membership-scoped Views.
-- **M1.2 (A)** Mobile chat UI: thread list, thread view, composer, presence,
-  optimistic send.
-- **M1.3 (A)** Group threads + membership management.
+- **M1.0 (A)** Realtime data model + reducers + membership Views. ✓ *Delivered in
+  M0.3 (`modules/spacetime`).*
+- **M1.1 (A)** Mobile realtime **chat MVP**: thread list, thread view, composer,
+  presence, create group + add-member. ✓ *Done 2026-06-13 — typechecks/lints/
+  bundles for Android; on-device behavior `V-4`. Anonymous identity until M1.2.*
+- **M1.2 (A)** **SpacetimeAuth** login (OIDC via `expo-auth-session`): real device
+  login → ID token → stable `Identity`; orchestrator service account; replaces the
+  anonymous token. (Was M0.5.)
+- **M1.3 (A)** Group/membership management + contacts/user-search (beyond
+  add-by-identity-hex).
 - **M1.4 (B)** Model Gateway v1: Vercel AI SDK with **two providers** (Anthropic +
   one of OpenAI/Google), streaming + tool-calling interface; BYOK key store
   (encrypted) and resolution.

@@ -8,18 +8,49 @@ import {
   t as __t,
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
-} from 'spacetimedb';
+} from "spacetimedb";
 
-export const Message = __t.object('Message', {
+export const Message = __t.object("Message", {
+  id: __t.u64(),
+  threadId: __t.u64(),
   sender: __t.identity(),
-  sent: __t.timestamp(),
   text: __t.string(),
+  sent: __t.timestamp(),
+  streamState: __t.string(),
 });
 export type Message = __Infer<typeof Message>;
 
-export const User = __t.object('User', {
+export const MyThreadMembers = __t.object("MyThreadMembers", {});
+export type MyThreadMembers = __Infer<typeof MyThreadMembers>;
+
+export const MyThreadMessages = __t.object("MyThreadMessages", {});
+export type MyThreadMessages = __Infer<typeof MyThreadMessages>;
+
+export const MyThreads = __t.object("MyThreads", {});
+export type MyThreads = __Infer<typeof MyThreads>;
+
+export const Thread = __t.object("Thread", {
+  id: __t.u64(),
+  kind: __t.string(),
+  title: __t.option(__t.string()),
+  createdBy: __t.identity(),
+  createdAt: __t.timestamp(),
+});
+export type Thread = __Infer<typeof Thread>;
+
+export const ThreadMember = __t.object("ThreadMember", {
+  id: __t.u64(),
+  threadId: __t.u64(),
+  member: __t.identity(),
+  role: __t.string(),
+  joinedAt: __t.timestamp(),
+});
+export type ThreadMember = __Infer<typeof ThreadMember>;
+
+export const User = __t.object("User", {
   identity: __t.identity(),
-  name: __t.option(__t.string()),
+  displayName: __t.option(__t.string()),
   online: __t.bool(),
 });
 export type User = __Infer<typeof User>;
+

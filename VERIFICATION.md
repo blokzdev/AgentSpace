@@ -73,3 +73,28 @@ Notes: <founder fills: device + OS + result>
 - **If it fails (B sees A's rows):** the Views aren't scoping by `ctx.sender` as
   expected — revisit the view definitions / consider RLS. Tell me.
 - **Notes (founder):** _result →_
+
+---
+
+### V-4 — Mobile realtime chat (human↔human)  ·  added 2026-06-13 · M1.1
+- **Why:** the mobile chat MVP renders + behaves correctly on a device (the UI is
+  the only part CI can't check; it typechecks, lints, and **bundles clean for
+  Android**). Exercises threads, messages, presence on our `agentspace` module.
+- **Setup:** `spacetime start`; from `modules/spacetime`:
+  `spacetime publish agentspace -p . --server local --yes`. Build/run the app on
+  **two** Android emulators/devices (`pnpm --filter @agentspace/mobile android`),
+  each pointed at the server: `EXPO_PUBLIC_SPACETIMEDB_HOST=ws://<host-ip>:3000`
+  (emulator default `ws://10.0.2.2:3000`).
+- **Steps:**
+  1. On both: app shows "Connecting…" then the thread list; each shows **its own
+     identity hex** at the top. Set a display name on each.
+  2. On **A**: create a group; open it; copy **B**'s identity hex into "Add member
+     by identity hex" → Add.
+  3. Both open the thread; send messages back and forth.
+- **Pass when:** the thread appears on **B** after being added; messages from each
+  appear on the other **in real time** with sender names + times; a sender's
+  display-name change and online/offline presence reflect across devices.
+- **If it fails:** capture the red-box / logcat and tell me. The data layer
+  (reducers + Views) is already proven headlessly (M0.3/M0.4), so failures are
+  most likely UI/subscription wiring.
+- **Notes (founder):** _devices + OS + result →_
