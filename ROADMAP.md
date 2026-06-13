@@ -29,10 +29,11 @@ client; and the three spikes are decided and recorded as DEC entries.
 - **M0.1 — Monorepo & CI.** pnpm workspaces (+ Turborepo); packages per the
   BLUEPRINT layout; TS strict; CI workflow (lint/typecheck/build/test, with
   concurrency-cancel). *Separate scaffold PR(s) from execution PRs.*
-- **M0.2 — Spike: RN ↔ SpacetimeDB (OT-003, [critical]).** Minimal Expo app +
-  SpacetimeDB TS client: prove WebSocket connect, a subscription, and a reducer
-  call on Hermes (Android). Decide go / polyfill / bridge / alternative. Record
-  DEC.
+- **M0.2 — Spike: RN ↔ SpacetimeDB (OT-003).** ◑ *Static analysis done
+  (2026-06-13): **GO**, two polyfills, no bridge — DEC-012,
+  `.audit/spike-rn-stdb-2026-06-13.md`.* Remaining: **M0.2b** scaffold the Expo
+  probe (polyfills + connect/subscribe/reducer screen) for the on-device `[gate]`
+  (no Android device in CI).
 - **M0.3 — Spike: module language & access control (DEC-007).** Stand up a TS
   module with `users`/`threads`/`thread_members`/`messages`; prove per-user
   `ViewContext` Views hide non-member rows from a subscribing client. Record

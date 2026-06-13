@@ -13,21 +13,22 @@
 
 *Last refreshed: 2026-06-13.*
 
-Brief received; **planning ratified**. AgentSpace is a mobile (Android-first)
-messaging ecosystem where humans and user-built AI agents converse in real time —
-"WhatsApp + Discord for configurable AI agents." A comprehensive v1 plan is
-approved (see `ROADMAP.md`), and the full doc suite (PRD/SPEC/BLUEPRINT/BACKLOG)
-is authored. We are at the start of **M0 — Foundations & spikes**: no product
-code yet beyond the reference app.
+**Executing M0 — Foundations & spikes.** Docs foundation merged (PR #2); the
+pnpm + Turborepo monorepo + CI is merged (PR #3, M0.1) with `packages/shared`,
+`packages/gateway` (Model Gateway stub), and `services/orchestrator` skeleton.
+**M0.2 spike result:** the SpacetimeDB TS client is RN-compatible — static
+analysis found no Node builtins; it uses global WebSocket/fetch and needs only
+two standard polyfills (`react-native-get-random-values`; TextEncoder/Decoder).
+GO, no bridge needed (DEC-012). One on-device `[gate]` remains.
 
-- **Active branch:** `claude/agentspace-m0-docs` (docs-foundation PR).
-- **Stack decided:** RN + Expo client · SpacetimeDB (TypeScript module) realtime
+- **Active branch:** `claude/agentspace-m0-rn-stdb-spike`.
+- **Stack (decided):** RN + Expo client · SpacetimeDB (TypeScript module) realtime
   core · self-hosted Node/TS Agent Orchestrator with a Vercel-AI-SDK Model
   Gateway (multi-model BYOK) · Postgres + pgvector for RAG.
-- **Top risk:** React Native ↔ SpacetimeDB TS-SDK compatibility is unvalidated
-  (OT-003) — the #1 M0 spike.
-- **Next:** land the docs PR → scaffold the monorepo + CI → run the three M0
-  spikes (RN↔STDB, module/access-control, orchestrator-as-trusted-client).
+- **Top risk (downgraded):** RN↔STDB — bundling risk cleared; runtime path is an
+  on-device gate (OT-003).
+- **Next:** scaffold `apps/mobile` (Expo) probe for the on-device gate (M0.2b) →
+  M0.3 module + access-control spike → M0.4 orchestrator-as-trusted-client.
 
 ---
 
@@ -133,6 +134,17 @@ workflows + multi-agent groups), built as two interlocking tracks from M0:
 **A = Realtime** and **B = Agent/AI**. The AI layer is foundational, not a
 bolt-on. Sequencing lives in `ROADMAP.md`.
 
+### DEC-012 — RN↔SpacetimeDB: GO with polyfills (no bridge)
+*2026-06-13.* M0.2 static-analysis spike of `spacetimedb@2.5.0` found **no Node
+builtins**; it uses the global `WebSocket` + `fetch` (both RN-provided), no
+`Buffer` (uses `base64-js`), a pure-JS RNG, and bundles its own URL/Headers
+polyfills. Only two standard RN polyfills are needed:
+`react-native-get-random-values` (mandatory) and a TextEncoder/Decoder polyfill
+(defensive). Decision: proceed with the RN + Expo client and the SpacetimeDB TS
+client directly — **no WS/REST bridge**. Full artifact:
+`.audit/spike-rn-stdb-2026-06-13.md`. The runtime path still needs an on-device
+`[gate]` (this container has no Android device). Downgrades OT-003.
+
 ---
 
 ## Session Journal (append-only)
@@ -158,6 +170,15 @@ bolt-on. Sequencing lives in `ROADMAP.md`.
   `BACKLOG.md`; updated `CLAUDE.md` doc-graph + code-reality.
 - **Next:** land docs PR → scaffold monorepo + CI → run the three M0 spikes.
 
+### 2026-06-13 — M0.1 scaffold + M0.2 spike
+- Shipped & merged the docs foundation (PR #2) and the monorepo + CI (PR #3,
+  M0.1: pnpm + Turborepo, `shared`/`gateway`/`orchestrator`, green CI 12/12).
+- Ran the **M0.2 RN↔STDB spike** (DEC-012): static analysis of the SpacetimeDB
+  TS client → GO with two polyfills, no bridge. Artifact in `.audit/`.
+- **Next:** scaffold `apps/mobile` Expo probe so the founder can run the
+  on-device `[gate]`; then M0.3 (module + access-control) and M0.4
+  (orchestrator-as-trusted-client) spikes.
+
 ---
 
 ## Open Threads
@@ -168,11 +189,11 @@ bolt-on. Sequencing lives in `ROADMAP.md`.
   North Star set).
 - **OT-002** — *SpacetimeDB module language.* ✅ Resolved by DEC-007 (TypeScript;
   access control via Views).
-- **OT-003** — *React Native ↔ SpacetimeDB TS-SDK compatibility.* **[critical]**
-  The TS client SDK officially targets browser/Node; RN/Hermes (WebSocket,
-  no Node builtins) is undocumented/unvalidated. Unblocks: the M0 connectivity
-  spike. Blocks: confidence in the whole client layer. Fallback: WS/REST bridge
-  service, a polyfill, or an alternative client transport.
+- **OT-003** — *React Native ↔ SpacetimeDB TS-SDK compatibility.* **[downgraded
+  → gate pending]** M0.2 static analysis cleared the bundling/resolution risk
+  (no Node builtins; global WebSocket/fetch; two polyfills) — see DEC-012. What
+  remains: an **on-device `[gate]`** proving the runtime connect + subscribe +
+  reducer round-trip on Android. Unblocks: founder runs the Expo probe (M0.2b).
 - **OT-004** — *Streaming write cadence & cost.* Confirm batched row UPDATEs
   (~50ms) for partial agent tokens don't strain SpacetimeDB/energy budget at
   realistic concurrency. Unblocks: M2 streaming work.
