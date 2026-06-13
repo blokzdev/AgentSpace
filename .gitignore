@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# SpacetimeDB local state
+**/spacetime.local.json
+.spacetime/
+
+# Rust / Cargo target dirs
+target/
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+
+# Local env overrides (commit *.env.example instead)
+.env
+.env.*.local
