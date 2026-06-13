@@ -1,0 +1,28 @@
+{
+  "name": "@agentspace/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "export:android": "expo export -p android",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint App.tsx index.ts polyfills.ts src"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.26.0",
+    "expo": "~52.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-get-random-values": "~1.11.0",
+    "spacetimedb": "2.5.*",
+    "text-encoding-polyfill": "^0.6.7"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~18.3.12",
+    "typescript": "~5.7.2"
+  }
+}

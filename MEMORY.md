@@ -13,22 +13,22 @@
 
 *Last refreshed: 2026-06-13.*
 
-**Executing M0 — Foundations & spikes.** Docs foundation merged (PR #2); the
-pnpm + Turborepo monorepo + CI is merged (PR #3, M0.1) with `packages/shared`,
-`packages/gateway` (Model Gateway stub), and `services/orchestrator` skeleton.
-**M0.2 spike result:** the SpacetimeDB TS client is RN-compatible — static
-analysis found no Node builtins; it uses global WebSocket/fetch and needs only
-two standard polyfills (`react-native-get-random-values`; TextEncoder/Decoder).
-GO, no bridge needed (DEC-012). One on-device `[gate]` remains.
+**Executing M0 — Foundations & spikes** (autonomous build loop now in force —
+DEC-013: plan-per-chunk in Plan Mode → build → PR auto-merges on green → next
+chunk; on-device checks batched in `VERIFICATION.md`). Merged: docs (PR #2),
+monorepo+CI (PR #3), RN↔STDB spike (PR #4). **M0.2b done:** `apps/mobile` Expo
+**connectivity probe** typechecks, lints, and **bundles for Android via Metro**
+(561 modules, ~1.9 MB Hermes) — the SpacetimeDB TS client works under RN. Only
+the live on-device connect remains (`VERIFICATION.md` V-1).
 
-- **Active branch:** `claude/agentspace-m0-rn-stdb-spike`.
-- **Stack (decided):** RN + Expo client · SpacetimeDB (TypeScript module) realtime
-  core · self-hosted Node/TS Agent Orchestrator with a Vercel-AI-SDK Model
-  Gateway (multi-model BYOK) · Postgres + pgvector for RAG.
-- **Top risk (downgraded):** RN↔STDB — bundling risk cleared; runtime path is an
-  on-device gate (OT-003).
-- **Next:** scaffold `apps/mobile` (Expo) probe for the on-device gate (M0.2b) →
-  M0.3 module + access-control spike → M0.4 orchestrator-as-trusted-client.
+- **Active branch:** `claude/agentspace-m0-expo-probe`.
+- **Stack (decided):** RN + Expo (SDK 52) client · SpacetimeDB (TypeScript module)
+  · self-hosted Node/TS Orchestrator + Vercel-AI-SDK Model Gateway (BYOK) ·
+  Postgres + pgvector. pnpm `node-linker=hoisted` (DEC-014, for Metro).
+- **Top risk (cleared on AI side):** RN↔STDB bundles clean; only the device run
+  is open (OT-003 → V-1).
+- **Next:** M0.3 — AgentSpace SpacetimeDB module + access-control (Views) spike →
+  M0.4 orchestrator-as-trusted-client → M0.5 auth.
 
 ---
 
@@ -145,6 +145,24 @@ client directly — **no WS/REST bridge**. Full artifact:
 `.audit/spike-rn-stdb-2026-06-13.md`. The runtime path still needs an on-device
 `[gate]` (this container has no Android device). Downgrades OT-003.
 
+### DEC-013 — Autonomous build loop + founder-owned VERIFICATION.md
+*2026-06-13.* Founder enabled auto-merge + auto-delete-branch and set the cadence:
+each chunk is planned in **Plan Mode**, ratified, then built autonomously; the AI
+watches CI and fixes to green, the PR auto-merges, and the AI proceeds to plan the
+next chunk. Human/on-device checks are batched into **`VERIFICATION.md`** (founder-
+owned); the AI never self-ticks them and never blocks the loop — it assumes green
+and continues unless the founder reports an issue. Encoded in `CLAUDE.md` §4/§5/§6.
+
+### DEC-014 — Expo SDK 52 + pnpm `node-linker=hoisted` + Metro package-exports
+*2026-06-13.* The mobile app is Expo SDK 52 (React 18.3.1 / RN 0.76). Two settings
+are required for Metro under our pnpm monorepo and are now repo config: a root
+`.npmrc` with **`node-linker=hoisted`** (flat node_modules so Metro resolves
+transitive deps like `expo-modules-core`), and **`unstable_enablePackageExports`**
++ `unstable_conditionNames` in `apps/mobile/metro.config.js` (so the SDK's
+`spacetimedb/react` `exports` subpath resolves). Verified by a clean
+`expo export -p android` (561 modules, ~1.9 MB Hermes). The probe's bindings are
+**vendored from the example module**, temporary until M0.3 generates ours.
+
 ---
 
 ## Session Journal (append-only)
@@ -179,6 +197,17 @@ client directly — **no WS/REST bridge**. Full artifact:
   on-device `[gate]`; then M0.3 (module + access-control) and M0.4
   (orchestrator-as-trusted-client) spikes.
 
+### 2026-06-13 — M0.2b Expo probe + autonomous loop
+- Founder enabled auto-merge/auto-delete and the plan-per-chunk autonomous loop
+  (DEC-013); created founder-owned `VERIFICATION.md`; encoded the loop in CLAUDE.md.
+- Built `apps/mobile` (Expo SDK 52) connectivity probe (connect + subscribe +
+  reducer screen) against vendored example bindings. Resolved pnpm↔Metro friction
+  via `node-linker=hoisted` + Metro package-exports (DEC-014).
+- **Verified on my side:** root `pnpm run ci` green (14/14); **Android Metro
+  bundle exports clean** (561 modules). Live device run is `VERIFICATION.md` V-1.
+- **Next:** M0.3 — AgentSpace SpacetimeDB module (users/threads/members/messages)
+  + per-user Views access-control spike.
+
 ---
 
 ## Open Threads
@@ -189,11 +218,11 @@ client directly — **no WS/REST bridge**. Full artifact:
   North Star set).
 - **OT-002** — *SpacetimeDB module language.* ✅ Resolved by DEC-007 (TypeScript;
   access control via Views).
-- **OT-003** — *React Native ↔ SpacetimeDB TS-SDK compatibility.* **[downgraded
-  → gate pending]** M0.2 static analysis cleared the bundling/resolution risk
-  (no Node builtins; global WebSocket/fetch; two polyfills) — see DEC-012. What
-  remains: an **on-device `[gate]`** proving the runtime connect + subscribe +
-  reducer round-trip on Android. Unblocks: founder runs the Expo probe (M0.2b).
+- **OT-003** — *React Native ↔ SpacetimeDB TS-SDK compatibility.* **[gate pending
+  only]** Static analysis (DEC-012) **and** a clean Android Metro bundle (DEC-014,
+  M0.2b) cleared the build/resolution risk. Sole remaining item: the live
+  on-device connect — tracked as **`VERIFICATION.md` V-1** (founder-owned). Not
+  blocking forward work.
 - **OT-004** — *Streaming write cadence & cost.* Confirm batched row UPDATEs
   (~50ms) for partial agent tokens don't strain SpacetimeDB/energy budget at
   realistic concurrency. Unblocks: M2 streaming work.
