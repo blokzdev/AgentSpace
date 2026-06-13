@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "comment": "Generated SpacetimeDB client bindings, consumed as source (see BACKLOG BL-009). A clean built .d.ts isn't achievable here: under node-linker=hoisted, declaration emit hits TS2742 ('inferred type cannot be named') and --noCheck/tsup don't suppress it. So this package is typecheck-only and lenient; consumers that import it relax the same flags.",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": false
+  },
+  "include": ["src"]
+}

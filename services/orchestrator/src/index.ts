@@ -1,9 +1,10 @@
-// Agent Orchestrator — skeleton entrypoint (BLUEPRINT.md §4).
-// The trusted SpacetimeDB connection (OIDC service identity), the work-surface
-// subscription, and the reply loop land in M0.4 / M1.6. For now this wires the
-// Model Gateway and proves the package graph compiles end to end.
+// Agent Orchestrator entrypoint (BLUEPRINT.md §4). M0.4 wires the trusted
+// SpacetimeDB connection + the echo reply loop. The Model Gateway stays a stub
+// until M1.4; agent/persona/run features arrive in M1.
 import { createModelGateway, type ModelGateway } from '@agentspace/gateway';
 import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
+import { connectOrchestrator } from './spacetime';
+import { startReplyLoop } from './replyLoop';
 
 export interface OrchestratorConfig {
   gateway: ModelGateway;
@@ -29,6 +30,9 @@ export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orches
   };
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
+  const { conn, identity } = await connectOrchestrator();
+  console.info(`[orchestrator] connected as ${identity.toHexString()}`);
   console.info(createOrchestrator().describe());
+  startReplyLoop(conn, identity);
 }

@@ -240,9 +240,10 @@ AgentSpace/
 │       · module_bindings/     # vendored from the example (temporary, M0.3 swap)
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
-│   └── gateway/               # Model Gateway interface + stub (M1.4 fills in)
+│   ├── gateway/               # Model Gateway interface + stub (M1.4 fills in)
+│   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
-│   └── orchestrator/          # Agent Orchestrator skeleton
+│   └── orchestrator/          # Agent Orchestrator — connects to STDB (M0.4)
 ├── modules/
 │   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3)
 │       · src/index.ts · bindings/ (generated, committed)
@@ -250,28 +251,32 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 in progress).** Monorepo + CI exist and are green (M0.1, 16/16).
-`gateway` is a stub, `orchestrator` wires the graph but does no real work yet.
-`apps/mobile` (M0.2b) is the Expo **connectivity probe**: it typechecks, lints,
-and **bundles for Android via Metro** (`npx expo export -p android` → ~1.9 MB
-Hermes bundle, 561 modules) — strong evidence the SpacetimeDB TS client works
-under RN; the runtime connect is `V-1` in `VERIFICATION.md`. `modules/spacetime`
-(M0.3) is the realtime-core module (users/threads/members/messages + reducers +
-per-user **Views**): it builds, publishes locally, and `tsc`/`eslint` pass;
-membership write-gating + the positive Views read-path are verified (`.audit/
-spike-stdb-access-control-2026-06-13.md`); the non-member negative case is `V-2`.
+**Status (M0 nearly complete; M0.5 auth remains).** Monorepo + CI green (M0.1,
+16/16). `apps/mobile` (M0.2b) is the Expo **probe** — bundles for Android via
+Metro (561 modules; runtime connect is `V-1`). `modules/spacetime` (M0.3) is the
+realtime-core module with reducers + per-user **Views**; write-gating + positive
+read-path verified (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
+**M0.4:** `services/orchestrator` connects to SpacetimeDB as a stable identity,
+subscribes to `my_thread_messages`, and replies via a reducer — proven end-to-end
+by `pnpm --filter @agentspace/orchestrator integration` (echo round-trip;
+`.audit/spike-orchestrator-client-…`). The Model Gateway is still a stub (M1.4).
 See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs
 `unstable_enablePackageExports` (set in `apps/mobile/metro.config.js`) to resolve
-the SDK's `spacetimedb/react` subpath.
+the SDK's `spacetimedb/react` subpath. Side-effect: generated SpacetimeDB bindings
+can't emit a clean `.d.ts` (TS2742), so `packages/stdb-bindings` is consumed as
+source and it + `services/orchestrator` relax a few strict flags (BL-009); the
+other packages stay fully strict.
 
 Workspace commands (from repo root): `pnpm install`, then `pnpm run ci`
 (= lint · typecheck · build · test), or `pnpm run {lint,typecheck,build,test}`.
 Mobile: `pnpm --filter @agentspace/mobile {start,android,export:android}`.
 Module (needs local `spacetime` CLI; not in CI): `pnpm --filter
 @agentspace/spacetime-module {spacetime:build,spacetime:publish:local,spacetime:generate}`.
+Orchestrator (needs a running local server + published module): `pnpm --filter
+@agentspace/orchestrator {start,integration}` (run via `tsx`).
 
 ### Toolchain (verified present in the dev container)
 

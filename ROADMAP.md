@@ -13,12 +13,14 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* In **M0**. Done: doc suite, monorepo + CI (M0.1), RN↔STDB spike +
-Expo probe (M0.2/M0.2b), SpacetimeDB module + access-control spike (M0.3 —
-reducers gate writes, per-user Views gate reads). Working under the autonomous
-build loop (CLAUDE.md §4). Open device checks: `VERIFICATION.md` V-1 (RN connect),
-V-2 (non-member view scoping). Next: **M0.4** — orchestrator as a trusted
-SpacetimeDB client (OIDC service identity), then **M0.5** auth.
+*2026-06-13.* In **M0**, nearly complete. Done: doc suite, monorepo + CI (M0.1),
+RN↔STDB spike + Expo probe (M0.2/M0.2b), module + access-control (M0.3),
+orchestrator as a trusted client (M0.4 — connect → subscribe → reduce, proven
+end-to-end). All three risky spikes cleared on the AI side. Working under the
+autonomous build loop (CLAUDE.md §4). Open device/manual checks: `VERIFICATION.md`
+V-1 (RN connect), V-2 (non-member view scoping). **Next: M0.5** — choose + wire the
+OIDC auth provider (device login + a real orchestrator service account), then
+close M0 and open **M1** (realtime chat + Agent MVP).
 
 ---
 
@@ -44,9 +46,12 @@ client; and the three spikes are decided and recorded as DEC entries.
   Membership write-gating + positive Views read-path verified via CLI
   (`.audit/spike-stdb-access-control-2026-06-13.md`); non-member negative case is
   `VERIFICATION.md` V-2.*
-- **M0.4 — Spike: orchestrator as trusted client (DEC-008).** Node/TS service
-  connects via an OIDC service identity, subscribes to messages, and writes a row
-  via a reducer. Confirm the service identity is stable.
+- **M0.4 — Orchestrator as trusted client (DEC-008).** ✓ *Done (2026-06-13):
+  `services/orchestrator` connects with a stable identity, subscribes to
+  `my_thread_messages`, and replies via a reducer. Proven end-to-end (echo
+  round-trip) by the local integration script —
+  `.audit/spike-orchestrator-client-2026-06-13.md`. Uses a persisted anonymous
+  token; real OIDC service account is M0.5.*
 - **M0.5 — Auth wiring.** Choose + wire the OIDC provider (SpacetimeAuth built-in
   vs Auth0/Clerk); device login → stable `Identity`.
 - **M0.6 — Doc suite & code-reality.** (this PR) ROADMAP/PRD/BLUEPRINT/SPEC/
