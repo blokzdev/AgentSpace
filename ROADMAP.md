@@ -14,12 +14,13 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 ## Current state
 
 *2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: `apps/mobile` is a
-realtime **chat MVP** (M1.1) with real **SpacetimeAuth OIDC login** (M1.2 ✓ —
-`expo-auth-session` code+PKCE → `withToken`; CI green, Android bundle clean).
-Working under the autonomous build loop (CLAUDE.md §4). Open device checks:
-`VERIFICATION.md` V-1, V-2, V-4, V-5; founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth
-client_id + redirect + Maincloud publish). **Next: M1.3** (groups/contacts) or
-**M1.4** (Model Gateway v1) → M1.5 Agent Studio → M1.6 agent replies.
+realtime **chat MVP** (M1.1) with real **SpacetimeAuth OIDC login** (M1.2 ✓); the
+**Model Gateway v1** is live (M1.4 ✓ — AI SDK v6 anthropic+openai, streaming +
+tool-calling, AES-256-GCM BYOK). Working under the autonomous build loop (CLAUDE.md
+§4). Open device/smoke checks: `VERIFICATION.md` V-1, V-2, V-4, V-5, V-6; founder
+setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider key). **Next:
+M1.5** Agent Studio → **M1.6** orchestrator reply loop (gateway → STDB streaming);
+**M1.3** (groups/contacts) when track A resumes.
 
 ---
 
@@ -87,7 +88,11 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   add-by-identity-hex).
 - **M1.4 (B)** Model Gateway v1: Vercel AI SDK with **two providers** (Anthropic +
   one of OpenAI/Google), streaming + tool-calling interface; BYOK key store
-  (encrypted) and resolution.
+  (encrypted) and resolution. ✓ *Done 2026-06-13 — `packages/gateway` on AI SDK v6:
+  provider registry (anthropic + openai; google/openai-compatible inert), `streamText`
+  → `GatewayDelta`; AES-256-GCM `EncryptedKeyStore` + injected resolver (DEC-020).
+  CI 16/16 (headless via `MockLanguageModelV3`); live round-trip `V-6` (key `SETUP.md`
+  S-4). `embed`→M3.1; orchestrator streaming→M1.6.*
 - **M1.5 (B)** Agent Studio v1: create/edit a persona (identity, system prompt,
   model + params); persisted as an agent + version.
 - **M1.6 (B)** Orchestrator reply loop: detect an agent is addressed in a 1:1

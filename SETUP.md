@@ -81,5 +81,23 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
+### S-4 — Provide a provider API key for the Model Gateway smoke test  ·  added 2026-06-13 · M1.4  ·  [ ]
+- **Why:** the gateway streams from real providers (Anthropic/OpenAI) using a
+  **BYOK** key. CI proves the wiring with a mock; a real round-trip (`V-6`) needs an
+  actual key. The key is a secret — it goes in an untracked `.env`, never committed.
+- **Where:** wherever you keep your provider key (e.g. the Anthropic Console for an
+  `sk-ant-…` key, or the OpenAI dashboard).
+- **Steps:**
+  1. Get an API key from your chosen provider (Anthropic recommended — the default
+     model is `claude-opus-4-8`).
+  2. Create an untracked `.env` at the repo root (or export in your shell) with the
+     matching variable: **`ANTHROPIC_API_KEY=sk-ant-…`** (or `OPENAI_API_KEY=…`).
+     The smoke harness reads `<PROVIDER>_API_KEY` for the default model's provider.
+- **Give back to the AI:** nothing to paste — **keep the key secret**. Just confirm
+  it's set, and I'll treat V-6 as ready for you to run.
+
+---
+
 *(When S-1…S-3 are done and you've set the three `EXPO_PUBLIC_*` values, the
-on-device login check is `VERIFICATION.md` V-5.)*
+on-device login check is `VERIFICATION.md` V-5. When S-4 is set, the gateway smoke
+is `VERIFICATION.md` V-6.)*

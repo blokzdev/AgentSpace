@@ -1,7 +1,7 @@
 // Agent Orchestrator entrypoint (BLUEPRINT.md §4). M0.4 wires the trusted
 // SpacetimeDB connection + the echo reply loop. The Model Gateway stays a stub
 // until M1.4; agent/persona/run features arrive in M1.
-import { createModelGateway, type ModelGateway } from '@agentspace/gateway';
+import { createModelGateway, envResolver, type ModelGateway } from '@agentspace/gateway';
 import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
 import { connectOrchestrator } from './spacetime';
 import { startReplyLoop } from './replyLoop';
@@ -18,7 +18,9 @@ export interface Orchestrator {
 
 export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orchestrator {
   const resolved: OrchestratorConfig = {
-    gateway: config?.gateway ?? createModelGateway(),
+    // BYOK keys resolved from env in v1 (M1.4); a per-user encrypted store wires
+    // in with the real reply loop (M1.6 / OT-007).
+    gateway: config?.gateway ?? createModelGateway({ resolveCredential: envResolver() }),
     defaultModel: config?.defaultModel ?? DEFAULT_MODEL,
   };
   return {

@@ -114,6 +114,16 @@ turn history), `tools` (normalized tool specs, §5), and BYOK credential handle.
 - The default model is `claude-opus-4-8` unless the agent overrides it.
 - Every stream terminates with `usage` so `runs` can record cost.
 
+**Implemented shape (M1.4, DEC-020).** `stream(req)` yields a `GatewayDelta`
+discriminated union, terminated by a `finish`:
+`{type:'text', text}` · `{type:'tool-call', name, input}` · `{type:'finish',
+usage:{inputTokens,outputTokens,costUsd?}, finishReason}`. `req` is
+`{model: ModelRef, messages: {role,content}[], tools?: ToolSpec[], credentialRef}`;
+`system` roles are hoisted into the AI SDK `system` arg. `generate` (non-streamed)
+and `embed` are **not yet built** — `embed` is M3.1; non-streamed callers consume
+`stream`. The `credentialRef` is resolved server-side by an injected
+`CredentialResolver` (BYOK; BLUEPRINT §4).
+
 ---
 
 ## 5. Tool / toolkit schema

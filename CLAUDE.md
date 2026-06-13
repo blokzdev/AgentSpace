@@ -255,7 +255,8 @@ AgentSpace/
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
-│   ├── gateway/               # Model Gateway interface + stub (M1.4 fills in)
+│   ├── gateway/               # Model Gateway — AI SDK adapters + BYOK (M1.4)
+│   │   · src/{index,providers,credentials}.ts · scripts/smoke.ts
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
 │   └── orchestrator/          # Agent Orchestrator — connects to STDB (M0.4)
@@ -287,7 +288,19 @@ and no `plugins` array** — listing `expo-web-browser`/`expo-secure-store` as c
 plugins makes `expo export` `require` `expo-modules-core`'s TS source and crashes on
 Node ≥22.18 type-stripping; both modules autolink without a plugin entry. The
 orchestrator keeps its persisted-token identity (a real service account is `OT-007`).
-The Model Gateway is still a stub (M1.4). See `BLUEPRINT.md` §2 for the module graph.
+**M1.4:** the **Model Gateway** is real — `packages/gateway` implements
+`createModelGateway({ resolveCredential, providers? })` with **streaming +
+tool-calling** on the **Vercel AI SDK v6** over a provider registry (`anthropic` +
+`openai` live; `google`/`openai-compatible` registered-but-inert), normalizing
+`streamText().fullStream` to a `GatewayDelta` union. **BYOK:** `src/credentials.ts`
+seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
+and resolves a request's `credentialRef` via an injected `CredentialResolver`
+(in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.
+The orchestrator builds the gateway with `envResolver()`; its echo reply loop is
+unchanged (streaming a real LLM reply into STDB is M1.6). 16 gateway tests cover
+the BYOK crypto + stream normalization (AI SDK `MockLanguageModelV3`); a real
+provider round-trip is the founder smoke (`V-6`, key via `SETUP.md` S-4). See
+`BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs
@@ -303,7 +316,9 @@ Mobile: `pnpm --filter @agentspace/mobile {start,android,export:android}`.
 Module (needs local `spacetime` CLI; not in CI): `pnpm --filter
 @agentspace/spacetime-module {spacetime:build,spacetime:publish:local,spacetime:generate}`.
 Orchestrator (needs a running local server + published module): `pnpm --filter
-@agentspace/orchestrator {start,integration}` (run via `tsx`).
+@agentspace/orchestrator {start,integration}` (run via `tsx`). Gateway smoke (needs
+a real provider key in env, e.g. `ANTHROPIC_API_KEY`; not in CI): `pnpm --filter
+@agentspace/gateway smoke`.
 
 ### Toolchain (verified present in the dev container)
 

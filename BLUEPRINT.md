@@ -156,13 +156,23 @@ OpenAI-compatible adapter for local runtimes (Ollama/vLLM/LM Studio).
   post-hoc JSON validation/repair.
 - **Tool reliability varies by provider** *(reported — verify)*; prefer Claude for
   complex tool chains, add validation/retry for others.
+- **v1 status (M1.4, DEC-020):** `createModelGateway({ resolveCredential, providers? })`
+  implements **streaming + tool-calling** over a **provider registry** — `anthropic`
+  + `openai` live on the AI SDK; `google` + `openai-compatible` registered but inert
+  (BACKLOG). `embed` is deferred to M3.1. The `streamText` `fullStream` is normalized
+  to `GatewayDelta` (text / tool-call / finish+usage).
 
 ### BYOK key custody
 
-Per-user provider keys are encrypted at rest (AES-256-GCM via a managed KMS),
-stored in the secret store (Postgres table or KMS), referenced from
-`provider_keys.secret_ref`. Keys are decrypted **in-memory in the orchestrator**
-at call time, never written to STDB, never sent to the device, never logged.
+Per-user provider keys are encrypted at rest (AES-256-GCM), decrypted **in-memory
+at call time**, never written to STDB, never sent to the device, never logged. The
+gateway owns an **`EncryptedKeyStore`** (seal/open under a KEK) and resolves a
+request's opaque `credentialRef` via an injected **`CredentialResolver`** (the
+orchestrator supplies it — keeping custody in the service layer). **v1 backing is an
+in-memory sealed map under an env KEK (`AGENTSPACE_GATEWAY_KEK`)**; the durable
+Postgres/KMS store referenced from `provider_keys.secret_ref` is deferred
+(OT-005 / BACKLOG). A dev `envResolver` (ref→`<PROVIDER>_API_KEY`) backs the smoke
+harness (V-6).
 
 ---
 
