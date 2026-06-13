@@ -1,8 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
+  "comment": "Relaxed vs the base because this package consumes generated @agentspace/stdb-bindings source (which can't emit a clean .d.ts — TS2742). Run via tsx; no tsc emit. Re-tighten if bindings get a typed boundary (see BACKLOG BL-009).",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src"
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": false
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }

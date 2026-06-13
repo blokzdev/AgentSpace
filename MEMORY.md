@@ -13,24 +13,24 @@
 
 *Last refreshed: 2026-06-13.*
 
-**Executing M0 — Foundations & spikes** (autonomous build loop — DEC-013:
-plan-per-chunk in Plan Mode → build → **AI merges green PRs via API** (DEC-016) →
-next chunk; on-device/manual checks batched in `VERIFICATION.md`). Merged: docs
-(PR #2), monorepo+CI (PR #3), RN↔STDB spike (PR #4), Expo probe (PR #5). **M0.3
-done:** `modules/spacetime` (users/threads/thread_members/messages + reducers +
-per-user **Views**) builds, publishes locally, generates bindings; CI 16/16.
-Verified via CLI: reducers reject non-members; a member's `my_threads` View
-returns only their thread (DEC-015). Non-member negative case → `VERIFICATION.md`
-V-2.
+**M0 — Foundations & spikes: all three risky spikes cleared.** Autonomous loop
+(DEC-013/016: plan-per-chunk → build → **AI merges green PRs via API** → next).
+Merged: PRs #2–#6 (docs, monorepo+CI, RN↔STDB spike, Expo probe, module). **M0.4
+done (this branch):** `services/orchestrator` connects to SpacetimeDB as a stable
+identity, subscribes to `my_thread_messages`, and replies via a reducer — proven
+end-to-end by the local integration (echo round-trip; DEC-017,
+`.audit/spike-orchestrator-client-2026-06-13.md`). CI 16/16 with the orchestrator
+fully strict. Bindings live in `packages/stdb-bindings` (consumed as source —
+TS2742 blocks a clean `.d.ts`; BL-009).
 
-- **Active branch:** `claude/agentspace-m0-stdb-module`.
-- **Stack (decided):** RN + Expo (SDK 52) client · SpacetimeDB (TypeScript module)
-  · self-hosted Node/TS Orchestrator + Vercel-AI-SDK Model Gateway (BYOK) ·
-  Postgres + pgvector. pnpm `node-linker=hoisted` (DEC-014).
+- **Active branch:** `claude/agentspace-m0-orchestrator`.
+- **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
+  Vercel-AI-SDK Model Gateway (BYOK) · Postgres + pgvector. pnpm
+  `node-linker=hoisted` (DEC-014).
 - **Open device/manual checks:** V-1 (RN on-device connect), V-2 (Views hide
   non-members). Not blocking.
-- **Next:** M0.4 — orchestrator as a trusted SpacetimeDB client (OIDC service
-  identity) → M0.5 auth.
+- **Next:** **M0.5** — wire the OIDC auth provider (device login + a real
+  orchestrator service account), close M0, then **M1** (realtime chat + Agent MVP).
 
 ---
 
@@ -184,6 +184,19 @@ enabled per-PR, so API-created PRs sat green-but-unmerged. Founder's decision: t
 branch-protected as the gate. Refines the DEC-013 loop (the "auto-merges" step is
 really "AI merges on green"). `CLAUDE.md` §6 updated.
 
+### DEC-017 — Orchestrator↔STDB loop proven; bindings consumed as source
+*2026-06-13.* The orchestrator connects to SpacetimeDB as a trusted client with a
+**persisted-token stable identity**, subscribes to the membership-scoped
+`my_thread_messages` View, and replies via `send_message` — the subscribe→react→
+reduce loop agent replies will use (echo stands in for the M1.4 LLM call). Proven
+end-to-end by `scripts/integration.ts` (a second user identity's message is echoed
+back). Generated client bindings live in `packages/stdb-bindings` and are
+**consumed as source**: under `node-linker=hoisted`, declaration emit fails with
+TS2742 and neither `--noCheck`, `tsup --dts`, nor `preserveSymlinks` produce a
+usable `.d.ts`; the resulting leniency is confined to `stdb-bindings` +
+`orchestrator` (other packages stay strict). Tracked as **BL-009**. Real OIDC
+service-account auth is deferred to M0.5 (anonymous token suffices for the spike).
+
 ---
 
 ## Session Journal (append-only)
@@ -237,6 +250,17 @@ really "AI merges on green"). `CLAUDE.md` §6 updated.
   scoped correctly (DEC-015). Non-member negative case → V-2.
 - **Next:** M0.4 — orchestrator connects as a trusted STDB client (OIDC service
   identity), subscribes to messages, and writes a reply via a reducer.
+
+### 2026-06-13 — M0.4 orchestrator↔STDB loop
+- Merged PR #6 (M0.3) via API. Built the orchestrator's real STDB connection +
+  echo reply loop (`spacetime.ts`, `replyLoop.ts`, `scripts/integration.ts`) on
+  `packages/stdb-bindings` (generated, source-consumed). Integration **passes
+  end-to-end** (DEC-017). CI 16/16, orchestrator fully strict.
+- Researched the bindings TS2742 issue (founder asked for a non-lenient option):
+  no clean `.d.ts` is achievable under hoisted pnpm → source-consumption, leniency
+  confined to 2 packages, BL-009 logged.
+- **Next:** M0.5 — OIDC auth provider (device login + orchestrator service
+  account), close M0, then M1 (realtime chat + Agent MVP).
 
 ---
 

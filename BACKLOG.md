@@ -52,6 +52,18 @@
 - **Trigger:** uptime/SLA requirements exceed single-region Maincloud.
 - **Promotion:** an infra task (Enterprise tier / self-host replication).
 
+### BL-009 — Typed boundary for generated SpacetimeDB bindings
+- **Source:** M0.4 (`.audit/spike-orchestrator-client-2026-06-13.md`).
+- **Problem:** `packages/stdb-bindings` can't emit a clean built `.d.ts` under
+  `node-linker=hoisted` (TS2742; `--noCheck`/`tsup --dts`/`preserveSymlinks` don't
+  fix it). It's consumed as source, so the `stdb-bindings` and `orchestrator`
+  packages relax `noUnusedLocals`/`verbatimModuleSyntax`/etc.
+- **Trigger:** the leniency hides a real bug, or we want full strictness on the
+  orchestrator as it grows.
+- **Promotion:** an infra task — try pnpm isolated linker + Metro symlink
+  resolution (re-validate the mobile bundle), a codegen post-process that adds
+  annotations, or upstream SpacetimeDB codegen improvements.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)
