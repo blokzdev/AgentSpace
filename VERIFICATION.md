@@ -98,3 +98,39 @@ Notes: <founder fills: device + OS + result>
   (reducers + Views) is already proven headlessly (M0.3/M0.4), so failures are
   most likely UI/subscription wiring.
 - **Notes (founder):** _devices + OS + result →_
+
+---
+
+### V-5 — SpacetimeAuth (OIDC) login on-device  ·  added 2026-06-13 · M1.2
+- **Why:** the login redirect round-trip is the only part of M1.2 CI can't check
+  (the hook typechecks, lints, and **bundles clean for Android**). Proves real
+  per-user identity: sign in → id token → `withToken` → stable `Identity` that
+  **survives a restart** (refresh-token path) and a real account, not the anonymous
+  token. Depends on **`SETUP.md` S-1…S-3**.
+- **Setup:**
+  1. Complete `SETUP.md` **S-1** (client_id), **S-2** (redirect `agentspace://redirect`),
+     **S-3** (publish `agentspace` to Maincloud).
+  2. Create `apps/mobile/.env.local` with:
+     `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID=<from S-1>`,
+     `EXPO_PUBLIC_SPACETIMEDB_HOST=wss://maincloud.spacetimedb.com`,
+     `EXPO_PUBLIC_SPACETIMEDB_DB_NAME=agentspace-hpm58`.
+  3. Build a **real dev build** — `pnpm --filter @agentspace/mobile android`
+     (`expo run:android`) or an EAS dev build. **Expo Go won't work**: the custom
+     `agentspace://` scheme only resolves in a standalone/dev-client build.
+- **Steps:**
+  1. Launch the app → it shows the **Login** screen ("Sign in with SpacetimeAuth").
+  2. Tap **Sign in** → a browser/web-view opens the SpacetimeAuth flow → sign in /
+     authorize → you're redirected **back into the app**.
+  3. Land on the thread list; note the **identity hex** at the top.
+  4. **Fully close and reopen** the app (kill it, don't just background).
+  5. Tap **Sign out** → confirm you return to the Login screen.
+- **Pass when:**
+  - After sign-in you reach the chat UI authenticated; chat works against Maincloud.
+  - After the restart you're **still signed in** with the **same identity hex** (no
+    re-login prompt) — the refresh-token restore worked.
+  - Sign out returns to Login; signing in again works.
+- **If it fails:** capture the error. Common causes: redirect URI mismatch (S-2
+  must be exactly `agentspace://redirect`), wrong/empty client_id (button disabled =
+  env not set), or pointing at a local server instead of Maincloud (token rejected —
+  the issuer is only trusted on Maincloud). Tell me which.
+- **Notes (founder):** _device + OS + result →_

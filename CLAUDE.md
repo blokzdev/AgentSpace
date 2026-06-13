@@ -41,6 +41,8 @@ the single source of truth for its topic and wins any conflict about it.
 | `SPEC.md` | Behavioral contracts: state machines, grammars, protocols | Prescriptive | Implementing a contract between components |
 | `BLUEPRINT.md` | Architecture & data model: module graph, schemas, dependency rules | Prescriptive | Adding a module; touching the data model |
 | `BACKLOG.md` | Carryover queue: tactical deferrals with revisit triggers + launch gates | Forward-looking | Deferring work; checking launch readiness |
+| `SETUP.md` | Founder-owned action items: external setup only the human can do (register apps, dashboards, accounts, credentials) | Living / `S-n` ledger | The build needs a founder-side external action or a credential/ID handed back |
+| `VERIFICATION.md` | Founder-owned on-device / real-world checklist (`V-n`): what CI can't check | Living / `V-n` ledger | Batching a human/on-device verification the AI can't self-run |
 
 The full doc suite now exists (authored 2026-06-13 alongside the ratified plan).
 A doc is still born only when it has something to own — do not add new doc types
@@ -149,6 +151,17 @@ blocks the loop** on them — it records the item, assumes green, and continues.
 The founder works through `VERIFICATION.md` independently and raises any failure;
 only the founder marks an item done.
 
+**Founder-side external setup → `SETUP.md`.** Anything the AI needs the *human* to
+do outside the codebase — register a third-party app, enable a dashboard, create
+an account, hand back a credential/ID/secret — is **batched into the founder-owned
+`SETUP.md`** as a numbered item (`S-1`, `S-2`, …) with exact click-by-click steps,
+where it's done (web vs terminal), and a **"give back to the AI"** line naming the
+value needed. The AI **builds around open items** (env placeholders, feature inert
+until wired) and **never blocks the loop** on one; it **never marks an item done**.
+The founder does the action, reports the value, and only the founder ticks it.
+Secrets/keys go in a local untracked `.env`, never a committed file — the AI names
+the variable. (This is the setup-side twin of `VERIFICATION.md`.)
+
 ---
 
 ## 5. Phase- and milestone-close rituals
@@ -231,13 +244,14 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 AgentSpace/
 ├── CLAUDE.md · MEMORY.md · ROADMAP.md · PRD.md       # operating + vision docs
 │   · BLUEPRINT.md · SPEC.md · BACKLOG.md · README.md
+│   · VERIFICATION.md · SETUP.md                       # founder-owned ledgers (V-n / S-n)
 ├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
-│   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc · VERIFICATION.md
+│   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1 (was the M0.2b probe)
-│       · App.tsx · src/screens/{ThreadList,Thread}.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; SpacetimeAuth login M1.2
+│       · App.tsx · src/auth.ts · src/screens/{Login,ThreadList,Thread}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
@@ -258,11 +272,22 @@ reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
 `my_thread_messages`, and replies via a reducer — proven end-to-end (echo) by
 `pnpm --filter @agentspace/orchestrator integration`. **M1.1:** `apps/mobile` is
-now a **realtime chat MVP** on the `agentspace` module (thread list + thread view
-+ composer + presence; `ThreadList`/`Thread` screens) — it typechecks, lints, and
-**bundles clean for Android** (Metro, ~1.9 MB Hermes); on-device behavior is `V-4`.
-Identity is anonymous-token for now; **SpacetimeAuth (OIDC) login is M1.2**. The
-Model Gateway is still a stub (M1.4). See `BLUEPRINT.md` §2 for the module graph.
+a **realtime chat MVP** on the `agentspace` module (thread list + thread view
++ composer + presence; `ThreadList`/`Thread` screens). **M1.2:** it now does real
+**SpacetimeAuth (OIDC) login** — `src/auth.ts` runs authorization-code + PKCE via
+`expo-auth-session` against issuer `https://auth.spacetimedb.com/oidc`, persists the
+refresh token in SecureStore, and passes the resulting id token to
+`DbConnection.withToken()`; `App.tsx` gates the `SpacetimeDBProvider` behind a
+`Login` screen, replacing the anonymous token with a stable per-user `Identity`.
+Typechecks, lints, and **bundles clean for Android** (Metro, 606 modules, 2.0 MB
+Hermes). The flow is inert until the founder supplies `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID`
+(`SETUP.md` S-1) and must target Maincloud `agentspace-hpm58` (which trusts the
+issuer); the on-device round-trip is `V-5`. **app.json carries `scheme: "agentspace"`
+and no `plugins` array** — listing `expo-web-browser`/`expo-secure-store` as config
+plugins makes `expo export` `require` `expo-modules-core`'s TS source and crashes on
+Node ≥22.18 type-stripping; both modules autolink without a plugin entry. The
+orchestrator keeps its persisted-token identity (a real service account is `OT-007`).
+The Model Gateway is still a stub (M1.4). See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

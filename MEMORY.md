@@ -14,22 +14,28 @@
 *Last refreshed: 2026-06-13.*
 
 **M0 closed; in M1.** All three M0 spikes cleared (RN↔STDB, module+Views,
-orchestrator); merged PRs #2–#7. **M1.1 done (this branch):** `apps/mobile` is now
-a realtime **chat MVP** on the `agentspace` module — `ThreadList` + `Thread`
-screens (my_threads / my_thread_messages / send_message / add_member / presence),
-regenerated bindings from our module. Typechecks, lints, and **bundles clean for
-Android** (Metro, ~1.9 MB Hermes); on-device behavior is `V-4` (DEC-018). Identity
-is anonymous-token until **M1.2 (SpacetimeAuth OIDC login**, was M0.5). Autonomous
-loop (DEC-013/016): plan-per-chunk → build → AI merges green PRs via API → next.
+orchestrator); merged PRs #2–#8. **M1.1 done** (chat MVP). **M1.2 done (this
+branch):** `apps/mobile` now does real **SpacetimeAuth (OIDC) login** —
+`src/auth.ts` runs authorization-code + PKCE via `expo-auth-session` (issuer
+`auth.spacetimedb.com/oidc`), persists the refresh token in SecureStore, and passes
+the id token to `DbConnection.withToken()`; `App.tsx` gates the provider behind a
+`Login` screen → stable per-user `Identity` replaces the anonymous token (DEC-019).
+CI 16/16; Android bundle clean (606 modules). Inert until founder supplies
+`EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID` (**`SETUP.md` S-1**) + targets Maincloud
+`agentspace-hpm58`; on-device round-trip is `V-5`. New founder-owned **`SETUP.md`**
+ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous loop
+(DEC-013/016): plan-per-chunk → build → AI merges green PRs via API → next.
 
-- **Active branch:** `claude/agentspace-m1-mobile-chat`.
+- **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK Model Gateway (BYOK) · Postgres + pgvector. pnpm
   `node-linker=hoisted` (DEC-014).
 - **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
-  (mobile chat). Not blocking.
-- **Next:** **M1.2** — SpacetimeAuth OIDC login (replace anonymous identity) →
-  M1.4 Model Gateway v1 → M1.5 Agent Studio → M1.6 agent replies.
+  (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
+- **Open founder setup:** `SETUP.md` S-1 (client_id), S-2 (redirect URI), S-3
+  (publish module to Maincloud) — needed before V-5.
+- **Next:** **M1.3** (group/contacts) or **M1.4** (Model Gateway v1) → M1.5 Agent
+  Studio → M1.6 agent replies.
 
 ---
 
@@ -206,6 +212,26 @@ the redirect flow is inherently device-verified. M0.5 in ROADMAP is relocated to
 M1.2. (M0 milestone-close drift sweep deferred — docs kept current per-PR; run
 `/audit` on demand.)
 
+### DEC-019 — SpacetimeAuth login via `expo-auth-session` + founder-owned `SETUP.md`
+*2026-06-13.* M1.2 ships real OIDC login in the mobile app. **Choices:** (1) Use
+**`expo-auth-session`** (authorization-code + PKCE) rather than the web
+`react-oidc-context` path — it's the RN-native OIDC client and needs no secret on
+the device. (2) The **refresh token is the durable credential**, persisted in
+**SecureStore**; the short-lived **id token** is what we hand to
+`DbConnection.withToken()` so SpacetimeDB derives a stable per-user `Identity`. On
+launch we `refreshAsync` → fresh id token → connect; `App.tsx` gates the
+`SpacetimeDBProvider` behind a `Login` screen. (3) `app.json` gets
+`scheme: "agentspace"` (redirect `agentspace://redirect`) but **no `plugins`
+array** — listing `expo-web-browser`/`expo-secure-store` as config plugins makes
+`expo export` `require` `expo-modules-core`'s `.ts` source and crash under Node
+≥22.18 type-stripping; both autolink without it. (4) Client lives only on
+**Maincloud `agentspace-hpm58`** (a local server doesn't trust the issuer), so the
+device test targets Maincloud. (5) New founder-owned **`SETUP.md`** (`S-n` items)
+captures everything the human must do externally (register the SpacetimeAuth client,
+add the redirect URI, publish to Maincloud) — the setup-side twin of
+`VERIFICATION.md`, encoded as a standing rule in `CLAUDE.md` §1/§4. The
+orchestrator's real service-account auth is out of scope → **OT-007**.
+
 ---
 
 ## Session Journal (append-only)
@@ -282,6 +308,25 @@ M1.2. (M0 milestone-close drift sweep deferred — docs kept current per-PR; run
   bundle clean. On-device behavior → `V-4`.
 - **Next:** M1.2 — SpacetimeAuth OIDC login.
 
+### 2026-06-13 — M1.2 SpacetimeAuth login + SETUP.md process
+- Researched SpacetimeAuth (hosted OIDC, issuer `auth.spacetimedb.com/oidc`,
+  code+PKCE, RN path = `expo-auth-session`). Founder has Maincloud `agentspace-hpm58`.
+- Built M1.2 (DEC-019): `src/auth.ts` (`useSpacetimeAuth` — discovery, login,
+  SecureStore refresh-token persistence, restore-on-launch), `Login` screen, and an
+  `App.tsx` auth gate that builds the connection with `.withToken(idToken)`; added
+  `expo-auth-session`/`expo-web-browser`/`expo-secure-store`/`expo-crypto` (SDK-52
+  versions) and `scheme: "agentspace"`.
+- **Verified on my side:** CI 16/16; mobile typecheck + lint clean; **Android export
+  clean** (606 modules, 2.0 MB Hermes). Hit a Node-22.22 type-stripping crash from
+  the `plugins` array (Expo `require`s `expo-modules-core` source) → removed
+  `plugins` (modules autolink anyway); export then passed.
+- Founder asked for a maintained "what I need from you" doc + workflow rule →
+  created **`SETUP.md`** (S-1 client_id, S-2 redirect URI, S-3 publish to Maincloud)
+  and encoded the `S-n` process in `CLAUDE.md` §1/§4. On-device login → `V-5`.
+  Orchestrator service-account auth → `OT-007`.
+- **Next:** founder works S-1…S-3 + V-5; AI plans **M1.3** (groups/contacts) or
+  **M1.4** (Model Gateway v1).
+
 ---
 
 ## Open Threads
@@ -306,6 +351,11 @@ M1.2. (M0 milestone-close drift sweep deferred — docs kept current per-PR; run
 - **OT-006** — *Local model structured output.* OpenAI-compatible local providers
   lack the AI SDK's structured-output mode; decide the validation/JSON-repair
   strategy for local agents. Unblocks: M5.
+- **OT-007** — *Orchestrator service-account auth.* The orchestrator still uses a
+  persisted anonymous token (DEC-017); interactive SpacetimeAuth OIDC (DEC-019)
+  doesn't fit a headless service. Decide the real grant (SpacetimeAuth
+  client-credentials / a long-lived service token) and wire it. Unblocks: trusted
+  agent identity in production. Likely alongside M1.6 (orchestrator reply loop).
 
 ---
 
@@ -331,3 +381,7 @@ M1.2. (M0 milestone-close drift sweep deferred — docs kept current per-PR; run
 - **Run** — one agent turn (a row recording status, model, tokens, cost).
 - **Doc graph** — the set of single-owner docs in `CLAUDE.md` §1.
 - **Drift sweep** — periodic doc↔code reconciliation (`CLAUDE.md` §7).
+- **SETUP.md / `S-n`** — founder-owned ledger of external setup only the human can
+  do (register apps, dashboards, credentials); setup twin of `VERIFICATION.md`.
+- **SpacetimeAuth** — SpacetimeDB's hosted OIDC provider (issuer
+  `auth.spacetimedb.com/oidc`); the app's login source of identity (DEC-019).
