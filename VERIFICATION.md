@@ -134,3 +134,24 @@ Notes: <founder fills: device + OS + result>
   env not set), or pointing at a local server instead of Maincloud (token rejected —
   the issuer is only trusted on Maincloud). Tell me which.
 - **Notes (founder):** _device + OS + result →_
+
+---
+
+### V-6 — Model Gateway live provider round-trip  ·  added 2026-06-13 · M1.4
+- **Why:** CI proves the gateway's wiring and BYOK crypto **headlessly** (mock
+  model, 16 tests), but a real provider stream can only run with an actual API key.
+  This confirms `createModelGateway` streams text + reports token usage end-to-end
+  against a live provider. Depends on **`SETUP.md` S-4**.
+- **Setup:** set a real key in env/`.env` — `ANTHROPIC_API_KEY=sk-ant-…` (default
+  model is `claude-opus-4-8`; or `OPENAI_API_KEY=…` and adjust the model). Run from
+  the repo root.
+- **Steps:**
+  1. `pnpm install` (if not already).
+  2. `pnpm --filter @agentspace/gateway smoke`.
+- **Pass when:** the command streams a one-sentence reply to stdout and prints a
+  `usage:` line with non-zero `inputTokens`/`outputTokens` — no error.
+- **If it fails:** `No API key in env (...)` → the var isn't set/exported;
+  `401/authentication` → bad key; a model-id error → the key's provider doesn't
+  serve `claude-opus-4-8` (use that provider's model, or set `ANTHROPIC_API_KEY`).
+  Tell me which.
+- **Notes (founder):** _provider + result →_

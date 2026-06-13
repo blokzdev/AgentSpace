@@ -15,9 +15,18 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {
-    "@agentspace/shared": "workspace:*"
+    "@agentspace/shared": "workspace:*",
+    "@ai-sdk/anthropic": "^3.0.84",
+    "@ai-sdk/openai": "^3.0.71",
+    "ai": "^6.0.204"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider": "^3.0.10",
+    "tsx": "^4.22.4",
+    "vitest": "^3.2.6"
   }
 }

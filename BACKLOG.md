@@ -64,6 +64,27 @@
   resolution (re-validate the mobile bundle), a codegen post-process that adds
   annotations, or upstream SpacetimeDB codegen improvements.
 
+### BL-010 — More gateway providers (Google + OpenAI-compatible/local)
+- **Source:** DEC-020 (M1.4 shipped anthropic + openai only).
+- **Trigger:** an agent needs Gemini, or M5 local models (Ollama/vLLM/LM Studio).
+- **Promotion:** add factories to `packages/gateway/src/providers.ts` (the registry
+  already reserves `google`/`openai-compatible`); local lands with BL-006 (structured
+  output) at M5.
+
+### BL-011 — Durable BYOK key store (Postgres/KMS)
+- **Source:** DEC-020 / OT-005 (M1.4 uses an in-memory AES-256-GCM store under an
+  env KEK).
+- **Trigger:** real per-user keys need persistence + a managed KMS; M3/infra stands
+  up Postgres.
+- **Promotion:** back `EncryptedKeyStore` with `provider_keys.secret_ref` (BLUEPRINT
+  §3/§4); rotate the KEK via KMS. Satisfies Launch Gate **LG-2**.
+
+### BL-012 — Gateway embeddings (`embed`)
+- **Source:** DEC-020 (gateway `embed` throws "M3.1").
+- **Trigger:** M3.1 knowledge ingestion/retrieval (RAG).
+- **Promotion:** implement `embed` via the AI SDK `embedMany` on an embedding
+  provider; wire into pgvector ingestion.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

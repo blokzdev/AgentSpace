@@ -13,9 +13,15 @@
 
 *Last refreshed: 2026-06-13.*
 
-**M0 closed; in M1.** All three M0 spikes cleared (RN↔STDB, module+Views,
-orchestrator); merged PRs #2–#8. **M1.1 done** (chat MVP). **M1.2 done (this
-branch):** `apps/mobile` now does real **SpacetimeAuth (OIDC) login** —
+**M0 closed; in M1.** All three M0 spikes cleared; merged PRs #2–#9. **M1.1** chat
+MVP, **M1.2** SpacetimeAuth login (merged). **M1.4 done (this branch):** the
+**Model Gateway is real** — `packages/gateway` implements `createModelGateway` with
+**streaming + tool-calling** on the **Vercel AI SDK v6** (provider registry:
+`anthropic` + `openai` live; `google`/`openai-compatible` inert) + **AES-256-GCM
+BYOK** key store + injected resolver (DEC-020). `embed`→M3.1; real LLM reply into
+STDB→M1.6. CI 16/16 (16 gateway tests, headless via `MockLanguageModelV3`); a real
+provider round-trip is the founder smoke `V-6` (key via `SETUP.md` S-4). Earlier:
+**M1.2** `apps/mobile` does real **SpacetimeAuth (OIDC) login** —
 `src/auth.ts` runs authorization-code + PKCE via `expo-auth-session` (issuer
 `auth.spacetimedb.com/oidc`), persists the refresh token in SecureStore, and passes
 the id token to `DbConnection.withToken()`; `App.tsx` gates the provider behind a
@@ -32,10 +38,12 @@ ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous l
   `node-linker=hoisted` (DEC-014).
 - **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
   (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
-- **Open founder setup:** `SETUP.md` S-1 (client_id), S-2 (redirect URI), S-3
-  (publish module to Maincloud) — needed before V-5.
-- **Next:** **M1.3** (group/contacts) or **M1.4** (Model Gateway v1) → M1.5 Agent
-  Studio → M1.6 agent replies.
+- **Open device checks:** + V-6 (gateway smoke — real provider key).
+- **Open founder setup:** `SETUP.md` S-1/S-2/S-3 (SpacetimeAuth + Maincloud, before
+  V-5); S-4 (a provider API key, before V-6).
+- **Next:** **M1.5** Agent Studio (persona create/edit) → **M1.6** orchestrator
+  reply loop (gateway.stream → batched STDB UPDATEs); M1.3 (groups/contacts) when
+  track A resumes.
 
 ---
 
@@ -232,6 +240,27 @@ add the redirect URI, publish to Maincloud) — the setup-side twin of
 `VERIFICATION.md`, encoded as a standing rule in `CLAUDE.md` §1/§4. The
 orchestrator's real service-account auth is out of scope → **OT-007**.
 
+### DEC-020 — Model Gateway v1: AI SDK adapters (Anthropic + OpenAI) + AES-256-GCM BYOK
+*2026-06-13.* M1.4 fills the gateway stub in on the **Vercel AI SDK v6**
+(`ai@6`, `@ai-sdk/anthropic@3`, `@ai-sdk/openai@3`), keeping the existing
+`ModelGateway` interface byte-stable. **Choices:** (1) `createModelGateway({
+resolveCredential, providers? })` — a **provider registry** maps `ModelRef.provider`
+→ an AI SDK model factory; **anthropic + openai** implemented, **google +
+openai-compatible** registered but throw (BACKLOG; the registry makes adding them a
+line each). (2) `stream(req)` calls `streamText` and normalizes `fullStream` →
+`GatewayDelta` (`text`/`tool-call`/`finish`+usage); `system` roles hoisted into the
+SDK `system` arg; `ToolSpec`→`jsonSchema`. (3) **BYOK** is an `EncryptedKeyStore`
+(Node `crypto` **AES-256-GCM**, seal/open under an env KEK) + an injected
+`CredentialResolver`; **v1 backing is an in-memory sealed map**, Postgres/KMS
+deferred (OT-005). Decryption is in-memory only, never logged (BLUEPRINT §4). (4)
+`resolveCredential` is **optional** (no-arg `createModelGateway()` still compiles;
+`stream` throws a clear error if used without one). (5) `embed` stays deferred to
+M3.1. (6) Tested **headlessly**: BYOK crypto (round-trip / tamper / wrong-KEK) +
+stream normalization via AI SDK `MockLanguageModelV3` (16 tests) — a real provider
+round-trip is the founder smoke (V-6, key via SETUP.md S-4). Orchestrator builds the
+gateway with `envResolver()`; the echo reply loop is untouched (real LLM reply into
+STDB is M1.6).
+
 ---
 
 ## Session Journal (append-only)
@@ -327,6 +356,20 @@ orchestrator's real service-account auth is out of scope → **OT-007**.
 - **Next:** founder works S-1…S-3 + V-5; AI plans **M1.3** (groups/contacts) or
   **M1.4** (Model Gateway v1).
 
+### 2026-06-13 — M1.4 Model Gateway v1 (AI SDK adapters + BYOK)
+- Chose track B (the agent/AI moat) over more chat UI. Filled the `packages/gateway`
+  stub in on the **Vercel AI SDK v6** (pinned the real v6 `fullStream` part shapes
+  via the installed `.d.ts` — `text-delta.text`, `finish.totalUsage`): provider
+  registry (anthropic + openai live; google/openai-compatible inert), `streamText`
+  → `GatewayDelta` normalization, `system` hoist, `ToolSpec`→`jsonSchema` (DEC-020).
+- BYOK: `src/credentials.ts` — AES-256-GCM `EncryptedKeyStore` + injected
+  `CredentialResolver` (+ dev `envResolver`); orchestrator wired with `envResolver()`.
+- **Verified headlessly:** CI **16/16**; 16 gateway tests (BYOK crypto round-trip /
+  tamper / wrong-KEK; stream normalization + tool-call via `MockLanguageModelV3`).
+  Real provider round-trip → `V-6`; provider key → `SETUP.md` S-4.
+- **Next:** **M1.5** Agent Studio, then **M1.6** wires `gateway.stream` into the
+  orchestrator reply loop (streaming UPDATEs into STDB).
+
 ---
 
 ## Open Threads
@@ -348,6 +391,9 @@ orchestrator's real service-account auth is out of scope → **OT-007**.
 - **OT-005** — *Hosting & data stores.* Decide SpacetimeDB host (Maincloud Pro
   vs self-host), orchestrator host, and the Postgres/pgvector provider. Unblocks:
   M0 infra / M3 RAG. (Pricing/limits cited in research are reported-not-verified.)
+  Now also owns the **durable BYOK key store**: M1.4's gateway uses an in-memory
+  AES-256-GCM store under an env KEK; the Postgres/KMS backing (`provider_keys.secret_ref`)
+  lands with this decision (DEC-020).
 - **OT-006** — *Local model structured output.* OpenAI-compatible local providers
   lack the AI SDK's structured-output mode; decide the validation/JSON-repair
   strategy for local agents. Unblocks: M5.
