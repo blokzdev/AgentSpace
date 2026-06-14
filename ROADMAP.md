@@ -13,15 +13,14 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-14.* **M0 closed; M1 build phases M1.1–M1.6 done** (chat, login, contacts/
-groups+UX, gateway, Agent Studio, agent replies). Drift sweep done
-(`.audit/sweep-2026-06-14.md`, findings routed + applied). **Next: M1.7 — per-user
-in-app BYOK** (DEC-024): the founder confirmed BYOK should gate the first real reply
-(no shared `.env` key), so M1.7 is the last M1 phase. Sequence: **M1.7 build →
-V-7/V-8 on the real BYOK path → tag `M1 [shipped]` → M2 / M3 / BL-016.** The
-`M1 [shipped]` tag is **HELD** until M1.7 + the on-device V-checklist. Autonomous build
-loop (CLAUDE.md §4); founder setup `SETUP.md` S-1/S-2 done, S-3 (Maincloud publish) +
-S-4 (interim key) pending.
+*2026-06-14.* **M0 closed; all seven M1 build phases done** (M1.1 chat, M1.2 login, M1.3
+contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies, **M1.7
+per-user BYOK**). Drift sweep done (findings applied). The full **build-an-agent →
+converse with your own key** loop works on real infra (verified headlessly end-to-end).
+**`M1 [shipped]` tag HELD** only on the founder on-device V-checklist (esp. V-7/V-8 on
+the real BYOK path) + S-3 (Maincloud publish). Then **M2** (multi-agent groups, BL-014),
+**M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Autonomous
+build loop (CLAUDE.md §4); founder setup S-1/S-2 done; S-4 now optional (keys go in-app).
 
 ---
 
@@ -114,15 +113,15 @@ with presence.
   `complete`) + seeded default persona; mobile streaming cursor (DEC-021). CI 16/16;
   local mock-gateway integration proves the round-trip headlessly. Live on-device
   reply `V-7` (interim key `SETUP.md` S-4).*
-- **M1.7 (B)** **Per-user in-app BYOK** *(NEXT — gates the M1 tag, DEC-024)*. Each user
-  enters their own provider key(s) in the app; keys are stored **encrypted, never raw
-  in STDB** (the `provider_keys` flow — BLUEPRINT §3); the orchestrator resolves
-  **per-user / per-persona** keys (swap `envResolver` → a real `CredentialResolver`).
-  The first real on-device agent reply (V-7/V-8) uses *this* path — no `.env`. Replaces
-  the interim operator key. *Acceptance:* a user adds their key in-app → their persona
-  replies with it on-device; the raw key never appears in STDB. Durable Postgres/KMS
-  backing stays **BL-011**; client-crypto/submission design decided in the M1.7 plan
-  (mobile has no crypto lib today). The orchestrator's real service account is `OT-007`.
+- **M1.7 (B)** **Per-user in-app BYOK** *(gates the M1 tag)*. ✓ *Done 2026-06-14 —
+  Option A (DEC-025): the orchestrator publishes a NaCl box pubkey (`service.encPubKey`/
+  `service_info`); the app **seals** the key client-side (`tweetnacl`) and stores
+  **ciphertext only** in `provider_key` (`set_provider_key`); the orchestrator decrypts
+  per-`<owner>:<provider>` in-memory (`createByokResolver`), resolved from
+  `my_persona_keys`. Mobile `ApiKeys` screen (🔑 Keys). Raw key never in STDB;
+  `envResolver`/`.env` now only the gateway smoke (V-6). CI 16/16 (14 orch tests);
+  headless integration proves seal→ciphertext→decrypt→reply. On-device `V-7/V-8`.
+  Durable Postgres/KMS backing `BL-011`; orchestrator service account `OT-007`.*
 
 Human verification: `[gate]` build-an-agent → live 1:1 reply on-device **with the
 user's own BYOK key** (V-7/V-8 after M1.7).

@@ -11,5 +11,5 @@ import {
 } from "spacetimedb";
 
 export default {
-  encPubKey: __t.string(),
+  provider: __t.string(),
 };

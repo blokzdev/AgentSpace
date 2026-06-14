@@ -5,6 +5,7 @@ import { createModelGateway, envResolver, type ModelGateway } from '@agentspace/
 import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
 import { connectOrchestrator } from './spacetime';
 import { startReplyLoop } from './replyLoop';
+import { createByokResolver, defaultKeyFile, loadOrCreateKeypair, pubKeyB64 } from './byok';
 
 export interface OrchestratorConfig {
   gateway: ModelGateway;
@@ -34,10 +35,19 @@ export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orches
 
 export async function main(): Promise<void> {
   const { conn, identity } = await connectOrchestrator();
-  const orchestrator = createOrchestrator();
   console.info(`[orchestrator] connected as ${identity.toHexString()}`);
-  console.info(orchestrator.describe());
-  // Register as the agent service so authored personas can be deployed (M1.5).
-  conn.reducers.registerService({});
-  startReplyLoop(conn, identity, orchestrator.config.gateway);
+  console.info(createOrchestrator().describe());
+
+  // BYOK (M1.7): publish our box public key so users can seal their provider keys to
+  // us; resolve each reply's key per (persona owner, provider) from `my_persona_keys`.
+  const keypair = loadOrCreateKeypair(defaultKeyFile());
+  conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
+  const gateway = createModelGateway({
+    resolveCredential: createByokResolver({
+      keys: () => conn.db.my_persona_keys.iter(),
+      secretKey: keypair.secretKey,
+    }),
+  });
+
+  startReplyLoop(conn, identity, gateway);
 }

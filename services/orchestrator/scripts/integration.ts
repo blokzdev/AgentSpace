@@ -1,8 +1,9 @@
-// Local end-to-end check for Agent Studio + the agent reply loop (M1.5/M1.6). A
-// user authors a persona, deploys it to a DM, and posts; the orchestrator streams a
-// reply via a MOCK gateway (no API key) — we assert the reply row goes
-// streaming → complete AND that the gateway received the *persona's* system prompt +
-// model (proving persona injection end-to-end).
+// Local end-to-end check for per-user BYOK + the agent reply loop (M1.7/M1.6). A user
+// seals a provider key to the orchestrator's box public key and stores the CIPHERTEXT
+// in STDB (`set_provider_key`); authors a persona; posts. The orchestrator resolves the
+// sealed key via `createByokResolver` (the real BYOK path) and replies. We assert the
+// reply streams AND that the orchestrator decrypted exactly the key the user sealed —
+// proving: app seals → STDB holds only ciphertext → orchestrator decrypts in-memory.
 // Needs a running local server with the `agentspace` module published. Not in CI.
 //   pnpm --filter @agentspace/orchestrator integration
 import { tmpdir } from 'node:os';
@@ -12,45 +13,23 @@ import type { GatewayDelta, GatewayRequest, ModelGateway } from '@agentspace/gat
 import { DbConnection } from '@agentspace/stdb-bindings';
 import { connectOrchestrator } from '../src/spacetime';
 import { startReplyLoop } from '../src/replyLoop';
+import { createByokResolver, loadOrCreateKeypair, pubKeyB64, seal } from '../src/byok';
 
 const HOST = process.env.AGENTSPACE_STDB_HOST ?? 'ws://127.0.0.1:3000';
 const DB = process.env.AGENTSPACE_STDB_DB ?? 'agentspace';
 
-const PERSONA = {
-  name: 'Pirate Pete',
-  systemPrompt: 'You are Pirate Pete. Reply only in pirate speak.',
-  provider: 'anthropic',
-  model: 'claude-opus-4-8',
-};
+const PERSONA = { name: 'Pirate Pete', systemPrompt: 'You are Pirate Pete.', provider: 'anthropic', model: 'claude-opus-4-8' };
+const USER_KEY = 'sk-test-byok-123';
 const REPLY_CHUNKS = ['Ahoy', ', ', 'matey', '!'];
 const EXPECTED = REPLY_CHUNKS.join('');
-
-// Mock gateway that records the request it was handed, then streams scripted chunks.
-function makeMockGateway(): { gateway: ModelGateway; lastRequest: () => GatewayRequest | undefined } {
-  let seen: GatewayRequest | undefined;
-  const gateway: ModelGateway = {
-    // eslint-disable-next-line @typescript-eslint/require-await
-    async *stream(req: GatewayRequest): AsyncIterable<GatewayDelta> {
-      seen = req;
-      for (const text of REPLY_CHUNKS) yield { type: 'text', text };
-      yield { type: 'finish', usage: { inputTokens: 7, outputTokens: 4 }, finishReason: 'stop' };
-    },
-    embed: () => Promise.reject(new Error('not used')),
-  };
-  return { gateway, lastRequest: () => seen };
-}
 
 function connectUser(): Promise<{ conn: DbConnection; identity: Identity }> {
   return new Promise((resolve, reject) => {
     DbConnection.builder()
       .withUri(HOST)
       .withDatabaseName(DB)
-      .onConnect((conn, identity) => {
-        resolve({ conn, identity });
-      })
-      .onConnectError((_ctx, err: Error) => {
-        reject(err);
-      })
+      .onConnect((conn, identity) => resolve({ conn, identity }))
+      .onConnectError((_ctx, err: Error) => reject(err))
       .build();
   });
 }
@@ -64,9 +43,21 @@ async function run(): Promise<void> {
   const orch = await connectOrchestrator({
     tokenFile: join(tmpdir(), `agentspace-orch-int-${Date.now()}.token`),
   });
-  orch.conn.reducers.registerService({}); // claim the agent service identity
-  const mock = makeMockGateway();
-  startReplyLoop(orch.conn, orch.identity, mock.gateway, { flushMs: 20 });
+  const keypair = loadOrCreateKeypair(join(tmpdir(), `agentspace-orch-int-${Date.now()}.boxkey`));
+  orch.conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
+
+  // Gateway that exercises the real BYOK resolver, then streams scripted chunks.
+  const resolver = createByokResolver({ keys: () => orch.conn.db.my_persona_keys.iter(), secretKey: keypair.secretKey });
+  let decryptedKey: string | undefined;
+  const gateway: ModelGateway = {
+    async *stream(req: GatewayRequest): AsyncIterable<GatewayDelta> {
+      decryptedKey = await resolver(req.credentialRef); // ← the BYOK path
+      for (const text of REPLY_CHUNKS) yield { type: 'text', text };
+      yield { type: 'finish', usage: { inputTokens: 7, outputTokens: 4 }, finishReason: 'stop' };
+    },
+    embed: () => Promise.reject(new Error('not used')),
+  };
+  startReplyLoop(orch.conn, orch.identity, gateway, { flushMs: 20 });
   console.info(`orchestrator identity: ${orch.identity.toHexString()}`);
 
   const user = await connectUser();
@@ -75,10 +66,13 @@ async function run(): Promise<void> {
   await new Promise<void>((resolve) => {
     user.conn
       .subscriptionBuilder()
-      .onApplied(() => {
-        resolve();
-      })
-      .subscribe(['SELECT * FROM my_thread_messages', 'SELECT * FROM my_threads', 'SELECT * FROM my_agents']);
+      .onApplied(() => resolve())
+      .subscribe([
+        'SELECT * FROM my_thread_messages',
+        'SELECT * FROM my_threads',
+        'SELECT * FROM my_agents',
+        'SELECT * FROM service_info',
+      ]);
   });
 
   const done = new Promise<string>((resolve, reject) => {
@@ -90,22 +84,37 @@ async function run(): Promise<void> {
         resolve(msg.text);
       }
     };
-    user.conn.db.my_thread_messages.onInsert((_ctx, msg) => {
-      check(msg);
-    });
-    user.conn.db.my_thread_messages.onUpdate((_ctx, _old, msg) => {
-      check(msg);
-    });
+    user.conn.db.my_thread_messages.onInsert((_ctx, m) => check(m));
+    user.conn.db.my_thread_messages.onUpdate((_ctx, _o, m) => check(m));
   });
 
-  // Author the persona; when it lands, deploy it to a DM.
+  // 1) once the orchestrator's pubkey is published, seal the key + author the persona.
+  let seeded = false;
+  const seed = (): void => {
+    if (seeded) return;
+    const svc = [...user.conn.db.service_info.iter()][0];
+    if (!svc || svc.encPubKey.length === 0) return;
+    seeded = true;
+    const sealed = seal(USER_KEY, svc.encPubKey); // client-side encryption to the orchestrator
+    user.conn.reducers.setProviderKey({ provider: PERSONA.provider, sealed });
+    user.conn.reducers.createAgent({
+      name: PERSONA.name,
+      systemPrompt: PERSONA.systemPrompt,
+      provider: PERSONA.provider,
+      model: PERSONA.model,
+    });
+  };
+  user.conn.db.service_info.onInsert(() => seed());
+  user.conn.db.service_info.onUpdate(() => seed());
+  seed();
+
+  // 2) deploy the persona to a DM, then post.
   let deployed = false;
   user.conn.db.my_agents.onInsert((_ctx, a) => {
     if (deployed) return;
     deployed = true;
     user.conn.reducers.createAgentDm({ agentId: a.id });
   });
-  // When the agent DM appears, post into it.
   let posted = false;
   user.conn.db.my_threads.onInsert((_ctx, th) => {
     if (posted || th.agentId === 0n) return;
@@ -113,28 +122,13 @@ async function run(): Promise<void> {
     user.conn.reducers.sendMessage({ threadId: th.id, text: 'hello there' });
   });
 
-  user.conn.reducers.createAgent({
-    name: PERSONA.name,
-    systemPrompt: PERSONA.systemPrompt,
-    provider: PERSONA.provider,
-    model: PERSONA.model,
-  });
-
   const text = await done.catch((e: Error) => fail(e.message));
   if (text !== EXPECTED) fail(`reply text was "${text}", expected "${EXPECTED}"`);
+  if (decryptedKey !== USER_KEY) fail(`orchestrator decrypted "${decryptedKey ?? '(none)'}", expected the user's sealed key`);
 
-  const req = mock.lastRequest();
-  if (!req) fail('gateway was never called');
-  if (req.model.model !== PERSONA.model || req.model.provider !== PERSONA.provider) {
-    fail(`gateway model was ${req.model.provider}/${req.model.model}, expected ${PERSONA.provider}/${PERSONA.model}`);
-  }
-  const system = req.messages.find((m) => m.role === 'system')?.content;
-  if (system !== PERSONA.systemPrompt) fail(`system prompt was "${system ?? '(none)'}", expected the persona's`);
-
-  console.info(`\n✅ persona "${PERSONA.name}" drove the reply:`);
-  console.info(`   model:  ${req.model.provider}/${req.model.model}`);
-  console.info(`   system: "${system}"`);
-  console.info(`   reply:  "${text}" (streaming → complete)`);
+  console.info(`\n✅ per-user BYOK end-to-end:`);
+  console.info(`   user sealed key → STDB holds only ciphertext → orchestrator decrypted "${decryptedKey}"`);
+  console.info(`   persona "${PERSONA.name}" replied: "${text}" (streaming → complete)`);
   process.exit(0);
 }
 

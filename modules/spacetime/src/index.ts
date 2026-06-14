@@ -112,18 +112,38 @@ const agent = table(
   }
 );
 
-// Singleton holding the orchestrator's identity, so reducers can add it as the
-// `agent` member of an agent DM without the client knowing it. Registered by the
-// orchestrator on startup (first-wins in v1 — harden with OT-007).
+// Singleton holding the orchestrator's identity + its box public key, so reducers
+// can add it as the `agent` member and clients can encrypt BYOK keys to it (M1.7).
 const service = table(
   { name: 'service' },
   {
-    id: t.u8().primaryKey(), // always 0n
+    id: t.u8().primaryKey(), // always 0
     identity: t.identity(),
+    encPubKey: t.string(), // NaCl box public key (base64) — clients seal BYOK keys to it
   }
 );
 
-const spacetimedb = schema({ user, thread, threadMember, message, run, agent, service });
+// Per-user BYOK provider keys (M1.7). `sealed` is CIPHERTEXT ONLY — the raw key is
+// encrypted client-side to the orchestrator's box public key and never appears here.
+const providerKey = table(
+  {
+    name: 'provider_key',
+    indexes: [
+      { accessor: 'by_owner', algorithm: 'btree', columns: ['owner'] },
+      { accessor: 'by_owner_provider', algorithm: 'btree', columns: ['owner', 'provider'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    owner: t.identity(),
+    provider: t.string(), // ModelProvider
+    sealed: t.string(), // base64(ephPub32 || nonce24 || ciphertext) — never raw
+    createdAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+const spacetimedb = schema({ user, thread, threadMember, message, run, agent, service, providerKey });
 export default spacetimedb;
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -225,12 +245,42 @@ export const delete_agent = spacetimedb.reducer({ agentId: t.u64() }, (ctx, { ag
 
 // The orchestrator registers its identity once so agent DMs can add it as the
 // `agent` member. First-wins in v1 (harden with OT-007).
-export const register_service = spacetimedb.reducer({}, (ctx) => {
-  const existing = ctx.db.service.id.find(0);
-  if (existing) {
-    ctx.db.service.id.update({ ...existing, identity: ctx.sender });
-  } else {
-    ctx.db.service.insert({ id: 0, identity: ctx.sender });
+export const register_service = spacetimedb.reducer(
+  { encPubKey: t.string() },
+  (ctx, { encPubKey }) => {
+    const existing = ctx.db.service.id.find(0);
+    if (existing) {
+      ctx.db.service.id.update({ ...existing, identity: ctx.sender, encPubKey });
+    } else {
+      ctx.db.service.insert({ id: 0, identity: ctx.sender, encPubKey });
+    }
+  }
+);
+
+// BYOK key management (M1.7) — the caller owns the key; `sealed` is ciphertext only.
+export const set_provider_key = spacetimedb.reducer(
+  { provider: t.string(), sealed: t.string() },
+  (ctx, { provider, sealed }) => {
+    if (!provider || !sealed) throw new SenderError('provider and sealed are required');
+    const existing = [...ctx.db.providerKey.by_owner_provider.filter([ctx.sender, provider])];
+    if (existing.length > 0) {
+      ctx.db.providerKey.id.update({ ...existing[0], sealed, updatedAt: ctx.timestamp });
+    } else {
+      ctx.db.providerKey.insert({
+        id: 0n,
+        owner: ctx.sender,
+        provider,
+        sealed,
+        createdAt: ctx.timestamp,
+        updatedAt: ctx.timestamp,
+      });
+    }
+  }
+);
+
+export const delete_provider_key = spacetimedb.reducer({ provider: t.string() }, (ctx, { provider }) => {
+  for (const k of [...ctx.db.providerKey.by_owner_provider.filter([ctx.sender, provider])]) {
+    ctx.db.providerKey.id.delete(k.id);
   }
 });
 
@@ -461,5 +511,38 @@ export const my_active_personas = spacetimedb.view(
       if (!th || th.agentId === 0n) return [];
       const a = ctx.db.agent.id.find(th.agentId);
       return a ? [a] : [];
+    })
+);
+
+// The orchestrator's box public key — public so clients can seal BYOK keys to it (M1.7).
+export const service_info = spacetimedb.view(
+  { name: 'service_info', public: true },
+  t.array(service.rowType),
+  (ctx) => {
+    const s = ctx.db.service.id.find(0);
+    return s ? [s] : [];
+  }
+);
+
+// The caller's own provider keys (metadata for the Settings UI — `sealed` is opaque).
+export const my_provider_keys = spacetimedb.view(
+  { name: 'my_provider_keys', public: true },
+  t.array(providerKey.rowType),
+  (ctx) => [...ctx.db.providerKey.by_owner.filter(ctx.sender)]
+);
+
+// Sealed keys the orchestrator needs: for each thread it's an `agent` member of,
+// the bound persona owner's provider keys (ciphertext — decryptable only by the
+// orchestrator's secret key). The reply loop's resolver surface.
+export const my_persona_keys = spacetimedb.view(
+  { name: 'my_persona_keys', public: true },
+  t.array(providerKey.rowType),
+  (ctx) =>
+    [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => {
+      if (m.role !== 'agent') return [];
+      const th = ctx.db.thread.id.find(m.threadId);
+      if (!th || th.agentId === 0n) return [];
+      const a = ctx.db.agent.id.find(th.agentId);
+      return a ? [...ctx.db.providerKey.by_owner.filter(a.owner)] : [];
     })
 );

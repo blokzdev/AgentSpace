@@ -5,7 +5,8 @@
 import { Identity } from 'spacetimedb';
 import type { ModelGateway } from '@agentspace/gateway';
 import { DbConnection } from '@agentspace/stdb-bindings';
-import { buildPrompt, createBatcher, newRunId, selectPersona, type PromptRow } from './prompt';
+import { MissingKeyError } from './byok';
+import { buildPrompt, createBatcher, newRunId, selectPersona, type AgentRef, type PromptRow } from './prompt';
 
 const FLUSH_MS = 50;
 
@@ -32,6 +33,7 @@ export function startReplyLoop(
       'SELECT * FROM my_thread_members',
       'SELECT * FROM my_threads',
       'SELECT * FROM my_active_personas',
+      'SELECT * FROM my_persona_keys',
     ]);
 
   conn.db.my_thread_messages.onInsert((_ctx, msg) => {
@@ -68,11 +70,14 @@ async function handleReply(
   });
 
   try {
-    const persona = selectPersona(
-      [...conn.db.my_threads.iter()],
-      [...conn.db.my_active_personas.iter()],
-      threadId,
-    );
+    const agents: AgentRef[] = [...conn.db.my_active_personas.iter()].map((a) => ({
+      id: a.id,
+      systemPrompt: a.systemPrompt,
+      provider: a.provider,
+      model: a.model,
+      owner: a.owner.toHexString(),
+    }));
+    const persona = selectPersona([...conn.db.my_threads.iter()], agents, threadId);
     const rows: PromptRow[] = [];
     for (const m of conn.db.my_thread_messages.iter()) {
       if (m.threadId === threadId) {
@@ -81,11 +86,12 @@ async function handleReply(
     }
     const messages = buildPrompt(rows, persona.systemPrompt);
     const model = persona.model;
+    const credentialRef = `${persona.ownerHex}:${model.provider}`; // BYOK key per owner+provider (M1.7)
 
     conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
 
     let usage = { inputTokens: 0, outputTokens: 0 };
-    for await (const delta of gateway.stream({ model, credentialRef: model.provider, messages })) {
+    for await (const delta of gateway.stream({ model, credentialRef, messages })) {
       if (delta.type === 'text') {
         acc += delta.text;
         batcher.push(acc);
@@ -104,7 +110,14 @@ async function handleReply(
   } catch (err) {
     batcher.stop();
     console.warn('[orchestrator] reply failed:', err instanceof Error ? err.message : err);
-    conn.reducers.agentReplyFinish({ runId, text: acc, ok: false, inputTokens: 0n, outputTokens: 0n });
+    // Surface a missing-key error to the user in-chat; otherwise a generic failure.
+    const text =
+      err instanceof MissingKeyError
+        ? `⚠️ ${err.message}`
+        : acc.length > 0
+          ? acc
+          : '⚠️ Sorry — I could not generate a reply.';
+    conn.reducers.agentReplyFinish({ runId, text, ok: false, inputTokens: 0n, outputTokens: 0n });
   } finally {
     active.delete(threadId);
   }

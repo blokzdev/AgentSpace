@@ -40,6 +40,12 @@ export type MyActivePersonas = __Infer<typeof MyActivePersonas>;
 export const MyAgents = __t.object("MyAgents", {});
 export type MyAgents = __Infer<typeof MyAgents>;
 
+export const MyPersonaKeys = __t.object("MyPersonaKeys", {});
+export type MyPersonaKeys = __Infer<typeof MyPersonaKeys>;
+
+export const MyProviderKeys = __t.object("MyProviderKeys", {});
+export type MyProviderKeys = __Infer<typeof MyProviderKeys>;
+
 export const MyThreadMembers = __t.object("MyThreadMembers", {});
 export type MyThreadMembers = __Infer<typeof MyThreadMembers>;
 
@@ -48,6 +54,16 @@ export type MyThreadMessages = __Infer<typeof MyThreadMessages>;
 
 export const MyThreads = __t.object("MyThreads", {});
 export type MyThreads = __Infer<typeof MyThreads>;
+
+export const ProviderKey = __t.object("ProviderKey", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  provider: __t.string(),
+  sealed: __t.string(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type ProviderKey = __Infer<typeof ProviderKey>;
 
 export const Run = __t.object("Run", {
   id: __t.u64(),
@@ -66,8 +82,12 @@ export type Run = __Infer<typeof Run>;
 export const Service = __t.object("Service", {
   id: __t.u8(),
   identity: __t.identity(),
+  encPubKey: __t.string(),
 });
 export type Service = __Infer<typeof Service>;
+
+export const ServiceInfo = __t.object("ServiceInfo", {});
+export type ServiceInfo = __Infer<typeof ServiceInfo>;
 
 export const Thread = __t.object("Thread", {
   id: __t.u64(),

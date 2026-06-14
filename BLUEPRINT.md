@@ -100,14 +100,14 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | `users` | `identity` (PK), `display_name`, `avatar`, `online` | View: self + co-members | one row per human Identity |
 | `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5) |
 | `agent_versions` | (deferred — BL-013) | — | v1 inlines config + a `version` counter; immutable history/run-pinning is BL-013 |
-| `service` | `id` (PK = 0), `identity` | private | singleton: the orchestrator's identity, so reducers add it as the `agent` member (M1.5) |
+| `service` | `id` (PK = 0), `identity`, `enc_pub_key` | View: `service_info` (public) | singleton: orchestrator identity (M1.5) + its NaCl **box public key** so clients seal BYOK keys to it (M1.7) |
 | `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5) |
 | `thread_members` | `(thread_id, member_ref)` , `role` (human\|agent), `member_kind` | View: members only | membership is the authz spine |
 | `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | streamed via UPDATE (§5); `run_id`=`''` for humans (M1.6) |
 | `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6). `cost`/`error` deferred |
 | `attachments` | `id` (PK), `message_id`, `kind`, `uri`, `meta` | View: thread members | blobs out-of-band |
 | `presence` | `identity`/`agent_id`, `state`, `typing_in_thread` | View: co-members | humans + agents |
-| `provider_keys` | `id` (PK), `owner`, `provider`, `secret_ref`, `label` | private; never raw key | **planned — M1.7** (per-user BYOK). Not built yet: v1 resolves one operator key via `envResolver`; durable Postgres/KMS backing is BL-011 |
+| `provider_key` | `id` (PK), `owner`, `provider`, `sealed`, `created_at`, `updated_at` | View: `my_provider_keys` (owner) + `my_persona_keys` (agent member) | per-user BYOK (M1.7). `sealed` = **ciphertext** (box-sealed to the orchestrator's pubkey); raw key never in STDB. Durable Postgres/KMS backing = BL-011 |
 | `agent_toolkits` | `(agent_id, toolkit_id)`, `config_ref` | private | per-agent tool scoping |
 | `workflows` | `id` (PK), `agent_id`, `trigger`, `definition_ref`, `enabled` | View: owner | |
 | `workflow_schedules` | `scheduled_id` (PK), `scheduled_at`, `workflow_id` | scheduled table | drives scheduled reducer |
@@ -176,16 +176,24 @@ layer); keys are decrypted **in-memory at call time**, never sent to the device,
 never logged. The gateway already ships an AES-256-GCM **`EncryptedKeyStore`**
 (seal/open under a KEK) for sealing keys at rest.
 
-**Today (v1, interim):** the orchestrator wires a **dev `envResolver`**
-(`credentialRef = model.provider` → `<PROVIDER>_API_KEY`), so **one operator key per
-provider** drives all replies. This backs the gateway smoke (V-6) and is a dev
-fallback — **not** the product model.
+**Per-user BYOK (M1.7, implemented — Option A: client-encrypt, ciphertext via STDB):**
+1. The orchestrator holds a **NaCl box keypair** (Curve25519; secret key persisted to a
+   file like its token) and publishes its **public key** via `service.enc_pub_key`
+   (`service_info` view).
+2. The app **seals** the user's provider key to that public key —
+   `base64(ephPub32 ‖ nonce24 ‖ box(rawKey))` — and stores only that **ciphertext** in a
+   `provider_key` row (`set_provider_key`). The raw key never leaves the device
+   unsealed and **never appears in STDB**.
+3. The orchestrator's `CredentialResolver` (`createByokResolver`) takes
+   `credentialRef = "<ownerHex>:<provider>"` (built from the persona's `owner` +
+   `provider`), finds the sealed blob in `my_persona_keys`, **opens it in-memory** with
+   its secret key, and hands the raw key to the gateway. Missing key → a friendly
+   in-chat error.
 
-**Per-user BYOK → M1.7.** Each user supplies their own provider key(s) in the app;
-keys are stored encrypted and **never raw in STDB** (the planned `provider_keys` row
-holds only a `secret_ref`, BLUEPRINT §3); the orchestrator resolves per-user /
-per-persona keys. The first real on-device agent reply (V-7/V-8) uses this path. The
-durable Postgres/KMS backing for `secret_ref` stays **BL-011**.
+**Interim (dev only):** the gateway smoke (V-6) + a fallback still use `envResolver`
+(`<PROVIDER>_API_KEY`); the orchestrator no longer does. Durable Postgres/KMS backing
++ keypair/KEK rotation stay **BL-011**. (Mobile seal + orchestrator open are coupled —
+`apps/mobile/src/byok.ts` ↔ `services/orchestrator/src/byok.ts`.)
 
 ---
 

@@ -22,7 +22,9 @@
     "react-native": "0.76.5",
     "react-native-get-random-values": "~1.11.0",
     "spacetimedb": "2.5.*",
-    "text-encoding-polyfill": "^0.6.7"
+    "text-encoding-polyfill": "^0.6.7",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

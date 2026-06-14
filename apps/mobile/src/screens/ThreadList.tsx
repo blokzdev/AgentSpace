@@ -11,12 +11,14 @@ export function ThreadList({
   onNewChat,
   onNewGroup,
   onAgents,
+  onApiKeys,
   onSignOut,
 }: {
   onOpen: (id: bigint) => void;
   onNewChat: () => void;
   onNewGroup: () => void;
   onAgents: () => void;
+  onApiKeys: () => void;
   onSignOut: () => void;
 }): React.JSX.Element {
   const { identity } = useSpacetimeDB();
@@ -83,6 +85,9 @@ export function ThreadList({
         <View style={styles.headerActions}>
           <Pressable onPress={onAgents} hitSlop={8}>
             <Text style={styles.link}>🤖 Agents</Text>
+          </Pressable>
+          <Pressable onPress={onApiKeys} hitSlop={8}>
+            <Text style={styles.link}>🔑 Keys</Text>
           </Pressable>
           <Pressable onPress={onSignOut} hitSlop={8}>
             <Text style={styles.link}>Sign out</Text>
