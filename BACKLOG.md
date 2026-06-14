@@ -71,12 +71,14 @@
   already reserves `google`/`openai-compatible`); local lands with BL-006 (structured
   output) at M5.
 
-### BL-011 — Durable BYOK key store (Postgres/KMS)
-- **Source:** DEC-020 / OT-005 (M1.4 uses an in-memory AES-256-GCM store under an
-  env KEK).
-- **Trigger:** real per-user keys need persistence + a managed KMS; M3/infra stands
-  up Postgres.
-- **Promotion:** back `EncryptedKeyStore` with `provider_keys.secret_ref` (BLUEPRINT
+### BL-011 — Durable BYOK key-store *backing* (Postgres/KMS)
+- **Note:** the per-user BYOK **feature** is promoted to **ROADMAP M1.7** (key-entry
+  UI + `provider_keys` flow + the orchestrator resolver swap). BL-011 now narrows to
+  the **durable storage backing** under it.
+- **Source:** DEC-020 / DEC-024 / OT-005 (M1.7's v1 store persists without Postgres;
+  this is the hardened backend).
+- **Trigger:** production key persistence + a managed KMS; M3/infra stands up Postgres.
+- **Promotion:** back the M1.7 store with `provider_keys.secret_ref` (BLUEPRINT
   §3/§4); rotate the KEK via KMS. Satisfies Launch Gate **LG-2**.
 
 ### BL-012 — Gateway embeddings (`embed`)

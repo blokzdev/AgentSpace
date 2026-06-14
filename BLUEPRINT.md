@@ -57,6 +57,7 @@ AgentSpace/
 ├── services/orchestrator/  # Node/TS agent runtime    (layer: service)
 ├── packages/gateway/       # Model Gateway (AI SDK)    (layer: lib)
 ├── packages/shared/        # shared types/contracts    (layer: lib, lowest)
+├── packages/stdb-bindings/ # generated STDB client     (layer: generated lib, BL-009)
 ├── modules/spacetime/      # SpacetimeDB TS module      (layer: module)
 └── examples/chat-react-ts/ # reference only (not imported by product code)
 ```
@@ -75,7 +76,11 @@ shared  ◀── modules/spacetime
   nothing internal.
 - `packages/gateway` depends only on `shared`. It must not import orchestrator,
   app, or module code.
-- `services/orchestrator` may import `gateway` and `shared`.
+- `packages/stdb-bindings` is **generated** from `modules/spacetime` (regenerated +
+  synced on schema change) and **consumed as source** (BL-009). `services/orchestrator`
+  imports it; `apps/mobile` vendors a copy as `module_bindings/`. It is the typed STDB
+  client boundary — no hand edits.
+- `services/orchestrator` may import `gateway`, `shared`, and `stdb-bindings`.
 - `apps/mobile` imports `shared` and the **generated** `module_bindings` only.
 - `modules/spacetime` imports `shared` (for shared enums/string constants) and the
   SpacetimeDB server SDK; it imports no app/service/gateway code.
@@ -102,7 +107,7 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6). `cost`/`error` deferred |
 | `attachments` | `id` (PK), `message_id`, `kind`, `uri`, `meta` | View: thread members | blobs out-of-band |
 | `presence` | `identity`/`agent_id`, `state`, `typing_in_thread` | View: co-members | humans + agents |
-| `provider_keys` | `id` (PK), `owner`, `provider`, `secret_ref`, `label` | private; never raw key | **reference** to the encrypted store |
+| `provider_keys` | `id` (PK), `owner`, `provider`, `secret_ref`, `label` | private; never raw key | **planned — M1.7** (per-user BYOK). Not built yet: v1 resolves one operator key via `envResolver`; durable Postgres/KMS backing is BL-011 |
 | `agent_toolkits` | `(agent_id, toolkit_id)`, `config_ref` | private | per-agent tool scoping |
 | `workflows` | `id` (PK), `agent_id`, `trigger`, `definition_ref`, `enabled` | View: owner | |
 | `workflow_schedules` | `scheduled_id` (PK), `scheduled_at`, `workflow_id` | scheduled table | drives scheduled reducer |
@@ -165,15 +170,22 @@ OpenAI-compatible adapter for local runtimes (Ollama/vLLM/LM Studio).
 
 ### BYOK key custody
 
-Per-user provider keys are encrypted at rest (AES-256-GCM), decrypted **in-memory
-at call time**, never written to STDB, never sent to the device, never logged. The
-gateway owns an **`EncryptedKeyStore`** (seal/open under a KEK) and resolves a
-request's opaque `credentialRef` via an injected **`CredentialResolver`** (the
-orchestrator supplies it — keeping custody in the service layer). **v1 backing is an
-in-memory sealed map under an env KEK (`AGENTSPACE_GATEWAY_KEK`)**; the durable
-Postgres/KMS store referenced from `provider_keys.secret_ref` is deferred
-(OT-005 / BACKLOG). A dev `envResolver` (ref→`<PROVIDER>_API_KEY`) backs the smoke
-harness (V-6).
+The gateway resolves a request's opaque `credentialRef` via an injected
+**`CredentialResolver`** (the orchestrator supplies it — custody stays in the service
+layer); keys are decrypted **in-memory at call time**, never sent to the device,
+never logged. The gateway already ships an AES-256-GCM **`EncryptedKeyStore`**
+(seal/open under a KEK) for sealing keys at rest.
+
+**Today (v1, interim):** the orchestrator wires a **dev `envResolver`**
+(`credentialRef = model.provider` → `<PROVIDER>_API_KEY`), so **one operator key per
+provider** drives all replies. This backs the gateway smoke (V-6) and is a dev
+fallback — **not** the product model.
+
+**Per-user BYOK → M1.7.** Each user supplies their own provider key(s) in the app;
+keys are stored encrypted and **never raw in STDB** (the planned `provider_keys` row
+holds only a `secret_ref`, BLUEPRINT §3); the orchestrator resolves per-user /
+per-persona keys. The first real on-device agent reply (V-7/V-8) uses this path. The
+durable Postgres/KMS backing for `secret_ref` stays **BL-011**.
 
 ---
 

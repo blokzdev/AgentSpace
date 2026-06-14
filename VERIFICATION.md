@@ -20,36 +20,11 @@ Notes: <founder fills: device + OS + result>
 
 ---
 
-### V-1 — RN ↔ SpacetimeDB on-device connectivity  ·  added 2026-06-13 · M0.2b
-- **Why:** closes the runtime half of **OT-003** — the SpacetimeDB TS client must
-  actually connect + subscribe + call a reducer from React Native on a device.
-  (Static analysis + a clean Android Metro bundle already passed on the AI side;
-  this is the live run.)
-- **Setup (on your machine):**
-  1. Start a local SpacetimeDB server: `spacetime start` (listens on `:3000`).
-  2. Publish the example chat module under the probe's name:
-     `spacetime publish agentspace-probe --project-path examples/chat-react-ts/spacetimedb --server local --yes`
-  3. From `apps/mobile`, point the probe at your machine if needed (the default
-     `ws://10.0.2.2:3000` is the Android emulator's alias for host localhost; for
-     a physical device use your LAN IP):
-     `EXPO_PUBLIC_SPACETIMEDB_HOST=ws://<host-ip>:3000`
-- **Steps:**
-  1. `pnpm install` at the repo root (uses `node-linker=hoisted`).
-  2. `pnpm --filter @agentspace/mobile android` (Expo dev build / Expo Go on an
-     Android emulator or device).
-  3. Open the app — the **probe screen** shows Host, Database, Status, Identity,
-     and live subscribed Users/Messages counts.
-  4. Tap **"Send test message (reducer)"** a few times.
-- **Pass when:**
-  - **Status** flips to `connected` and an **Identity** hex appears.
-  - **Users/Messages** counts populate from the subscription (≥ 0, and Messages
-    increases after sends).
-  - **Reducer calls sent** increments and Messages reflects the new rows in real
-    time (no error toast / red screen).
-- **If it fails:** capture the red-box / logcat error and tell me. Likely fixes
-  (in order): a missing/extra polyfill, the `unstable_conditionNames` Metro
-  setting, or (worst case) a thin WS bridge — see `.audit/spike-rn-stdb-2026-06-13.md`.
-- **Notes (founder):** _device + OS + Expo SDK + result →_
+### V-1 — RN ↔ SpacetimeDB on-device connectivity  ·  added 2026-06-13 · M0.2b  ·  ~~SUPERSEDED by V-4~~
+- **Status:** **superseded.** V-1 verified the retired M0.2b *connectivity probe*
+  (the "probe screen" was replaced by the M1.1 chat MVP and no longer exists). The
+  RN↔STDB runtime path (OT-003) is now covered live by **V-4** (the real chat connect
+  + send/receive). Skip V-1; run **V-4** instead. *(Kept for history.)*
 
 ---
 
@@ -159,6 +134,9 @@ Notes: <founder fills: device + OS + result>
 ---
 
 ### V-7 — Live agent reply streams into a chat on-device  ·  added 2026-06-13 · M1.6
+> **Note:** the first real on-device reply will use **per-user in-app BYOK (M1.7)** —
+> a key you enter in the app, not `.env`. Until M1.7 lands, this runs against the
+> interim **operator key** (`SETUP.md` S-4). Re-run on the real path once M1.7 ships.
 - **Why:** the reply loop is proven headlessly with a **mock** gateway (local STDB
   integration); this exercises it with a **real LLM** end-to-end — a human message
   produces a token-by-token agent reply rendered live in the mobile thread. Depends
@@ -188,6 +166,9 @@ Notes: <founder fills: device + OS + result>
 ---
 
 ### V-8 — Author a persona and chat with it on-device (Agent Studio)  ·  added 2026-06-13 · M1.5
+> **Note:** with **per-user BYOK (M1.7)** this becomes the canonical end-to-end test —
+> a user enters their own key in the app and their persona replies with it. Until then,
+> it uses the interim operator key (`SETUP.md` S-4).
 - **Why:** proves the full **build-an-agent → converse** loop on a device: create a
   persona in the app, deploy it, and confirm the orchestrator replies **as that
   persona** (its system prompt + model). The data path + persona injection are proven

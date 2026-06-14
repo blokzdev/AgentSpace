@@ -13,16 +13,15 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-14.* **M0 closed; all six M1 build phases done** (M1.1 chat, M1.2 login, M1.3
-contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies). The full
-**build-an-agent → converse** North-Star loop + real messaging UX work on real infra
-(verified headlessly + reducers via `spacetime call`). **Milestone-close in progress:**
-drift sweep done (`.audit/sweep-2026-06-14.md` — no `[critical]`; 4 `[important]`
-doc-only findings awaiting routing); **`M1 [shipped]` tag HELD** until those are routed
-+ the founder on-device V-checklist (V-1…V-9) passes (M1's bar is an on-device agent
-reply). Then **M2** (multi-agent group threads — needs agents-as-contacts, BL-014),
-**BL-016** (chat polish), or **M3** (RAG). Autonomous build loop (CLAUDE.md §4); founder
-setup `SETUP.md` S-1…S-4 in progress.
+*2026-06-14.* **M0 closed; M1 build phases M1.1–M1.6 done** (chat, login, contacts/
+groups+UX, gateway, Agent Studio, agent replies). Drift sweep done
+(`.audit/sweep-2026-06-14.md`, findings routed + applied). **Next: M1.7 — per-user
+in-app BYOK** (DEC-024): the founder confirmed BYOK should gate the first real reply
+(no shared `.env` key), so M1.7 is the last M1 phase. Sequence: **M1.7 build →
+V-7/V-8 on the real BYOK path → tag `M1 [shipped]` → M2 / M3 / BL-016.** The
+`M1 [shipped]` tag is **HELD** until M1.7 + the on-device V-checklist. Autonomous build
+loop (CLAUDE.md §4); founder setup `SETUP.md` S-1/S-2 done, S-3 (Maincloud publish) +
+S-4 (interim key) pending.
 
 ---
 
@@ -71,9 +70,10 @@ Human verification: V-1 (Expo connect on a real Android device).
 
 ## M1 — Realtime core (A) + Agent MVP (B)
 
-**Acceptance bar:** a user signs in, builds an agent persona, and holds a live,
-streamed 1:1 conversation with it on-device; the same app supports human↔human
-1:1 and group threads with presence.
+**Acceptance bar:** a user signs in, **enters their own provider key (BYOK)**, builds
+an agent persona, and holds a live, streamed 1:1 conversation with it on-device — the
+agent reply uses *their* key; the same app supports human↔human 1:1 and group threads
+with presence.
 
 - **M1.0 (A)** Realtime data model + reducers + membership Views. ✓ *Delivered in
   M0.3 (`modules/spacetime`).*
@@ -113,10 +113,19 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   finish`; `replyLoop.ts` (gateway.stream → ~50ms batched UPDATEs, `streaming`→
   `complete`) + seeded default persona; mobile streaming cursor (DEC-021). CI 16/16;
   local mock-gateway integration proves the round-trip headlessly. Live on-device
-  reply `V-7` (key `SETUP.md` S-4).*
+  reply `V-7` (interim key `SETUP.md` S-4).*
+- **M1.7 (B)** **Per-user in-app BYOK** *(NEXT — gates the M1 tag, DEC-024)*. Each user
+  enters their own provider key(s) in the app; keys are stored **encrypted, never raw
+  in STDB** (the `provider_keys` flow — BLUEPRINT §3); the orchestrator resolves
+  **per-user / per-persona** keys (swap `envResolver` → a real `CredentialResolver`).
+  The first real on-device agent reply (V-7/V-8) uses *this* path — no `.env`. Replaces
+  the interim operator key. *Acceptance:* a user adds their key in-app → their persona
+  replies with it on-device; the raw key never appears in STDB. Durable Postgres/KMS
+  backing stays **BL-011**; client-crypto/submission design decided in the M1.7 plan
+  (mobile has no crypto lib today). The orchestrator's real service account is `OT-007`.
 
-Human verification: `[gate]` build-an-agent → live 1:1 reply on-device;
-`[gate]` real BYOK key round-trip.
+Human verification: `[gate]` build-an-agent → live 1:1 reply on-device **with the
+user's own BYOK key** (V-7/V-8 after M1.7).
 
 ---
 

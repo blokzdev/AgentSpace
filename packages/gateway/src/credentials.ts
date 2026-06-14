@@ -76,9 +76,10 @@ export function kekFromEnv(env: NodeJS.ProcessEnv = process.env): Buffer {
 }
 
 /**
- * Dev/smoke resolver: maps a credential ref (a provider name, e.g. "anthropic")
- * to the matching `<PROVIDER>_API_KEY` env var. Lets the smoke harness run with a
- * BYOK key in `.env` without provisioning an encrypted store (SETUP.md S-4).
+ * INTERIM dev/smoke resolver (DEC-024): maps a credential ref (a provider name, e.g.
+ * "anthropic") to the matching `<PROVIDER>_API_KEY` env var — one operator key per
+ * provider. Backs the smoke harness (SETUP.md S-4); **not** the product model.
+ * Per-user in-app BYOK (a real per-user `CredentialResolver`) is M1.7.
  */
 export function envResolver(env: NodeJS.ProcessEnv = process.env): CredentialResolver {
   return (ref) => {

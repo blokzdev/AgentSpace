@@ -19,23 +19,23 @@ people by name + DM/group chat (M1.1/M1.3) → author AI agents (Agent Studio, M
 the orchestrator streams real LLM replies into chat as the bound persona (Model
 Gateway M1.4 + reply loop M1.6). Every layer is verified **headlessly** (CI 16/16 +
 real-local-STDB integrations + `spacetime call` reducer checks); **nothing has run
-on a device yet**. **Drift sweep done** (`.audit/sweep-2026-06-14.md`): no
-`[critical]`; four `[important]` **doc-only** findings (README/BLUEPRINT/VERIFICATION/
-`provider_keys`) awaiting founder routing. **`M1 [shipped]` tag HELD** until those
-fixes are routed + the founder's on-device V-checklist passes (M1's acceptance bar is
-an on-device agent reply, V-7/V-8).
+on a device yet**, and **BYOK is still the interim env key** (one operator key per
+provider via `envResolver`, not per-user). Drift sweep done + **findings F-1…F-4
+applied**. **Next build chunk: `M1.7` — per-user in-app BYOK** (DEC-024), which the
+founder set as the gate for the first real reply. **`M1 [shipped]` tag HELD** until
+M1.7 ships + the on-device V-checklist passes.
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (AES-256-GCM BYOK) · (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud) → V-5;
-  S-4 (a provider key) → V-6/V-7/V-8. Then the on-device batch V-1…V-9. Founder doing
-  setup soon (will hand back the SpacetimeAuth `client_id`) — not blocking the dev loop.
-- **Next:** founder routes the 4 `[important]` sweep findings (likely one docs PR) +
-  runs the V-checklist → then tag `M1 [shipped]`. Build-wise: **M2** (multi-agent group
-  threads — needs agents-as-contacts, BL-014), **BL-016** (deep chat polish, after
-  on-device review), or **M3** (RAG).
+- **Open founder work:** S-1/S-2 **done** (client_id wired + validated, PR #15);
+  **S-3** (Maincloud publish — AI is 401-blocked, founder runs it) + **S-4** (interim
+  key) pending → unblock V-5/V-6. The full on-device batch (V-4/V-5/V-7/V-8/V-9) ideally
+  runs *after* M1.7 so V-7/V-8 use the real BYOK path.
+- **Next:** **M1.7 — per-user in-app BYOK** (plan it next; needs the client-crypto /
+  submission-path decision). Then V-7/V-8 on the real path → tag `M1 [shipped]` →
+  **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish).
 
 ---
 
@@ -305,6 +305,23 @@ in `Thread`. (4) Deferred: a **non-global contacts/visibility/blocking** model (
 public directory exposes everyone) → `BL-015`; **deep chat polish** (grouping, day
 separators, unread, animations) → `BL-016`. Reducers verified via `spacetime call`;
 on-device UX is `V-9`.
+
+### DEC-024 — Per-user in-app BYOK is the next chunk (M1.7) + gates the first real reply
+*2026-06-14.* Founder asked why S-4 needs a `.env` key when the vision is per-user
+BYOK. **Reality:** M1.4 built the gateway BYOK-*ready* (the `CredentialResolver` seam +
+AES-256-GCM `EncryptedKeyStore`) but wired it to a **dev `envResolver`** —
+`credentialRef = model.provider` → one `<PROVIDER>_API_KEY`, shared by all users — so
+the agent reply loop could be proven (M1.5/M1.6) without first building key management.
+That env key is **interim dev scaffolding, not the product model.** **Decision
+(founder-ratified):** build **full per-user in-app BYOK as `M1.7`** and make it **gate
+the first real on-device reply** (V-7/V-8) — production never uses a shared `.env` key.
+`envResolver`/`.env` stays only for the gateway smoke (V-6) + a dev fallback. Per-user
+key management (key-entry UI + a `provider_keys` flow where keys are stored **encrypted,
+never raw in STDB** + the orchestrator resolver swap) is M1.7; the durable Postgres/KMS
+*backing* stays **BL-011**. Open design point for the M1.7 plan: mobile ships only
+`expo-crypto` (no symmetric/asymmetric lib), so client-side encryption needs a crypto
+lib **or** an orchestrator submission path — decided then. ROADMAP re-sequenced (M1.7
+before the M1 tag); SETUP S-4 / VERIFICATION V-7-8 / BLUEPRINT reframed accordingly.
 
 ---
 
