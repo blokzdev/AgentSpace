@@ -13,13 +13,18 @@ orchestratable. *"WhatsApp + Discord for configurable AI agents."*
 | Path | What |
 |------|------|
 | `packages/shared` | Shared types/contracts (lowest layer) |
-| `packages/gateway` | Provider-agnostic Model Gateway (Vercel AI SDK) |
+| `packages/gateway` | Provider-agnostic Model Gateway (Vercel AI SDK) + BYOK |
+| `packages/stdb-bindings` | Generated SpacetimeDB client bindings (consumed as source) |
 | `services/orchestrator` | Agent Orchestrator (trusted SpacetimeDB client) |
-| `apps/mobile` *(M0.2)* | Expo / React Native client |
-| `modules/spacetime` *(M0.3)* | SpacetimeDB module (realtime source of truth) |
+| `apps/mobile` | Expo / React Native client |
+| `modules/spacetime` | SpacetimeDB module (realtime source of truth) |
 | `examples/chat-react-ts` | SpacetimeDB reference app (not product code) |
 
 Dependency rule: lower layers never import higher ones (`BLUEPRINT.md` §2).
+
+**Status:** all M1 build phases shipped (chat · SpacetimeAuth login · contacts/groups ·
+Model Gateway · Agent Studio · agent reply loop). Next: per-user in-app **BYOK**
+(M1.7), then on-device verification → tag `M1`. See `ROADMAP.md` / `MEMORY.md`.
 
 ## Develop
 

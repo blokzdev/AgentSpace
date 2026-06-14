@@ -94,7 +94,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-4 — Provide a provider API key for the Model Gateway smoke test  ·  added 2026-06-13 · M1.4  ·  [ ]
+### S-4 — Provide an **interim** operator API key (gateway smoke + dev)  ·  added 2026-06-13 · M1.4  ·  [ ]
+- **Scope note:** this is a **dev/interim** key, **not** the product BYOK model. With
+  **per-user in-app BYOK (M1.7)** each user enters their own key in the app and never
+  touches `.env`. Until M1.7 ships, this single operator key in `.env` powers the
+  gateway smoke (V-6) and any interim live reply (V-7/V-8).
 - **Why:** the gateway streams from real providers (Anthropic/OpenAI) using a
   **BYOK** key. CI proves the wiring with a mock; a real round-trip (`V-6`) needs an
   actual key. The key is a secret — it goes in an untracked `.env`, never committed.

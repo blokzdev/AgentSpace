@@ -18,8 +18,8 @@ export interface Orchestrator {
 
 export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orchestrator {
   const resolved: OrchestratorConfig = {
-    // BYOK keys resolved from env in v1 (M1.4); a per-user encrypted store wires
-    // in with the real reply loop (M1.6 / OT-007).
+    // INTERIM (DEC-024): one operator key per provider via envResolver. Per-user
+    // in-app BYOK — swap this for a real per-user CredentialResolver — is M1.7.
     gateway: config?.gateway ?? createModelGateway({ resolveCredential: envResolver() }),
     defaultModel: config?.defaultModel ?? DEFAULT_MODEL,
   };
