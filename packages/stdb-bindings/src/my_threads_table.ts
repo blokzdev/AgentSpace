@@ -16,4 +16,5 @@ export default __t.row({
   title: __t.option(__t.string()),
   createdBy: __t.identity().name("created_by"),
   createdAt: __t.timestamp().name("created_at"),
+  agentId: __t.u64().name("agent_id"),
 });

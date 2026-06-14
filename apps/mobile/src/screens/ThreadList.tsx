@@ -14,16 +14,27 @@ import { colors, shortId } from '../chat';
 
 export function ThreadList({
   onOpen,
+  onAgents,
   onSignOut,
 }: {
   onOpen: (id: bigint) => void;
+  onAgents: () => void;
   onSignOut: () => void;
 }): React.JSX.Element {
   const { identity } = useSpacetimeDB();
   const [threads] = useTable(tables.my_threads);
   const [users] = useTable(tables.user);
+  const [agents] = useTable(tables.my_agents);
   const setDisplayName = useReducer(reducers.setDisplayName);
   const createGroup = useReducer(reducers.createGroup);
+
+  const titleOf = (t: { title?: string; kind: string; id: bigint; agentId: bigint }): string => {
+    if (t.agentId !== 0n) {
+      const a = agents.find((x) => x.id === t.agentId);
+      if (a) return `🤖 ${a.name}`;
+    }
+    return t.title ?? `${t.kind} #${t.id.toString()}`;
+  };
 
   const [name, setName] = useState('');
   const [title, setTitle] = useState('');
@@ -40,9 +51,14 @@ export function ThreadList({
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>AgentSpace</Text>
-          <Pressable onPress={onSignOut} hitSlop={8}>
-            <Text style={styles.signOut}>Sign out</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={onAgents} hitSlop={8}>
+              <Text style={styles.agentsLink}>🤖 Agents</Text>
+            </Pressable>
+            <Pressable onPress={onSignOut} hitSlop={8}>
+              <Text style={styles.signOut}>Sign out</Text>
+            </Pressable>
+          </View>
         </View>
         <Text style={styles.you}>You: {myName}</Text>
         {identity ? <Text selectable style={styles.id}>{identity.toHexString()}</Text> : null}
@@ -95,8 +111,8 @@ export function ThreadList({
         ListEmptyComponent={<Text style={styles.empty}>No threads yet — create a group above.</Text>}
         renderItem={({ item }) => (
           <Pressable style={styles.thread} onPress={() => onOpen(item.id)}>
-            <Text style={styles.threadTitle}>{item.title ?? `${item.kind} #${item.id.toString()}`}</Text>
-            <Text style={styles.threadMeta}>{item.kind}</Text>
+            <Text style={styles.threadTitle}>{titleOf(item)}</Text>
+            <Text style={styles.threadMeta}>{item.agentId !== 0n ? 'agent' : item.kind}</Text>
           </Pressable>
         )}
       />
@@ -108,6 +124,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: 16 },
   header: { marginBottom: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerActions: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  agentsLink: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   title: { color: colors.text, fontSize: 22, fontWeight: '700' },
   signOut: { color: colors.accent, fontSize: 14, fontWeight: '600' },
   you: { color: colors.dim, marginTop: 4 },

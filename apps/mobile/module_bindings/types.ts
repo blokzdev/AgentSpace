@@ -10,6 +10,19 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+export const Agent = __t.object("Agent", {
+  id: __t.u64(),
+  owner: __t.identity(),
+  name: __t.string(),
+  systemPrompt: __t.string(),
+  provider: __t.string(),
+  model: __t.string(),
+  version: __t.u64(),
+  createdAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type Agent = __Infer<typeof Agent>;
+
 export const Message = __t.object("Message", {
   id: __t.u64(),
   threadId: __t.u64(),
@@ -20,6 +33,12 @@ export const Message = __t.object("Message", {
   runId: __t.string(),
 });
 export type Message = __Infer<typeof Message>;
+
+export const MyActivePersonas = __t.object("MyActivePersonas", {});
+export type MyActivePersonas = __Infer<typeof MyActivePersonas>;
+
+export const MyAgents = __t.object("MyAgents", {});
+export type MyAgents = __Infer<typeof MyAgents>;
 
 export const MyThreadMembers = __t.object("MyThreadMembers", {});
 export type MyThreadMembers = __Infer<typeof MyThreadMembers>;
@@ -44,12 +63,19 @@ export const Run = __t.object("Run", {
 });
 export type Run = __Infer<typeof Run>;
 
+export const Service = __t.object("Service", {
+  id: __t.u8(),
+  identity: __t.identity(),
+});
+export type Service = __Infer<typeof Service>;
+
 export const Thread = __t.object("Thread", {
   id: __t.u64(),
   kind: __t.string(),
   title: __t.option(__t.string()),
   createdBy: __t.identity(),
   createdAt: __t.timestamp(),
+  agentId: __t.u64(),
 });
 export type Thread = __Infer<typeof Thread>;
 

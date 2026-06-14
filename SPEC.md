@@ -154,7 +154,10 @@ tool registry + MCP client + the agent loop (cite all).
 
 - **Read:** orchestrator subscribes (as a service identity) to the work surface —
   new `messages` in threads with an agent member (`my_thread_messages` +
-  `my_thread_members`), and (later) due `workflow_schedules`.
+  `my_thread_members`), the thread→persona binding (`my_threads.agentId` +
+  `my_active_personas`, M1.5), and (later) due `workflow_schedules`. The reply uses
+  the bound persona's `system_prompt` + `model` (`selectPersona`), falling back to the
+  seeded default when none is bound.
 - **Write:** only via reducers. **Implemented (M1.6):** `agent_reply_begin(threadId,
   runId, model)` (insert a `streaming` message + a `running` `run`),
   `agent_reply_append(runId, text)` (UPDATE cumulative text), `agent_reply_finish(

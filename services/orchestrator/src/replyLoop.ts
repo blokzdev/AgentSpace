@@ -4,16 +4,13 @@
 // batched UPDATEs (BLUEPRINT §5). Correlation is a client-owned runId.
 import { Identity } from 'spacetimedb';
 import type { ModelGateway } from '@agentspace/gateway';
-import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
 import { DbConnection } from '@agentspace/stdb-bindings';
-import { buildPrompt, createBatcher, newRunId, type PromptRow } from './prompt';
+import { buildPrompt, createBatcher, newRunId, selectPersona, type PromptRow } from './prompt';
 
 const FLUSH_MS = 50;
 
 export interface ReplyLoopOptions {
-  model?: ModelRef;
   flushMs?: number;
-  systemPrompt?: string;
 }
 
 export function startReplyLoop(
@@ -22,7 +19,6 @@ export function startReplyLoop(
   gateway: ModelGateway,
   opts: ReplyLoopOptions = {},
 ): void {
-  const model = opts.model ?? DEFAULT_MODEL;
   const flushMs = opts.flushMs ?? FLUSH_MS;
   const active = new Set<bigint>(); // threads with a reply in flight (loop guard)
 
@@ -31,7 +27,12 @@ export function startReplyLoop(
     .onApplied(() => {
       console.info('[orchestrator] reply loop subscribed');
     })
-    .subscribe(['SELECT * FROM my_thread_messages', 'SELECT * FROM my_thread_members']);
+    .subscribe([
+      'SELECT * FROM my_thread_messages',
+      'SELECT * FROM my_thread_members',
+      'SELECT * FROM my_threads',
+      'SELECT * FROM my_active_personas',
+    ]);
 
   conn.db.my_thread_messages.onInsert((_ctx, msg) => {
     if (msg.sender.isEqual(self)) return; // our own writes
@@ -39,7 +40,7 @@ export function startReplyLoop(
     if (msg.runId !== '') return; // another agent's reply
     if (active.has(msg.threadId)) return; // already replying in this thread
     if (!isAgentMemberOf(conn, self, msg.threadId)) return; // we're not the agent here
-    void handleReply(conn, self, gateway, model, flushMs, opts.systemPrompt, msg.threadId, active);
+    void handleReply(conn, self, gateway, flushMs, msg.threadId, active);
   });
 }
 
@@ -54,9 +55,7 @@ async function handleReply(
   conn: DbConnection,
   self: Identity,
   gateway: ModelGateway,
-  model: ModelRef,
   flushMs: number,
-  systemPrompt: string | undefined,
   threadId: bigint,
   active: Set<bigint>,
 ): Promise<void> {
@@ -69,13 +68,19 @@ async function handleReply(
   });
 
   try {
+    const persona = selectPersona(
+      [...conn.db.my_threads.iter()],
+      [...conn.db.my_active_personas.iter()],
+      threadId,
+    );
     const rows: PromptRow[] = [];
     for (const m of conn.db.my_thread_messages.iter()) {
       if (m.threadId === threadId) {
         rows.push({ isAgent: m.sender.isEqual(self), text: m.text, sentMicros: m.sent.microsSinceUnixEpoch });
       }
     }
-    const messages = buildPrompt(rows, systemPrompt);
+    const messages = buildPrompt(rows, persona.systemPrompt);
+    const model = persona.model;
 
     conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
 

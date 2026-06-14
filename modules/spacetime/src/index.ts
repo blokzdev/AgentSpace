@@ -25,6 +25,7 @@ const thread = table(
     title: t.string().optional(),
     createdBy: t.identity(),
     createdAt: t.timestamp(),
+    agentId: t.u64(), // bound persona for an agent DM (0 = human-only thread) — M1.5
   }
 );
 
@@ -89,7 +90,40 @@ const run = table(
   }
 );
 
-const spacetimedb = schema({ user, thread, threadMember, message, run });
+// Agent personas — user-authored configs (M1.5). Config is inline; an immutable
+// version *history* (BLUEPRINT §3) is deferred (BL-013) in favor of a `version`
+// counter. Private; the owner reads via `my_agents`, the orchestrator via
+// `my_active_personas`.
+const agent = table(
+  {
+    name: 'agent',
+    indexes: [{ accessor: 'by_owner', algorithm: 'btree', columns: ['owner'] }],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    owner: t.identity(),
+    name: t.string(),
+    systemPrompt: t.string(),
+    provider: t.string(), // ModelProvider (@agentspace/shared)
+    model: t.string(), // provider model id, e.g. 'claude-opus-4-8'
+    version: t.u64(),
+    createdAt: t.timestamp(),
+    updatedAt: t.timestamp(),
+  }
+);
+
+// Singleton holding the orchestrator's identity, so reducers can add it as the
+// `agent` member of an agent DM without the client knowing it. Registered by the
+// orchestrator on startup (first-wins in v1 — harden with OT-007).
+const service = table(
+  { name: 'service' },
+  {
+    id: t.u8().primaryKey(), // always 0n
+    identity: t.identity(),
+  }
+);
+
+const spacetimedb = schema({ user, thread, threadMember, message, run, agent, service });
 export default spacetimedb;
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -115,6 +149,7 @@ export const create_dm = spacetimedb.reducer(
       title: undefined,
       createdBy: ctx.sender,
       createdAt: ctx.timestamp,
+      agentId: 0n,
     });
     ctx.db.threadMember.insert({ id: 0n, threadId: th.id, member: ctx.sender, role: 'human', joinedAt: ctx.timestamp });
     ctx.db.threadMember.insert({ id: 0n, threadId: th.id, member: other, role: 'human', joinedAt: ctx.timestamp });
@@ -130,10 +165,87 @@ export const create_group = spacetimedb.reducer(
       title,
       createdBy: ctx.sender,
       createdAt: ctx.timestamp,
+      agentId: 0n,
     });
     ctx.db.threadMember.insert({ id: 0n, threadId: th.id, member: ctx.sender, role: 'human', joinedAt: ctx.timestamp });
   }
 );
+
+// ── Agent Studio (M1.5) ──────────────────────────────────────────────────────
+
+export const create_agent = spacetimedb.reducer(
+  { name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string() },
+  (ctx, { name, systemPrompt, provider, model }) => {
+    if (!name) throw new SenderError('Agent name must not be empty');
+    if (!model) throw new SenderError('Agent model must not be empty');
+    ctx.db.agent.insert({
+      id: 0n,
+      owner: ctx.sender,
+      name,
+      systemPrompt,
+      provider: provider || 'anthropic',
+      model,
+      version: 1n,
+      createdAt: ctx.timestamp,
+      updatedAt: ctx.timestamp,
+    });
+  }
+);
+
+export const update_agent = spacetimedb.reducer(
+  { agentId: t.u64(), name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string() },
+  (ctx, { agentId, name, systemPrompt, provider, model }) => {
+    const a = ctx.db.agent.id.find(agentId);
+    if (!a || !a.owner.isEqual(ctx.sender)) throw new SenderError('Not your agent');
+    if (!name) throw new SenderError('Agent name must not be empty');
+    if (!model) throw new SenderError('Agent model must not be empty');
+    ctx.db.agent.id.update({
+      ...a,
+      name,
+      systemPrompt,
+      provider: provider || 'anthropic',
+      model,
+      version: a.version + 1n,
+      updatedAt: ctx.timestamp,
+    });
+  }
+);
+
+export const delete_agent = spacetimedb.reducer({ agentId: t.u64() }, (ctx, { agentId }) => {
+  const a = ctx.db.agent.id.find(agentId);
+  if (!a || !a.owner.isEqual(ctx.sender)) throw new SenderError('Not your agent');
+  ctx.db.agent.id.delete(agentId);
+});
+
+// The orchestrator registers its identity once so agent DMs can add it as the
+// `agent` member. First-wins in v1 (harden with OT-007).
+export const register_service = spacetimedb.reducer({}, (ctx) => {
+  const existing = ctx.db.service.id.find(0);
+  if (existing) {
+    ctx.db.service.id.update({ ...existing, identity: ctx.sender });
+  } else {
+    ctx.db.service.insert({ id: 0, identity: ctx.sender });
+  }
+});
+
+// Deploy a persona into a fresh DM: the owner (human) + the orchestrator service
+// identity (agent) become members; the thread carries the bound agentId.
+export const create_agent_dm = spacetimedb.reducer({ agentId: t.u64() }, (ctx, { agentId }) => {
+  const a = ctx.db.agent.id.find(agentId);
+  if (!a || !a.owner.isEqual(ctx.sender)) throw new SenderError('Not your agent');
+  const svc = ctx.db.service.id.find(0);
+  if (!svc) throw new SenderError('No agent service is available yet');
+  const th = ctx.db.thread.insert({
+    id: 0n,
+    kind: 'dm',
+    title: a.name,
+    createdBy: ctx.sender,
+    createdAt: ctx.timestamp,
+    agentId,
+  });
+  ctx.db.threadMember.insert({ id: 0n, threadId: th.id, member: ctx.sender, role: 'human', joinedAt: ctx.timestamp });
+  ctx.db.threadMember.insert({ id: 0n, threadId: th.id, member: svc.identity, role: 'agent', joinedAt: ctx.timestamp });
+});
 
 export const add_member = spacetimedb.reducer(
   { threadId: t.u64(), member: t.identity(), role: t.string() },
@@ -298,4 +410,26 @@ export const my_thread_members = spacetimedb.view(
     [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => [
       ...ctx.db.threadMember.by_thread.filter(m.threadId),
     ])
+);
+
+// The caller's own authored agents (Agent Studio).
+export const my_agents = spacetimedb.view(
+  { name: 'my_agents', public: true },
+  t.array(agent.rowType),
+  (ctx) => [...ctx.db.agent.by_owner.filter(ctx.sender)]
+);
+
+// Personas bound to threads the caller is an `agent` member of — the orchestrator's
+// runtime persona lookup (it never owns the agent, so `my_agents` doesn't reach it).
+export const my_active_personas = spacetimedb.view(
+  { name: 'my_active_personas', public: true },
+  t.array(agent.rowType),
+  (ctx) =>
+    [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => {
+      if (m.role !== 'agent') return [];
+      const th = ctx.db.thread.id.find(m.threadId);
+      if (!th || th.agentId === 0n) return [];
+      const a = ctx.db.agent.id.find(th.agentId);
+      return a ? [a] : [];
+    })
 );
