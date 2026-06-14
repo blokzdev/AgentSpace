@@ -26,7 +26,13 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-1 — Enable SpacetimeAuth on `agentspace-hpm58` + get the `client_id`  ·  added 2026-06-13 · M1.2  ·  [ ]
+### S-1 — Enable SpacetimeAuth on `agentspace-hpm58` + get the `client_id`  ·  added 2026-06-13 · M1.2  ·  [x] (founder 2026-06-14)
+> **DONE.** `client_id = client_033XyhtPkMcEQ4adazN6Cx`; wired in as
+> `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID` (`apps/mobile/.env.example` + `.env.local`).
+> Client config **validated**: **Public client** (Private toggle OFF = public — correct
+> for our PKCE/no-secret flow ✔), Web Application OFF (fine for a native app ✔), scopes
+> `openid email profile offline_access` ✔ — the app now requests `offline_access` too
+> (refresh-token persistence). No dashboard change needed.
 - **Why:** unblocks the mobile login flow. The app does OIDC against the hosted
   SpacetimeAuth provider (issuer `https://auth.spacetimedb.com/oidc`); it needs a
   **client_id** to start the flow. Without it the "Sign in" button stays disabled.
@@ -46,7 +52,9 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-2 — Register the mobile redirect URI on that Client  ·  added 2026-06-13 · M1.2  ·  [ ]
+### S-2 — Register the mobile redirect URI on that Client  ·  added 2026-06-13 · M1.2  ·  [x] (founder 2026-06-14)
+> **DONE.** Redirect URI `agentspace://redirect` registered (matches
+> `makeRedirectUri({ scheme: 'agentspace', path: 'redirect' })` in `src/auth.ts` ✔).
 - **Why:** OIDC only returns to a **pre-registered** redirect URI. The mobile app
   uses the custom scheme `agentspace://redirect`; it must be on the client's
   allow-list or the provider rejects the login.
@@ -63,21 +71,26 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-3 — Confirm the `agentspace` module is published to Maincloud  ·  added 2026-06-13 · M1.2  ·  [ ]
+### S-3 — Publish the module to Maincloud `agentspace-hpm58`  ·  added 2026-06-13 · M1.2  ·  [ ] (FOUNDER — AI is blocked)
 - **Why:** `DbConnection.withToken(idToken)` only succeeds against a server that
   **trusts the SpacetimeAuth issuer** — that's Maincloud, not a local
-  `spacetime start`. So the device test must point at your Maincloud DB.
-- **Where:** **terminal** (SpacetimeDB CLI), one-time publish.
-- **Steps:**
-  1. From `modules/spacetime`, publish to Maincloud (logged in as `blokzdev`):
+  `spacetime start`. So login + the agent reply loop must run against Maincloud.
+- **AI attempted 2026-06-14 → blocked:** the module **builds clean**, but publishing
+  to Maincloud returned **`401 Unauthorized: Invalid token: InvalidSignature`** — this
+  container is logged in as a different identity, **not your `blokzdev` Maincloud
+  account** (which owns `agentspace-hpm58`). So this step is **yours**: run it from a
+  machine where `spacetime login` is your Maincloud/`blokzdev` account.
+- **Steps (founder):**
+  1. From `modules/spacetime/` (logged in as `blokzdev`):
      `spacetime publish agentspace-hpm58 -p . --server maincloud --yes`
-     (use whatever server alias your CLI has for Maincloud; `spacetime server
-     list` shows it).
-  2. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud` or
-     the Maincloud console shows the tables.
-- **Give back to the AI:** confirm the module name to target. For the device test
-  I'll have you set `EXPO_PUBLIC_SPACETIMEDB_HOST=wss://maincloud.spacetimedb.com`
-  and `EXPO_PUBLIC_SPACETIMEDB_DB_NAME=agentspace-hpm58` in `apps/mobile/.env.local`.
+  2. If it warns about a **breaking schema change with existing data**, decide whether
+     to wipe: add `--delete-data=on-conflict` (destroys current data — only if you're OK
+     with that). For a fresh DB there's nothing to lose.
+  3. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
+     Maincloud console shows the tables (`user`, `thread`, `agent`, …).
+- **Give back to the AI:** confirm it published. The env values are already set
+  (`apps/mobile/.env.local`: host `wss://maincloud.spacetimedb.com`, db
+  `agentspace-hpm58`). Then V-5/V-7/V-8 are ready.
 
 ---
 
@@ -98,6 +111,17 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-*(When S-1…S-3 are done and you've set the three `EXPO_PUBLIC_*` values, the
-on-device login check is `VERIFICATION.md` V-5. When S-4 is set, the gateway smoke
-is `VERIFICATION.md` V-6.)*
+## Env files (wired 2026-06-14)
+
+- **`apps/mobile/.env.example`** (tracked) + **`apps/mobile/.env.local`** (gitignored)
+  carry the three `EXPO_PUBLIC_*` values (client_id + Maincloud host/db). These are
+  **non-secret** — `EXPO_PUBLIC_*` is inlined into the app bundle. On your own build
+  machine, `cp apps/mobile/.env.example apps/mobile/.env.local` (the container's copy is
+  ephemeral/gitignored).
+- **`.env.example`** (repo root, tracked) documents the **secret** server-side vars for
+  S-4 (`ANTHROPIC_API_KEY`, optional `AGENTSPACE_GATEWAY_KEK`) — copy to an untracked
+  root `.env`.
+
+*Remaining: S-3 (founder Maincloud publish) and S-4 (provider key). After S-1…S-3 +
+the env values, the on-device login check is `VERIFICATION.md` V-5; after S-4, the
+gateway smoke is V-6; V-7/V-8 (live agent reply) need S-3 + S-4.*

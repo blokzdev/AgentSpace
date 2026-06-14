@@ -18,6 +18,8 @@ export const SPACETIMEAUTH_ISSUER: string =
 export const SPACETIMEAUTH_CLIENT_ID: string =
   process.env.EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID ?? '';
 
-export const SPACETIMEAUTH_SCOPES: readonly string[] = ['openid', 'profile', 'email'];
+// `offline_access` is required to receive a refresh token (the durable credential
+// `src/auth.ts` persists in SecureStore for stay-signed-in across restarts).
+export const SPACETIMEAUTH_SCOPES: readonly string[] = ['openid', 'profile', 'email', 'offline_access'];
 
 export const SPACETIMEAUTH_CONFIGURED: boolean = SPACETIMEAUTH_CLIENT_ID.length > 0;
