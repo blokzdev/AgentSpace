@@ -345,6 +345,22 @@ users re-enter keys). (5) Verified **headlessly end-to-end** (integration: seal
 replies) + 14 orchestrator tests. Mobile `ApiKeys` screen (🔑 Keys). On-device is
 `V-7/V-8` (now the real path, no `.env`).
 
+### DEC-026 — SpacetimeDB is identity-based: no API key / no committed secret (by design)
+*2026-06-14.* Founder asked why there's no SpacetimeDB API key or credential to add to
+`.env`/GitHub Secrets. **Captured as the durable answer:** SpacetimeDB authenticates
+every actor with an **identity token**, not an API key, and none is a committed secret —
+(1) mobile users use a per-login SpacetimeAuth **OIDC id token** (the only config is the
+non-secret `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID`); (2) the orchestrator uses a self-issued
+**anonymous identity token** cached to a local file (DEC-017; real service account =
+OT-007); (3) module publish uses the developer's `spacetime login` session in
+`~/.config/spacetime/`. **CI never connects to a live DB**, so no GitHub secret is needed.
+The **only** real secrets are **per-user BYOK keys** (in-app, sealed, ciphertext-only in
+STDB — DEC-025) + the optional dev `ANTHROPIC_API_KEY` (S-4, local smoke). Future
+**deployment** secrets arrive only when the orchestrator is hosted (OT-005): service-account
+auth (OT-007) + durable KEK/keypair backing (BL-011). This posture (per-actor, refreshable,
+reducer/View-scoped) is intentional and better than a shared static key. Recorded in
+BLUEPRINT §8.1; doc-only (no code change).
+
 ---
 
 ## Session Journal (append-only)
@@ -529,6 +545,13 @@ replies) + 14 orchestrator tests. Mobile `ApiKeys` screen (🔑 Keys). On-device
 - **Next:** **all M1 build phases done.** Founder S-3 (Maincloud publish) + on-device
   V-checklist (V-5/V-7/V-8 on the real BYOK path) → tag `M1 [shipped]`; then M2 / M3 /
   BL-016 / BL-011.
+
+### 2026-06-14 — Doc: SpacetimeDB credentials & secrets model (DEC-026)
+- Founder asked why there's no SpacetimeDB API key/credential for `.env` or GitHub
+  Secrets. Answered (identity-based, not key-based — no committed secret) and, at the
+  founder's request, captured it durably: new **BLUEPRINT §8.1** (three identity-token
+  paths + the no-`.env`/CI-secret posture) + **DEC-026** + a SETUP.md pointer. Doc-only.
+- **Next:** unchanged — founder S-3 + on-device V-checklist → tag `M1 [shipped]`.
 
 ---
 
