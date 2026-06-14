@@ -210,3 +210,29 @@ Notes: <founder fills: device + OS + result>
   tell me (the binding/View didn’t resolve); a model error → the persona’s provider
   key isn’t set (S-4). Capture orchestrator logs.
 - **Notes (founder):** _persona + provider + result →_
+
+---
+
+### V-9 — Contacts, DMs & group management on-device  ·  added 2026-06-13 · M1.3
+- **Why:** the directory search + membership reducers are verified at the data layer
+  (`spacetime call`); this is the on-device UX (the part CI can’t judge) — finding
+  people by name, DMs that read as a person, and managing a group. Needs **two devices/
+  identities** (set a display name on each first so they’re findable).
+- **Setup:** V-4 setup (two devices on the same module); set a display name on each
+  (the first-run nudge prompts for it).
+- **Steps:**
+  1. On A: tap **＋ New chat**, search B by name, tap → a DM titled with **B’s name**
+     opens; send a message (B sees it; the inbox shows the preview + time).
+  2. On A: tap **New group** → it opens the group’s members screen → **Rename** it →
+     **+ Add member** → pick B; B appears in the members list (and the group shows in
+     B’s inbox).
+  3. As the group **creator** (A): **Remove** B, then add again; confirm changes reflect
+     on B’s device live.
+  4. On B: open the group → **Leave conversation**; it disappears from B’s inbox.
+- **Pass when:** name-search finds users; DMs are titled by person + dedupe (re-opening
+  “New chat” for the same person reuses the thread); add/remove/rename/leave all reflect
+  **live** on both devices; avatars + online dots render.
+- **If it fails:** users don’t appear in search → they haven’t set a display name (or
+  no presence); remove/rename does nothing → you’re not the group **creator** (only the
+  creator can). Capture the screen + tell me.
+- **Notes (founder):** _devices + result →_

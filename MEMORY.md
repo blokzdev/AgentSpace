@@ -13,8 +13,13 @@
 
 *Last refreshed: 2026-06-13.*
 
-**M0 closed; in M1 (only M1.3 left).** Merged PRs #2–#11. **M1.1** chat MVP, **M1.2**
-login, **M1.4** Model Gateway, **M1.6** agent reply loop. **M1.5 done (this branch):**
+**M0 closed; M1 build phases done (milestone-close ritual pending).** Merged PRs
+#2–#12. **M1.3 done (this branch):** **contacts + group management** — a searchable
+user directory powers **New chat** + group **Add member** (`UserPicker`); creator-gated
+`remove_member`/`set_thread_title` + `create_dm` dedupe; a `ThreadMembers` screen; plus
+a **UI/UX elevation** (avatars + presence, inbox with last-message/relative-time,
+name nudge, auto-scroll) — DEC-023. CI 16/16; reducers verified via `spacetime call`;
+on-device is `V-9`. **Prior: M1.5** Agent Studio —
 **Agent Studio** — users author personas (name/system-prompt/provider/model) in mobile
 `AgentList`/`AgentEditor`; deploying one opens an agent DM and the orchestrator replies
 as that persona (`thread.agentId` → `selectPersona`; service-identity binding, DEC-022).
@@ -48,13 +53,13 @@ ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous l
   `node-linker=hoisted` (DEC-014).
 - **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
   (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
-- **Open device checks:** + V-6 (gateway smoke), V-7 (live agent reply), V-8 (author
-  + chat with a persona on-device).
+- **Open device checks:** V-1/V-2/V-4/V-5/V-6/V-7/V-8/V-9 (founder will batch them).
 - **Open founder setup:** `SETUP.md` S-1/S-2/S-3 (SpacetimeAuth + Maincloud, before
-  V-5); S-4 (a provider API key, before V-6/V-7/V-8).
-- **Next:** **M1.3** (groups/contacts + user-search) closes M1; then **M2** (multi-agent
-  group threads — needs agents-as-contacts, BL-014). Founder may instead prioritize
-  the V-checklist / on-device validation.
+  V-5); S-4 (a provider API key, before V-6/V-7/V-8). Founder doing setup soon; will
+  hand back the SpacetimeAuth `client_id`. Not currently blocking the dev loop.
+- **Next:** **M1 milestone-close ritual** (drift sweep `.audit/`, re-snapshot, tag) —
+  all M1 build phases are done; then **M2** (multi-agent group threads — needs
+  agents-as-contacts, BL-014) or a polish/RAG track.
 
 ---
 
@@ -309,6 +314,22 @@ Verified **headlessly end-to-end**: the integration authors "Pirate Pete", deplo
 posts, and asserts the mock gateway received the persona's system prompt + model.
 On-device authoring/reply → `V-8`.
 
+### DEC-023 — Contacts via the public `user` directory; creator-gated group mgmt
+*2026-06-13.* M1.3 closes M1's build phases. **Choices:** (1) The `user` table is
+already `public`, and the React SDK's `useTable` auto-subscribes — so a **user
+directory / name search is a client-side filter; no new View or subscription**. A
+reusable `UserPicker` powers **New chat** (`create_dm`) and group **Add member**
+(`add_member`). (2) Group management = two **creator-gated** reducers
+(`remove_member`, `set_thread_title`) + a `ThreadMembers` screen (add/remove/rename/
+leave); `create_dm` gains a **dedupe** (one human DM per pair). (3) A focused
+**world-class UI/UX pass** (founder-requested): a deterministic `Avatar` (color-from-
+identity + initials + online ring), `ThreadList` as a real inbox (last-message preview,
+relative time, activity sort, FAB, first-run name nudge), avatar headers + auto-scroll
+in `Thread`. (4) Deferred: a **non-global contacts/visibility/blocking** model (the
+public directory exposes everyone) → `BL-015`; **deep chat polish** (grouping, day
+separators, unread, animations) → `BL-016`. Reducers verified via `spacetime call`;
+on-device UX is `V-9`.
+
 ---
 
 ## Session Journal (append-only)
@@ -444,6 +465,19 @@ On-device authoring/reply → `V-8`.
   integration** authored "Pirate Pete", deployed, and asserted the mock gateway got the
   persona's system prompt + model; Android bundle clean (2.02 MB). On-device → `V-8`.
 - **Next:** **M1.3** (groups/contacts) to close M1, or founder on-device verification.
+
+### 2026-06-13 — M1.3 contacts + group management (+ UI/UX pass; closes M1 build)
+- Module: `remove_member`/`set_thread_title` (creator-gated) + `create_dm` dedupe;
+  republished + regenerated/synced bindings; **verified live via `spacetime call`**
+  (rename changed the title; add/remove member worked; creator-gate held).
+- Mobile: reusable `UserPicker` (directory search over the public `user` table) for
+  **New chat** + group **Add member**; `ThreadMembers` (add/remove/rename/leave);
+  `App.tsx` nav + open-or-create-DM flow. **UI/UX:** `Avatar` (color-from-identity +
+  presence ring), `ThreadList` inbox (last message, relative time, activity sort, FAB,
+  name nudge), `Thread` avatar header + auto-scroll + agent bubbles; design tokens in
+  `chat.ts` (DEC-023). Founder asked for the world-class pass; deeper polish → BL-016.
+- **Verified:** CI 16/16; Android bundle clean (2.05 MB). On-device → `V-9`.
+- **Next:** **M1 milestone-close** (drift sweep + re-snapshot + tag), then M2.
 
 ---
 

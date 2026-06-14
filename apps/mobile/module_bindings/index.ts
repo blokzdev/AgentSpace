@@ -45,8 +45,10 @@ import CreateGroupReducer from "./create_group_reducer";
 import DeleteAgentReducer from "./delete_agent_reducer";
 import LeaveThreadReducer from "./leave_thread_reducer";
 import RegisterServiceReducer from "./register_service_reducer";
+import RemoveMemberReducer from "./remove_member_reducer";
 import SendMessageReducer from "./send_message_reducer";
 import SetDisplayNameReducer from "./set_display_name_reducer";
+import SetThreadTitleReducer from "./set_thread_title_reducer";
 import UpdateAgentReducer from "./update_agent_reducer";
 
 // Import all procedure arg schemas
@@ -124,8 +126,10 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_agent", DeleteAgentReducer),
   __reducerSchema("leave_thread", LeaveThreadReducer),
   __reducerSchema("register_service", RegisterServiceReducer),
+  __reducerSchema("remove_member", RemoveMemberReducer),
   __reducerSchema("send_message", SendMessageReducer),
   __reducerSchema("set_display_name", SetDisplayNameReducer),
+  __reducerSchema("set_thread_title", SetThreadTitleReducer),
   __reducerSchema("update_agent", UpdateAgentReducer),
 );
 

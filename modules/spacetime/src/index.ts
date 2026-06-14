@@ -143,6 +143,12 @@ export const create_dm = spacetimedb.reducer(
   { other: t.identity() },
   (ctx, { other }) => {
     if (ctx.sender.isEqual(other)) throw new SenderError('Cannot DM yourself');
+    // Dedupe: if a human DM with exactly these two already exists, do nothing.
+    for (const m of [...ctx.db.threadMember.by_member.filter(ctx.sender)]) {
+      const th = ctx.db.thread.id.find(m.threadId);
+      if (!th || th.kind !== 'dm' || th.agentId !== 0n) continue;
+      if ([...ctx.db.threadMember.by_thread_member.filter([th.id, other])].length > 0) return;
+    }
     const th = ctx.db.thread.insert({
       id: 0n,
       kind: 'dm',
@@ -358,6 +364,30 @@ export const leave_thread = spacetimedb.reducer(
     for (const m of [...ctx.db.threadMember.by_thread_member.filter([threadId, ctx.sender])]) {
       ctx.db.threadMember.id.delete(m.id);
     }
+  }
+);
+
+// Group management (M1.3) — creator-gated.
+export const remove_member = spacetimedb.reducer(
+  { threadId: t.u64(), member: t.identity() },
+  (ctx, { threadId, member }) => {
+    const th = ctx.db.thread.id.find(threadId);
+    if (!th) throw new SenderError('Unknown thread');
+    if (!th.createdBy.isEqual(ctx.sender)) throw new SenderError('Only the creator can remove members');
+    if (member.isEqual(ctx.sender)) throw new SenderError('Use leave_thread to remove yourself');
+    for (const m of [...ctx.db.threadMember.by_thread_member.filter([threadId, member])]) {
+      ctx.db.threadMember.id.delete(m.id);
+    }
+  }
+);
+
+export const set_thread_title = spacetimedb.reducer(
+  { threadId: t.u64(), title: t.string() },
+  (ctx, { threadId, title }) => {
+    const th = ctx.db.thread.id.find(threadId);
+    if (!th) throw new SenderError('Unknown thread');
+    if (!th.createdBy.isEqual(ctx.sender)) throw new SenderError('Only the creator can rename');
+    ctx.db.thread.id.update({ ...th, title: title.length > 0 ? title : undefined });
   }
 );
 
