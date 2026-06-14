@@ -85,6 +85,20 @@
 - **Promotion:** implement `embed` via the AI SDK `embedMany` on an embedding
   provider; wire into pgvector ingestion.
 
+### BL-013 — Immutable agent version history (run-pinning)
+- **Source:** DEC-022 (M1.5 inlined config + a `version` counter; no history table).
+- **Trigger:** need reproducibility/rollback, or to pin the persona a `run` used.
+- **Promotion:** add the `agent_versions` table (BLUEPRINT §3); `update_agent` writes a
+  new immutable version; `run` records the pinned version.
+
+### BL-014 — Agents as first-class contacts (per-agent identity)
+- **Source:** DEC-022 (M1.5 chose service-identity binding; agents are per-thread configs).
+- **Trigger:** **M2** multi-agent group threads (need distinct agent members with their
+  own identity/presence), or the "deploy agents as contacts" product step.
+- **Promotion:** mint a per-agent STDB identity (service-managed token), make each agent
+  a first-class member with presence/avatar; the orchestrator drives N agent identities.
+  Ties to OT-007 (orchestrator service-account auth) + hardening `register_service`.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

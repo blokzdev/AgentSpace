@@ -93,9 +93,10 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | Table | Key fields | Visibility | Notes |
 |-------|-----------|-----------|-------|
 | `users` | `identity` (PK), `display_name`, `avatar`, `online` | View: self + co-members | one row per human Identity |
-| `agents` | `id` (PK), `owner`, `name`, `avatar`, `current_version` | View: owner (+ members of threads it's in) | persona header |
-| `agent_versions` | `id` (PK), `agent_id`, `version`, `system_prompt`, `model_ref`, `params` | private (orchestrator + owner) | immutable; pinned per run |
-| `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by` | View: members only | |
+| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5) |
+| `agent_versions` | (deferred — BL-013) | — | v1 inlines config + a `version` counter; immutable history/run-pinning is BL-013 |
+| `service` | `id` (PK = 0), `identity` | private | singleton: the orchestrator's identity, so reducers add it as the `agent` member (M1.5) |
+| `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5) |
 | `thread_members` | `(thread_id, member_ref)` , `role` (human\|agent), `member_kind` | View: members only | membership is the authz spine |
 | `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | streamed via UPDATE (§5); `run_id`=`''` for humans (M1.6) |
 | `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6). `cost`/`error` deferred |

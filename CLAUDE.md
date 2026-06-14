@@ -250,8 +250,8 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; SpacetimeAuth login M1.2
-│       · App.tsx · src/auth.ts · src/screens/{Login,ThreadList,Thread}.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5
+│       · App.tsx · src/auth.ts · src/screens/{Login,ThreadList,Thread,AgentList,AgentEditor}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
@@ -262,7 +262,7 @@ AgentSpace/
 │   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6)
 │       · src/{index,replyLoop,prompt,spacetime}.ts · scripts/integration.ts
 ├── modules/
-│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6)
+│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5)
 │       · src/index.ts · bindings/ (generated, committed)
 └── examples/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
@@ -310,10 +310,23 @@ an `agent` member of, builds the prompt (`prompt.ts`: `buildPrompt`/`newRunId`/a
 `agent_reply_append` UPDATEs, then `agent_reply_finish` with token usage. Mobile
 renders a streaming cursor (`▍`) on `streaming` rows — partial text already arrives
 live via `useTable`. Proven **headlessly end-to-end** by the rewritten
-`scripts/integration.ts` (a **mock gateway** streams a reply through a real local
-STDB; asserts `streaming`→`complete` + live UPDATEs) — no key needed; a real LLM
-reply on-device is `V-7`. The publish script uses `spacetime publish agentspace -p .`
-(`--project-path` was wrong for CLI 2.5.0). See `BLUEPRINT.md` §2 for the module graph.
+`scripts/integration.ts` — no key needed; a real LLM reply on-device is `V-7`. The
+publish script uses `spacetime publish agentspace -p .` (`--project-path` was wrong
+for CLI 2.5.0). **M1.5 (Agent Studio):** users author **personas**. `modules/spacetime`
+gained an **`agent`** table (owner-scoped: name/systemPrompt/provider/model + a
+`version` counter — immutable version *history* deferred to BL-013), a **`service`**
+singleton (the orchestrator registers its identity so reducers can add it as the
+`agent` member), and `thread.agentId` (a DM bound to a persona). Reducers:
+`create_agent`/`update_agent`/`delete_agent`, `register_service`, `create_agent_dm`;
+Views `my_agents` (studio) + `my_active_personas` (orchestrator runtime). The
+orchestrator now resolves the per-thread persona (`prompt.ts:selectPersona`) and
+replies with **its** system prompt + model (falling back to the seeded default);
+`main()` calls `registerService`. Mobile adds **`AgentList`** + **`AgentEditor`**
+screens (provider chips + model field) reached from a `🤖 Agents` header link; agent
+DMs are titled with the persona name. The rewritten integration proves it **headlessly
+end-to-end** (author "Pirate Pete" → deploy → post → assert the mock gateway received
+the persona's system prompt + model). On-device persona authoring/reply is `V-8`. See
+`BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

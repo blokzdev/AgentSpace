@@ -1,6 +1,7 @@
 // Pure helpers for the agent reply loop (SPEC §6) — no SpacetimeDB/network deps,
 // so the loop's logic is unit-testable in CI.
 import type { GatewayMessage } from '@agentspace/gateway';
+import { DEFAULT_MODEL, MODEL_PROVIDERS, type ModelProvider, type ModelRef } from '@agentspace/shared';
 
 /** Minimal view of a thread message for prompt assembly. */
 export interface PromptRow {
@@ -24,6 +25,44 @@ export function buildPrompt(rows: PromptRow[], system: string = DEFAULT_SYSTEM_P
     turns.push({ role: r.isAgent ? 'assistant' : 'user', content: r.text });
   }
   return [{ role: 'system', content: system }, ...turns];
+}
+
+/** The persona the orchestrator replies as (M1.5). */
+export interface Persona {
+  systemPrompt: string;
+  model: ModelRef;
+}
+
+/** Minimal views of the rows `selectPersona` reads (kept binding-free for tests). */
+export interface ThreadRef {
+  id: bigint;
+  agentId: bigint;
+}
+export interface AgentRef {
+  id: bigint;
+  systemPrompt: string;
+  provider: string;
+  model: string;
+}
+
+const isProvider = (p: string): p is ModelProvider => (MODEL_PROVIDERS as readonly string[]).includes(p);
+
+/**
+ * Resolve the persona bound to a thread (via `thread.agentId` → the agent config),
+ * falling back to the seeded default when no valid persona is bound.
+ */
+export function selectPersona(threads: ThreadRef[], agents: AgentRef[], threadId: bigint): Persona {
+  const agentId = threads.find((t) => t.id === threadId)?.agentId ?? 0n;
+  if (agentId !== 0n) {
+    const a = agents.find((x) => x.id === agentId);
+    if (a && isProvider(a.provider)) {
+      return {
+        systemPrompt: a.systemPrompt.length > 0 ? a.systemPrompt : DEFAULT_SYSTEM_PROMPT,
+        model: { provider: a.provider, model: a.model },
+      };
+    }
+  }
+  return { systemPrompt: DEFAULT_SYSTEM_PROMPT, model: DEFAULT_MODEL };
 }
 
 let runCounter = 0;

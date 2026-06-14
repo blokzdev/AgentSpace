@@ -12,9 +12,12 @@ import {
 
 export default __t.row({
   id: __t.u64().primaryKey(),
-  kind: __t.string(),
-  title: __t.option(__t.string()),
-  createdBy: __t.identity().name("created_by"),
+  owner: __t.identity(),
+  name: __t.string(),
+  systemPrompt: __t.string().name("system_prompt"),
+  provider: __t.string(),
+  model: __t.string(),
+  version: __t.u64(),
   createdAt: __t.timestamp().name("created_at"),
-  agentId: __t.u64().name("agent_id"),
+  updatedAt: __t.timestamp().name("updated_at"),
 });

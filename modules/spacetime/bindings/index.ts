@@ -38,15 +38,22 @@ import AddMemberReducer from "./add_member_reducer";
 import AgentReplyAppendReducer from "./agent_reply_append_reducer";
 import AgentReplyBeginReducer from "./agent_reply_begin_reducer";
 import AgentReplyFinishReducer from "./agent_reply_finish_reducer";
+import CreateAgentReducer from "./create_agent_reducer";
+import CreateAgentDmReducer from "./create_agent_dm_reducer";
 import CreateDmReducer from "./create_dm_reducer";
 import CreateGroupReducer from "./create_group_reducer";
+import DeleteAgentReducer from "./delete_agent_reducer";
 import LeaveThreadReducer from "./leave_thread_reducer";
+import RegisterServiceReducer from "./register_service_reducer";
 import SendMessageReducer from "./send_message_reducer";
 import SetDisplayNameReducer from "./set_display_name_reducer";
+import UpdateAgentReducer from "./update_agent_reducer";
 
 // Import all procedure arg schemas
 
 // Import all table schema definitions
+import MyActivePersonasRow from "./my_active_personas_table";
+import MyAgentsRow from "./my_agents_table";
 import MyThreadMembersRow from "./my_thread_members_table";
 import MyThreadMessagesRow from "./my_thread_messages_table";
 import MyThreadsRow from "./my_threads_table";
@@ -67,6 +74,20 @@ const tablesSchema = __schema({
       { name: 'user_identity_key', constraint: 'unique', columns: ['identity'] },
     ],
   }, UserRow),
+  my_active_personas: __table({
+    name: 'my_active_personas',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyActivePersonasRow),
+  my_agents: __table({
+    name: 'my_agents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyAgentsRow),
   my_thread_members: __table({
     name: 'my_thread_members',
     indexes: [
@@ -96,11 +117,16 @@ const reducersSchema = __reducers(
   __reducerSchema("agent_reply_append", AgentReplyAppendReducer),
   __reducerSchema("agent_reply_begin", AgentReplyBeginReducer),
   __reducerSchema("agent_reply_finish", AgentReplyFinishReducer),
+  __reducerSchema("create_agent", CreateAgentReducer),
+  __reducerSchema("create_agent_dm", CreateAgentDmReducer),
   __reducerSchema("create_dm", CreateDmReducer),
   __reducerSchema("create_group", CreateGroupReducer),
+  __reducerSchema("delete_agent", DeleteAgentReducer),
   __reducerSchema("leave_thread", LeaveThreadReducer),
+  __reducerSchema("register_service", RegisterServiceReducer),
   __reducerSchema("send_message", SendMessageReducer),
   __reducerSchema("set_display_name", SetDisplayNameReducer),
+  __reducerSchema("update_agent", UpdateAgentReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

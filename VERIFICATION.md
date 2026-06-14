@@ -184,3 +184,29 @@ Notes: <founder fills: device + OS + result>
   a gateway/provider error (the loop marks it `failed`). Capture the orchestrator
   logs and tell me.
 - **Notes (founder):** _host (local/Maincloud) + provider + result →_
+
+---
+
+### V-8 — Author a persona and chat with it on-device (Agent Studio)  ·  added 2026-06-13 · M1.5
+- **Why:** proves the full **build-an-agent → converse** loop on a device: create a
+  persona in the app, deploy it, and confirm the orchestrator replies **as that
+  persona** (its system prompt + model). The data path + persona injection are proven
+  headlessly (integration); this is the on-device UX + a real model. Depends on a
+  running orchestrator (as V-7) + a provider key (`SETUP.md` S-4).
+- **Setup:** same as V-7 (publish the module; run the orchestrator with a key against
+  the same server). The orchestrator registers itself as the agent service on startup.
+- **Steps:**
+  1. In the app, tap **🤖 Agents** (thread list header) → **+ New**.
+  2. Create an agent with a distinctive persona — e.g. name "Pirate Pete", system
+     prompt "You are Pirate Pete. Reply only in pirate speak.", provider **anthropic**,
+     model `claude-opus-4-8`. Save.
+  3. On the agent's card, tap **Chat** (opens a DM titled `🤖 Pirate Pete`).
+  4. Send a message.
+- **Pass when:** the reply **streams in live** (cursor) and reflects the persona (e.g.
+  pirate speak) — i.e. the system prompt took effect, not the generic default. Editing
+  the agent (**Edit**) and chatting again reflects the change.
+- **If it fails:** no reply → orchestrator not running / not registered as the service
+  (it must start *before* you deploy, or re-deploy after); reply ignores the persona →
+  tell me (the binding/View didn’t resolve); a model error → the persona’s provider
+  key isn’t set (S-4). Capture orchestrator logs.
+- **Notes (founder):** _persona + provider + result →_

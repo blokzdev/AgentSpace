@@ -37,7 +37,7 @@ export async function main(): Promise<void> {
   const orchestrator = createOrchestrator();
   console.info(`[orchestrator] connected as ${identity.toHexString()}`);
   console.info(orchestrator.describe());
-  startReplyLoop(conn, identity, orchestrator.config.gateway, {
-    model: orchestrator.config.defaultModel,
-  });
+  // Register as the agent service so authored personas can be deployed (M1.5).
+  conn.reducers.registerService({});
+  startReplyLoop(conn, identity, orchestrator.config.gateway);
 }

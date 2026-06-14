@@ -13,15 +13,15 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* **M0 closed** (all spikes cleared). In **M1**: realtime **chat MVP**
-(M1.1) + **SpacetimeAuth login** (M1.2 ✓) + **Model Gateway v1** (M1.4 ✓) + the
-**agent reply loop** (M1.6 ✓ — the orchestrator streams real LLM replies into chat
-via batched UPDATEs; mobile renders them live). The end-to-end **build-an-agent →
-live reply** vision now works with a seeded default persona. Working under the
-autonomous build loop (CLAUDE.md §4). Open checks: `VERIFICATION.md` V-1/V-2/V-4/V-5/
-V-6/V-7; founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider
-key). **Next: M1.5** Agent Studio (author personas); **M1.3** (groups/contacts) and
-**M2** (multi-agent groups) when those tracks resume.
+*2026-06-13.* **M0 closed.** **M1 is feature-complete except M1.3**: chat MVP (M1.1) +
+SpacetimeAuth login (M1.2 ✓) + Model Gateway v1 (M1.4 ✓) + agent reply loop (M1.6 ✓) +
+**Agent Studio** (M1.5 ✓ — users author personas and chat with them; the orchestrator
+replies as the bound persona). The full **build-an-agent → converse** North-Star loop
+works on real infra (verified headlessly end-to-end). Working under the autonomous
+build loop (CLAUDE.md §4). Open checks: `VERIFICATION.md` V-1/V-2/V-4/V-5/V-6/V-7/V-8;
+founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider key).
+**Next: M1.3** (group/membership management + contacts/user-search) closes M1; then
+**M2** (multi-agent group threads — needs agents-as-contacts, BL-014).
 
 ---
 
@@ -95,7 +95,12 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   CI 16/16 (headless via `MockLanguageModelV3`); live round-trip `V-6` (key `SETUP.md`
   S-4). `embed`→M3.1; orchestrator streaming→M1.6.*
 - **M1.5 (B)** Agent Studio v1: create/edit a persona (identity, system prompt,
-  model + params); persisted as an agent + version.
+  model + params); persisted as an agent + version. ✓ *Done 2026-06-13 — `agent`
+  table (inline config + `version` counter) + `service` singleton + `thread.agentId`;
+  mobile `AgentList`/`AgentEditor`; orchestrator `selectPersona` drives the reply
+  (DEC-022, service-identity binding). CI 16/16; local integration proves persona
+  injection ("Pirate Pete"). Immutable version history → BL-013; agents-as-contacts
+  → BL-014/M2. On-device `V-8`.*
 - **M1.6 (B)** Orchestrator reply loop: detect an agent is addressed in a 1:1
   thread → build context → stream a reply back via batched UPDATEs; `run` records.
   ✓ *Done 2026-06-13 — `run` table + `message.runId` + `agent_reply_begin/append/

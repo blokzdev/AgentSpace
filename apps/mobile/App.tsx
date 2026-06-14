@@ -13,6 +13,8 @@ import { colors } from './src/chat';
 import { Login } from './src/screens/Login';
 import { ThreadList } from './src/screens/ThreadList';
 import { Thread } from './src/screens/Thread';
+import { AgentList } from './src/screens/AgentList';
+import { AgentEditor } from './src/screens/AgentEditor';
 
 function buildConnection(idToken: string): ReturnType<typeof DbConnection.builder> {
   return DbConnection.builder()
@@ -27,9 +29,15 @@ function buildConnection(idToken: string): ReturnType<typeof DbConnection.builde
     });
 }
 
+type Screen =
+  | { name: 'threads' }
+  | { name: 'thread'; threadId: bigint }
+  | { name: 'agents' }
+  | { name: 'agentEditor'; agentId: bigint | null };
+
 function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   const { isActive } = useSpacetimeDB();
-  const [threadId, setThreadId] = useState<bigint | null>(null);
+  const [screen, setScreen] = useState<Screen>({ name: 'threads' });
 
   if (!isActive) {
     return (
@@ -40,16 +48,29 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
     );
   }
 
-  return threadId === null ? (
-    <ThreadList onOpen={setThreadId} onSignOut={onSignOut} />
-  ) : (
-    <Thread
-      threadId={threadId}
-      onBack={() => {
-        setThreadId(null);
-      }}
-    />
-  );
+  switch (screen.name) {
+    case 'thread':
+      return <Thread threadId={screen.threadId} onBack={() => setScreen({ name: 'threads' })} />;
+    case 'agents':
+      return (
+        <AgentList
+          onBack={() => setScreen({ name: 'threads' })}
+          onNew={() => setScreen({ name: 'agentEditor', agentId: null })}
+          onEdit={(agentId) => setScreen({ name: 'agentEditor', agentId })}
+          onOpenThread={(threadId) => setScreen({ name: 'thread', threadId })}
+        />
+      );
+    case 'agentEditor':
+      return <AgentEditor agentId={screen.agentId} onBack={() => setScreen({ name: 'agents' })} />;
+    default:
+      return (
+        <ThreadList
+          onOpen={(threadId) => setScreen({ name: 'thread', threadId })}
+          onAgents={() => setScreen({ name: 'agents' })}
+          onSignOut={onSignOut}
+        />
+      );
+  }
 }
 
 export default function App(): React.JSX.Element {

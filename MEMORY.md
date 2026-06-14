@@ -13,9 +13,13 @@
 
 *Last refreshed: 2026-06-13.*
 
-**M0 closed; in M1.** All three M0 spikes cleared; merged PRs #2–#10. **M1.1** chat
-MVP, **M1.2** SpacetimeAuth login, **M1.4** Model Gateway (merged). **M1.6 done
-(this branch):** **agents now stream real replies into chat** — `modules/spacetime`
+**M0 closed; in M1 (only M1.3 left).** Merged PRs #2–#11. **M1.1** chat MVP, **M1.2**
+login, **M1.4** Model Gateway, **M1.6** agent reply loop. **M1.5 done (this branch):**
+**Agent Studio** — users author personas (name/system-prompt/provider/model) in mobile
+`AgentList`/`AgentEditor`; deploying one opens an agent DM and the orchestrator replies
+as that persona (`thread.agentId` → `selectPersona`; service-identity binding, DEC-022).
+Proven headlessly (integration: "Pirate Pete" drove the reply); on-device → `V-8`. CI
+16/16. **Earlier M1.6:** **agents now stream real replies into chat** — `modules/spacetime`
 gained a `run` table + `message.runId` + `agent_reply_begin/append/finish`; the
 orchestrator's `replyLoop.ts` reacts to a human message in a thread it's an `agent`
 member of, calls `gateway.stream`, and flushes ~50ms batched UPDATEs (`streaming`→
@@ -44,12 +48,13 @@ ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous l
   `node-linker=hoisted` (DEC-014).
 - **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
   (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
-- **Open device checks:** + V-6 (gateway smoke), V-7 (live agent reply on-device).
+- **Open device checks:** + V-6 (gateway smoke), V-7 (live agent reply), V-8 (author
+  + chat with a persona on-device).
 - **Open founder setup:** `SETUP.md` S-1/S-2/S-3 (SpacetimeAuth + Maincloud, before
-  V-5); S-4 (a provider API key, before V-6 **and V-7**).
-- **Next:** **M1.5** Agent Studio (author personas: system prompt + model, persisted
-  as agents) — then richer multi-agent/group behavior is M2; M1.3 (groups/contacts)
-  when track A resumes.
+  V-5); S-4 (a provider API key, before V-6/V-7/V-8).
+- **Next:** **M1.3** (groups/contacts + user-search) closes M1; then **M2** (multi-agent
+  group threads — needs agents-as-contacts, BL-014). Founder may instead prioritize
+  the V-checklist / on-device validation.
 
 ---
 
@@ -286,6 +291,24 @@ LLM reply on-device is `V-7`. (6) Mobile renders a streaming cursor; partial tex
 already arrives via `useTable` (no other client change). Coupled SPEC §1/§6 +
 BLUEPRINT §3 updated. Fixed the publish script flag (`-p`, not `--project-path`).
 
+### DEC-022 — Agent Studio: agents as per-thread configs bound via a service identity
+*2026-06-13.* M1.5 lets users author personas. **The defining fork** — how a persona
+becomes a chat participant — resolved as **(A) service-identity binding**, not (B)
+per-agent identity. **Choices:** (1) `agent` is an owner-scoped **config row**
+(name/systemPrompt/provider/model + a `version` counter); the single orchestrator
+**service identity** is the `agent` member, and **`thread.agentId`** names which
+persona. A `service` singleton holds the orchestrator identity (registered on startup,
+first-wins — harden via OT-007) so `create_agent_dm` can add it. (2) The orchestrator
+resolves the bound persona (`selectPersona`) and replies with its system prompt +
+model, falling back to the seeded default. (3) Mobile `AgentList`/`AgentEditor`
+screens; "Chat" deploys/opens an agent DM. (4) **Reversible:** the `agent` table holds
+the data; minting per-agent identities (agents-as-contacts with presence, needed for
+multi-agent groups) is the additive B step → **BL-014 / M2**. Immutable
+`agent_versions` history (BLUEPRINT §3) cut to a counter for v1 → **BL-013**. (5)
+Verified **headlessly end-to-end**: the integration authors "Pirate Pete", deploys,
+posts, and asserts the mock gateway received the persona's system prompt + model.
+On-device authoring/reply → `V-8`.
+
 ---
 
 ## Session Journal (append-only)
@@ -408,6 +431,19 @@ BLUEPRINT §3 updated. Fixed the publish script flag (`-p`, not `--project-path`
   clean (609 modules). Live LLM reply on-device → `V-7`.
 - **Next:** **M1.5** Agent Studio (author personas) so users build their own agents
   beyond the seeded default.
+
+### 2026-06-13 — M1.5 Agent Studio (author personas → orchestrator replies as them)
+- Resolved the agent-participation fork as **(A) service-identity binding** (DEC-022).
+  `modules/spacetime`: `agent` table + `service` singleton + `thread.agentId`; reducers
+  `create_agent`/`update_agent`/`delete_agent`/`register_service`/`create_agent_dm`;
+  Views `my_agents` + `my_active_personas`. Republished + regenerated/synced bindings.
+- Orchestrator: `selectPersona` (pure, tested) drives per-thread prompt+model;
+  `main()` registers the service. Mobile: `AgentList` + `AgentEditor` screens, `🤖 Agents`
+  nav, agent-DM titles, screen-state navigation in `App.tsx`.
+- **Verified:** CI 16/16 (10 orchestrator tests incl. `selectPersona`); **local
+  integration** authored "Pirate Pete", deployed, and asserted the mock gateway got the
+  persona's system prompt + model; Android bundle clean (2.02 MB). On-device → `V-8`.
+- **Next:** **M1.3** (groups/contacts) to close M1, or founder on-device verification.
 
 ---
 
