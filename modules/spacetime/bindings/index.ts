@@ -43,11 +43,13 @@ import CreateAgentDmReducer from "./create_agent_dm_reducer";
 import CreateDmReducer from "./create_dm_reducer";
 import CreateGroupReducer from "./create_group_reducer";
 import DeleteAgentReducer from "./delete_agent_reducer";
+import DeleteProviderKeyReducer from "./delete_provider_key_reducer";
 import LeaveThreadReducer from "./leave_thread_reducer";
 import RegisterServiceReducer from "./register_service_reducer";
 import RemoveMemberReducer from "./remove_member_reducer";
 import SendMessageReducer from "./send_message_reducer";
 import SetDisplayNameReducer from "./set_display_name_reducer";
+import SetProviderKeyReducer from "./set_provider_key_reducer";
 import SetThreadTitleReducer from "./set_thread_title_reducer";
 import UpdateAgentReducer from "./update_agent_reducer";
 
@@ -56,9 +58,12 @@ import UpdateAgentReducer from "./update_agent_reducer";
 // Import all table schema definitions
 import MyActivePersonasRow from "./my_active_personas_table";
 import MyAgentsRow from "./my_agents_table";
+import MyPersonaKeysRow from "./my_persona_keys_table";
+import MyProviderKeysRow from "./my_provider_keys_table";
 import MyThreadMembersRow from "./my_thread_members_table";
 import MyThreadMessagesRow from "./my_thread_messages_table";
 import MyThreadsRow from "./my_threads_table";
+import ServiceInfoRow from "./service_info_table";
 import UserRow from "./user_table";
 
 /** Type-only namespace exports for generated type groups. */
@@ -90,6 +95,20 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyAgentsRow),
+  my_persona_keys: __table({
+    name: 'my_persona_keys',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyPersonaKeysRow),
+  my_provider_keys: __table({
+    name: 'my_provider_keys',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyProviderKeysRow),
   my_thread_members: __table({
     name: 'my_thread_members',
     indexes: [
@@ -111,6 +130,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyThreadsRow),
+  service_info: __table({
+    name: 'service_info',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, ServiceInfoRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
@@ -124,11 +150,13 @@ const reducersSchema = __reducers(
   __reducerSchema("create_dm", CreateDmReducer),
   __reducerSchema("create_group", CreateGroupReducer),
   __reducerSchema("delete_agent", DeleteAgentReducer),
+  __reducerSchema("delete_provider_key", DeleteProviderKeyReducer),
   __reducerSchema("leave_thread", LeaveThreadReducer),
   __reducerSchema("register_service", RegisterServiceReducer),
   __reducerSchema("remove_member", RemoveMemberReducer),
   __reducerSchema("send_message", SendMessageReducer),
   __reducerSchema("set_display_name", SetDisplayNameReducer),
+  __reducerSchema("set_provider_key", SetProviderKeyReducer),
   __reducerSchema("set_thread_title", SetThreadTitleReducer),
   __reducerSchema("update_agent", UpdateAgentReducer),
 );

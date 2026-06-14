@@ -250,9 +250,9 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3
-│       · App.tsx · src/auth.ts · src/components/Avatar.tsx
-│       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor}.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7
+│       · App.tsx · src/auth.ts · src/byok.ts · src/components/Avatar.tsx
+│       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
@@ -260,8 +260,8 @@ AgentSpace/
 │   │   · src/{index,providers,credentials}.ts · scripts/smoke.ts
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
-│   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6)
-│       · src/{index,replyLoop,prompt,spacetime}.ts · scripts/integration.ts
+│   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7)
+│       · src/{index,replyLoop,prompt,byok,spacetime}.ts · scripts/integration.ts
 ├── modules/
 │   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5)
 │       · src/index.ts · bindings/ (generated, committed)
@@ -338,7 +338,21 @@ preview, relative time, last-activity sort, "＋ New chat" FAB, first-run name n
 `Thread` has an avatar header → members, auto-scroll, agent-styled bubbles. New
 reducers verified via `spacetime call`; bundle clean (609→ ~2.05 MB). On-device is
 `V-9`; deeper chat polish is `BL-016`; a non-global contacts/visibility model is
-`BL-015`. See `BLUEPRINT.md` §2 for the module graph.
+`BL-015`. **M1.7 (per-user in-app BYOK):** each user enters their own provider key in a
+mobile **`ApiKeys`** screen (🔑 Keys); the key is **box-sealed client-side
+(`tweetnacl`) to the orchestrator's public key** and only **ciphertext** is stored in a
+new private **`provider_key`** table (`set_provider_key`/`delete_provider_key`) — the
+raw key never touches STDB. `service` gained `encPubKey` (published via the public
+`service_info` view); `provider_key` is exposed to the owner (`my_provider_keys`) and,
+for threads it serves, to the orchestrator (`my_persona_keys`). The orchestrator
+(`src/byok.ts`) holds a persisted NaCl box keypair, registers its pubkey on startup, and
+its `createByokResolver` decrypts the per-(owner,provider) key in-memory; the reply loop
+passes `credentialRef = "<ownerHex>:<provider>"` (DEC-025). `envResolver`/`.env` is now
+**only** the gateway smoke (V-6). Proven **headlessly end-to-end** by the rewritten
+integration (user seals `sk-test-byok-123` → STDB holds ciphertext → orchestrator
+decrypts the exact key → persona replies) + 14 orchestrator tests; Android bundle clean
+(632 modules, 2.12 MB). Durable Postgres/KMS backing = `BL-011`; on-device is `V-7/V-8`.
+See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

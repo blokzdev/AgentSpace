@@ -15,11 +15,13 @@ import CreateAgentDmReducer from "../create_agent_dm_reducer";
 import CreateDmReducer from "../create_dm_reducer";
 import CreateGroupReducer from "../create_group_reducer";
 import DeleteAgentReducer from "../delete_agent_reducer";
+import DeleteProviderKeyReducer from "../delete_provider_key_reducer";
 import LeaveThreadReducer from "../leave_thread_reducer";
 import RegisterServiceReducer from "../register_service_reducer";
 import RemoveMemberReducer from "../remove_member_reducer";
 import SendMessageReducer from "../send_message_reducer";
 import SetDisplayNameReducer from "../set_display_name_reducer";
+import SetProviderKeyReducer from "../set_provider_key_reducer";
 import SetThreadTitleReducer from "../set_thread_title_reducer";
 import UpdateAgentReducer from "../update_agent_reducer";
 
@@ -32,11 +34,13 @@ export type CreateAgentDmParams = __Infer<typeof CreateAgentDmReducer>;
 export type CreateDmParams = __Infer<typeof CreateDmReducer>;
 export type CreateGroupParams = __Infer<typeof CreateGroupReducer>;
 export type DeleteAgentParams = __Infer<typeof DeleteAgentReducer>;
+export type DeleteProviderKeyParams = __Infer<typeof DeleteProviderKeyReducer>;
 export type LeaveThreadParams = __Infer<typeof LeaveThreadReducer>;
 export type RegisterServiceParams = __Infer<typeof RegisterServiceReducer>;
 export type RemoveMemberParams = __Infer<typeof RemoveMemberReducer>;
 export type SendMessageParams = __Infer<typeof SendMessageReducer>;
 export type SetDisplayNameParams = __Infer<typeof SetDisplayNameReducer>;
+export type SetProviderKeyParams = __Infer<typeof SetProviderKeyReducer>;
 export type SetThreadTitleParams = __Infer<typeof SetThreadTitleReducer>;
 export type UpdateAgentParams = __Infer<typeof UpdateAgentReducer>;
 

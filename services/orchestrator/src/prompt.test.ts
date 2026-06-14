@@ -54,14 +54,15 @@ describe('selectPersona', () => {
     { id: 3n, agentId: 99n },
   ];
   const agents: AgentRef[] = [
-    { id: 42n, systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o' },
-    { id: 99n, systemPrompt: '', provider: 'not-a-provider', model: 'x' },
+    { id: 42n, systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o', owner: 'abc123' },
+    { id: 99n, systemPrompt: '', provider: 'not-a-provider', model: 'x', owner: 'def456' },
   ];
 
-  it('uses the bound persona prompt + model', () => {
+  it('uses the bound persona prompt + model + owner', () => {
     expect(selectPersona(threads, agents, 2n)).toEqual({
       systemPrompt: 'You are Pirate Pete.',
       model: { provider: 'openai', model: 'gpt-4o' },
+      ownerHex: 'abc123',
     });
   });
 
@@ -69,6 +70,7 @@ describe('selectPersona', () => {
     expect(selectPersona(threads, agents, 1n)).toEqual({
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       model: DEFAULT_MODEL,
+      ownerHex: '',
     });
   });
 
@@ -76,6 +78,7 @@ describe('selectPersona', () => {
     expect(selectPersona(threads, agents, 3n)).toEqual({
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       model: DEFAULT_MODEL,
+      ownerHex: '',
     });
   });
 

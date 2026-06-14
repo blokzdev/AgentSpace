@@ -14,7 +14,8 @@
     "@agentspace/gateway": "workspace:*",
     "@agentspace/shared": "workspace:*",
     "@agentspace/stdb-bindings": "workspace:*",
-    "spacetimedb": "2.5.*"
+    "spacetimedb": "2.5.*",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "tsx": "^4.19.2"

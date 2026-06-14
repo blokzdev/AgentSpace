@@ -31,6 +31,8 @@ export function buildPrompt(rows: PromptRow[], system: string = DEFAULT_SYSTEM_P
 export interface Persona {
   systemPrompt: string;
   model: ModelRef;
+  /** Hex of the agent owner — keys the BYOK credential (M1.7); '' for the default. */
+  ownerHex: string;
 }
 
 /** Minimal views of the rows `selectPersona` reads (kept binding-free for tests). */
@@ -43,6 +45,7 @@ export interface AgentRef {
   systemPrompt: string;
   provider: string;
   model: string;
+  owner: string; // hex
 }
 
 const isProvider = (p: string): p is ModelProvider => (MODEL_PROVIDERS as readonly string[]).includes(p);
@@ -59,10 +62,11 @@ export function selectPersona(threads: ThreadRef[], agents: AgentRef[], threadId
       return {
         systemPrompt: a.systemPrompt.length > 0 ? a.systemPrompt : DEFAULT_SYSTEM_PROMPT,
         model: { provider: a.provider, model: a.model },
+        ownerHex: a.owner,
       };
     }
   }
-  return { systemPrompt: DEFAULT_SYSTEM_PROMPT, model: DEFAULT_MODEL };
+  return { systemPrompt: DEFAULT_SYSTEM_PROMPT, model: DEFAULT_MODEL, ownerHex: '' };
 }
 
 let runCounter = 0;

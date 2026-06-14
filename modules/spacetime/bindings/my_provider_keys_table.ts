@@ -10,6 +10,11 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  encPubKey: __t.string(),
-};
+export default __t.row({
+  id: __t.u64().primaryKey(),
+  owner: __t.identity(),
+  provider: __t.string(),
+  sealed: __t.string(),
+  createdAt: __t.timestamp().name("created_at"),
+  updatedAt: __t.timestamp().name("updated_at"),
+});

@@ -133,10 +133,11 @@ Notes: <founder fills: device + OS + result>
 
 ---
 
-### V-7 — Live agent reply streams into a chat on-device  ·  added 2026-06-13 · M1.6
-> **Note:** the first real on-device reply will use **per-user in-app BYOK (M1.7)** —
-> a key you enter in the app, not `.env`. Until M1.7 lands, this runs against the
-> interim **operator key** (`SETUP.md` S-4). Re-run on the real path once M1.7 ships.
+### V-7 — Live agent reply streams into a chat on-device  ·  added 2026-06-13 · M1.6 · M1.7
+> **Now the real BYOK path:** enter your provider key in the app (**🔑 Keys**, M1.7) —
+> the orchestrator decrypts *your* key to reply. No `.env` needed (that's smoke-only).
+> Setup step: tap **🔑 Keys** → paste your `ANTHROPIC` key → Save (the orchestrator must
+> be running so its public key is published).
 - **Why:** the reply loop is proven headlessly with a **mock** gateway (local STDB
   integration); this exercises it with a **real LLM** end-to-end — a human message
   produces a token-by-token agent reply rendered live in the mobile thread. Depends
@@ -166,9 +167,10 @@ Notes: <founder fills: device + OS + result>
 ---
 
 ### V-8 — Author a persona and chat with it on-device (Agent Studio)  ·  added 2026-06-13 · M1.5
-> **Note:** with **per-user BYOK (M1.7)** this becomes the canonical end-to-end test —
-> a user enters their own key in the app and their persona replies with it. Until then,
-> it uses the interim operator key (`SETUP.md` S-4).
+> **Canonical end-to-end test (per-user BYOK, M1.7):** enter your own key in the app
+> (**🔑 Keys**), author a persona, chat — your persona replies **with your key**. The
+> raw key is encrypted on-device and stored as ciphertext (never raw in STDB). If you
+> haven't added a key, the agent replies "⚠️ …add an API key in Settings → API Keys".
 - **Why:** proves the full **build-an-agent → converse** loop on a device: create a
   persona in the app, deploy it, and confirm the orchestrator replies **as that
   persona** (its system prompt + model). The data path + persona injection are proven

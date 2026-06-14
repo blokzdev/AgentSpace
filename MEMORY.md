@@ -19,11 +19,13 @@ people by name + DM/group chat (M1.1/M1.3) → author AI agents (Agent Studio, M
 the orchestrator streams real LLM replies into chat as the bound persona (Model
 Gateway M1.4 + reply loop M1.6). Every layer is verified **headlessly** (CI 16/16 +
 real-local-STDB integrations + `spacetime call` reducer checks); **nothing has run
-on a device yet**, and **BYOK is still the interim env key** (one operator key per
-provider via `envResolver`, not per-user). Drift sweep done + **findings F-1…F-4
-applied**. **Next build chunk: `M1.7` — per-user in-app BYOK** (DEC-024), which the
-founder set as the gate for the first real reply. **`M1 [shipped]` tag HELD** until
-M1.7 ships + the on-device V-checklist passes.
+on a device yet**. **M1.7 per-user BYOK shipped (this branch, DEC-025):** users enter
+their own provider key in a 🔑 Keys screen; it's **box-sealed client-side** to the
+orchestrator's pubkey and stored as **ciphertext only** in `provider_key` (raw key never
+in STDB); the orchestrator decrypts per-(owner,provider) in-memory. Proven headlessly
+end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M1.7) are
+done.** **`M1 [shipped]` tag HELD** only on the on-device V-checklist (esp. V-7/V-8 on
+the real BYOK path).
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
@@ -33,9 +35,10 @@ M1.7 ships + the on-device V-checklist passes.
   **S-3** (Maincloud publish — AI is 401-blocked, founder runs it) + **S-4** (interim
   key) pending → unblock V-5/V-6. The full on-device batch (V-4/V-5/V-7/V-8/V-9) ideally
   runs *after* M1.7 so V-7/V-8 use the real BYOK path.
-- **Next:** **M1.7 — per-user in-app BYOK** (plan it next; needs the client-crypto /
-  submission-path decision). Then V-7/V-8 on the real path → tag `M1 [shipped]` →
-  **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish).
+- **Next:** all M1 build phases done. Founder runs **S-3** (Maincloud publish) + **S-4**
+  (now optional — keys go in-app) → on-device **V-5/V-7/V-8** on the real BYOK path →
+  tag `M1 [shipped]`. Build-wise: **M2** (multi-agent groups, BL-014) / **M3** (RAG) /
+  **BL-016** (chat polish, after on-device review) / **BL-011** (durable key backing).
 
 ---
 
@@ -323,6 +326,25 @@ never raw in STDB** + the orchestrator resolver swap) is M1.7; the durable Postg
 lib **or** an orchestrator submission path — decided then. ROADMAP re-sequenced (M1.7
 before the M1 tag); SETUP S-4 / VERIFICATION V-7-8 / BLUEPRINT reframed accordingly.
 
+### DEC-025 — Per-user BYOK shipped: client-encrypt to the orchestrator's pubkey (Option A)
+*2026-06-14.* M1.7 built. **Design (founder-approved Option A):** the orchestrator holds
+a **NaCl box keypair** (`tweetnacl`; secret key persisted to a file like its token) and
+publishes its **public key** in `service.encPubKey` (`service_info` view). The app
+**seals** a provider key to that pubkey client-side and stores only **ciphertext** in a
+private `provider_key` row (`set_provider_key`); the **raw key never appears in STDB**.
+The orchestrator resolves `credentialRef = "<ownerHex>:<provider>"` by finding the
+sealed blob in `my_persona_keys` and **opening it in-memory** (`createByokResolver`).
+**Choices:** (1) STDB carries the ciphertext (no new network surface) — Option B (an
+orchestrator HTTP endpoint) rejected as it pulls hosting/OT-005 forward. (2) `tweetnacl`
+on both ends (mobile had only `expo-crypto`); seal/open coupled across
+`apps/mobile/src/byok.ts` ↔ `services/orchestrator/src/byok.ts`. (3) `envResolver`/`.env`
+now **only** the gateway smoke (V-6). (4) v1 caveat: keypair + `provider_key` ciphertext
+persist, but durable Postgres/KMS backing + rotation stay **BL-011** (lose the keypair →
+users re-enter keys). (5) Verified **headlessly end-to-end** (integration: seal
+`sk-test-byok-123` → STDB ciphertext → orchestrator decrypts the exact key → persona
+replies) + 14 orchestrator tests. Mobile `ApiKeys` screen (🔑 Keys). On-device is
+`V-7/V-8` (now the real path, no `.env`).
+
 ---
 
 ## Session Journal (append-only)
@@ -490,6 +512,23 @@ before the M1 tag); SETUP S-4 / VERIFICATION V-7-8 / BLUEPRINT reframed accordin
   founder's verification batch.
 - **Next:** founder routes F-1…F-4 + runs V-checklist → tag `M1 [shipped]`; then M2 /
   BL-016 / M3.
+
+### 2026-06-14 — M1.7 per-user BYOK (Option A: client-encrypt → ciphertext via STDB)
+- Built the real BYOK path (DEC-025): module `provider_key` + `service.encPubKey` +
+  `set_provider_key`/`delete_provider_key` + views `service_info`/`my_provider_keys`/
+  `my_persona_keys`; republished + regenerated/synced bindings. Orchestrator `byok.ts`
+  (`tweetnacl` keypair persistence + seal/open + `createByokResolver`); `main()`
+  publishes the pubkey + wires the BYOK gateway; reply loop passes
+  `credentialRef = owner:provider` + surfaces missing-key errors in chat. Mobile
+  `byok.ts` (`sealForOrchestrator`) + `ApiKeys` screen (🔑 Keys) + nav. Founder also
+  routed fix-all earlier (PR #16) + wired the SpacetimeAuth client_id (PR #15).
+- **Verified:** CI 16/16 (14 orchestrator tests incl. seal/open + resolver); **headless
+  integration** proved the full path (user seals `sk-test-byok-123` → STDB holds only
+  ciphertext → orchestrator decrypts the exact key → persona replies); Android bundle
+  clean (632 modules, 2.12 MB with `tweetnacl`). On-device → `V-7/V-8`.
+- **Next:** **all M1 build phases done.** Founder S-3 (Maincloud publish) + on-device
+  V-checklist (V-5/V-7/V-8 on the real BYOK path) → tag `M1 [shipped]`; then M2 / M3 /
+  BL-016 / BL-011.
 
 ---
 

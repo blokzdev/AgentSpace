@@ -155,9 +155,12 @@ tool registry + MCP client + the agent loop (cite all).
 - **Read:** orchestrator subscribes (as a service identity) to the work surface —
   new `messages` in threads with an agent member (`my_thread_messages` +
   `my_thread_members`), the thread→persona binding (`my_threads.agentId` +
-  `my_active_personas`, M1.5), and (later) due `workflow_schedules`. The reply uses
-  the bound persona's `system_prompt` + `model` (`selectPersona`), falling back to the
-  seeded default when none is bound.
+  `my_active_personas`, M1.5), the persona owner's **sealed BYOK keys**
+  (`my_persona_keys`, M1.7), and (later) due `workflow_schedules`. The reply uses the
+  bound persona's `system_prompt` + `model` (`selectPersona`); the gateway
+  `credentialRef = "<ownerHex>:<provider>"` is resolved to the owner's API key by
+  decrypting the sealed `provider_key` in-memory (`createByokResolver`). Seeded default
+  + interim `envResolver` remain for the gateway smoke only.
 - **Write:** only via reducers. **Implemented (M1.6):** `agent_reply_begin(threadId,
   runId, model)` (insert a `streaming` message + a `running` `run`),
   `agent_reply_append(runId, text)` (UPDATE cumulative text), `agent_reply_finish(

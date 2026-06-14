@@ -17,6 +17,7 @@ import { ThreadMembers } from './src/screens/ThreadMembers';
 import { UserPicker } from './src/screens/UserPicker';
 import { AgentList } from './src/screens/AgentList';
 import { AgentEditor } from './src/screens/AgentEditor';
+import { ApiKeys } from './src/screens/ApiKeys';
 
 function buildConnection(idToken: string): ReturnType<typeof DbConnection.builder> {
   return DbConnection.builder()
@@ -38,7 +39,8 @@ type Screen =
   | { name: 'addMember'; threadId: bigint }
   | { name: 'newChat' }
   | { name: 'agents' }
-  | { name: 'agentEditor'; agentId: bigint | null };
+  | { name: 'agentEditor'; agentId: bigint | null }
+  | { name: 'apiKeys' };
 
 function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   const { isActive, identity } = useSpacetimeDB();
@@ -163,6 +165,8 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
       );
     case 'agentEditor':
       return <AgentEditor agentId={screen.agentId} onBack={() => setScreen({ name: 'agents' })} />;
+    case 'apiKeys':
+      return <ApiKeys onBack={() => setScreen({ name: 'threads' })} />;
     default:
       return (
         <ThreadList
@@ -170,6 +174,7 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
           onNewChat={() => setScreen({ name: 'newChat' })}
           onNewGroup={startGroup}
           onAgents={() => setScreen({ name: 'agents' })}
+          onApiKeys={() => setScreen({ name: 'apiKeys' })}
           onSignOut={onSignOut}
         />
       );
