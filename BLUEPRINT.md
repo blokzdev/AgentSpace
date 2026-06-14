@@ -235,6 +235,28 @@ built-in vs Auth0/Clerk — decided in M0.5); the orchestrator authenticates via
 separate **service-account** OIDC identity. `ctx.sender` is the only trusted
 identity inside reducers; never trust identity passed as an argument.
 
+### 8.1 Credentials & secrets model (DEC-026)
+
+SpacetimeDB is **identity-based, not key-based** — there is no "SpacetimeDB API key."
+Every actor authenticates with an **identity token**, and none of those tokens is a
+committed secret. This is deliberate (DEC-026): per-actor, refreshable, reducer/View-
+scoped identities are strictly better than a shared static API key.
+
+| Actor | Authenticates with | Where the credential lives | Secret? |
+|-------|--------------------|----------------------------|---------|
+| **Mobile user** | SpacetimeAuth OIDC **id token** (per-login, code+PKCE) | on-device; the only config is the **non-secret** `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID` (inlined into the bundle by design) | no |
+| **Orchestrator** | self-issued **anonymous identity token** (DEC-017) | cached to a local file (`spacetime.ts:defaultTokenFile`); never in `.env`/CI. Real service-account grant = **OT-007** | no |
+| **Module publish (dev)** | the developer's `spacetime login` session | `~/.config/spacetime/` — a CLI session, not an app secret | no |
+
+**Nothing SpacetimeDB-related goes in `.env` or GitHub Secrets.** The mobile host/
+db-name are non-secret `EXPO_PUBLIC_*` values; CI runs `lint·typecheck·build·test` and
+**never connects to a live DB**, so it needs no token. The **only** real secrets in the
+product are **per-user BYOK provider keys** — entered in-app, NaCl-sealed, stored as
+ciphertext only in STDB (§4 / DEC-025) — plus the *optional* dev `ANTHROPIC_API_KEY`
+(local gateway smoke only — `SETUP.md` S-4, never committed). Future **deployment**
+secrets appear only when the orchestrator is hosted (OT-005): a real service-account
+credential (OT-007) and durable KEK/box-keypair backing (BL-011).
+
 ---
 
 ## 9. Known risks (live in `MEMORY.md` Open Threads)

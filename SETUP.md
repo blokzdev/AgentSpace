@@ -163,6 +163,10 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 - **`.env.example`** (repo root, tracked) documents the **secret** server-side vars for
   S-4 (`ANTHROPIC_API_KEY`, optional `AGENTSPACE_GATEWAY_KEK`) — copy to an untracked
   root `.env`.
+- **No SpacetimeDB API key exists** — auth is **identity-based**, not key-based, so there's
+  nothing SpacetimeDB-related to add to `.env` or GitHub Secrets (see **BLUEPRINT §8.1** /
+  DEC-026). The only real secrets are per-user BYOK keys (entered in-app) + the optional
+  dev `ANTHROPIC_API_KEY` above.
 
 ## On-device test path (after S-1/S-2 ✓)
 
