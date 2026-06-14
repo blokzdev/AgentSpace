@@ -99,6 +99,20 @@
   a first-class member with presence/avatar; the orchestrator drives N agent identities.
   Ties to OT-007 (orchestrator service-account auth) + hardening `register_service`.
 
+### BL-015 — Contacts / visibility / blocking model (non-global directory)
+- **Source:** DEC-023 (M1.3 user search reads the *public* `user` table — every user
+  sees every user).
+- **Trigger:** real user volume / privacy needs, or a friends/contacts product step.
+- **Promotion:** a contacts model (mutual add / requests), a scoped directory View, and
+  block/report. Revisit the `user` table's `public` flag.
+
+### BL-016 — Deep chat-polish pass
+- **Source:** DEC-023 (M1.3 shipped a focused UI/UX pass; deeper polish deferred).
+- **Trigger:** post on-device review (V-9), pre-launch UX bar (M6).
+- **Promotion:** message grouping + day separators, unread badges/read state, typing
+  indicators beyond the streaming cursor, animations/skeletons/haptics, light theme,
+  swipe actions, image/attachment rendering.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

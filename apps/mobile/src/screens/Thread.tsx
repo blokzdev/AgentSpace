@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -13,25 +13,34 @@ import {
 import { Identity } from 'spacetimedb';
 import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { reducers, tables } from '../../module_bindings';
-import { colors, fmtTime, shortId } from '../chat';
+import { Avatar } from '../components/Avatar';
+import { colors, fmtTime, radius, shortId, space } from '../chat';
 
 export function Thread({
   threadId,
   onBack,
+  onMembers,
 }: {
   threadId: bigint;
   onBack: () => void;
+  onMembers: () => void;
 }): React.JSX.Element {
   const { identity } = useSpacetimeDB();
   const [allMessages] = useTable(tables.my_thread_messages);
   const [allMembers] = useTable(tables.my_thread_members);
   const [users] = useTable(tables.user);
+  const [threads] = useTable(tables.my_threads);
+  const [agents] = useTable(tables.my_agents);
   const sendMessage = useReducer(reducers.sendMessage);
-  const addMember = useReducer(reducers.addMember);
 
   const [text, setText] = useState('');
-  const [member, setMember] = useState('');
-  const [addRole, setAddRole] = useState<'human' | 'agent'>('human');
+  const listRef = useRef<FlatList>(null);
+
+  const members = useMemo(() => allMembers.filter((m) => m.threadId === threadId), [allMembers, threadId]);
+  const agentMemberHexes = useMemo(
+    () => new Set(members.filter((m) => m.role === 'agent').map((m) => m.member.toHexString())),
+    [members],
+  );
 
   const messages = useMemo(
     () =>
@@ -40,12 +49,26 @@ export function Thread({
         .sort((a, b) => (a.sent.microsSinceUnixEpoch < b.sent.microsSinceUnixEpoch ? -1 : 1)),
     [allMessages, threadId],
   );
-  const memberCount = allMembers.filter((m) => m.threadId === threadId).length;
 
-  const nameOf = (sender: Identity): string => {
-    const u = users.find((x) => x.identity.isEqual(sender));
-    return u?.displayName ?? shortId(sender);
-  };
+  useEffect(() => {
+    if (messages.length > 0) listRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length]);
+
+  const thread = threads.find((t) => t.id === threadId);
+  const headerTitle = useMemo(() => {
+    if (!thread) return 'Conversation';
+    if (thread.agentId !== 0n) return `🤖 ${agents.find((a) => a.id === thread.agentId)?.name ?? 'Agent'}`;
+    if (thread.kind === 'dm') {
+      const other = members.find((m) => !(identity && m.member.isEqual(identity)));
+      return other
+        ? (users.find((u) => u.identity.isEqual(other.member))?.displayName ?? shortId(other.member))
+        : 'Direct message';
+    }
+    return thread.title ?? `Group #${thread.id.toString()}`;
+  }, [thread, agents, members, users, identity]);
+
+  const nameOf = (sender: Identity): string =>
+    users.find((x) => x.identity.isEqual(sender))?.displayName ?? shortId(sender);
 
   const onSend = (): void => {
     if (text.trim().length === 0) return;
@@ -53,64 +76,50 @@ export function Thread({
     setText('');
   };
 
-  const onAdd = (): void => {
-    const hex = member.trim();
-    if (hex.length === 0) return;
-    try {
-      void addMember({ threadId, member: Identity.fromString(hex), role: addRole });
-      setMember('');
-    } catch {
-      // invalid identity hex — ignored (validated on the device)
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Pressable onPress={onBack} hitSlop={12}>
-          <Text style={styles.back}>‹ Threads</Text>
+          <Text style={styles.back}>‹ Chats</Text>
         </Pressable>
-        <Text style={styles.title}>Thread #{threadId.toString()}</Text>
-        <Text style={styles.meta}>{memberCount} members</Text>
-      </View>
-
-      <View style={styles.addRow}>
-        <TextInput
-          style={styles.addInput}
-          placeholder="Add member by identity hex"
-          placeholderTextColor={colors.faint}
-          autoCapitalize="none"
-          value={member}
-          onChangeText={setMember}
-        />
-        <Pressable
-          style={styles.roleBtn}
-          onPress={() => {
-            setAddRole((r) => (r === 'human' ? 'agent' : 'human'));
-          }}
-        >
-          <Text style={styles.roleBtnText}>{addRole === 'agent' ? '🤖 Agent' : '🧑 Human'}</Text>
-        </Pressable>
-        <Pressable style={styles.addBtn} onPress={onAdd}>
-          <Text style={styles.addBtnText}>Add</Text>
+        <Text numberOfLines={1} style={styles.title}>{headerTitle}</Text>
+        <Pressable onPress={onMembers} hitSlop={8}>
+          <Text style={styles.membersLink}>{members.length} members ›</Text>
         </Pressable>
       </View>
 
       <FlatList
+        ref={listRef}
         style={styles.list}
         data={messages}
         keyExtractor={(m) => m.id.toString()}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={<Text style={styles.empty}>No messages yet. Say hello.</Text>}
         renderItem={({ item }) => {
           const mine = identity ? item.sender.isEqual(identity) : false;
+          const isAgent = agentMemberHexes.has(item.sender.toHexString());
+          if (mine) {
+            return (
+              <View style={[styles.bubble, styles.mine]}>
+                <Text style={styles.body}>
+                  {item.text}
+                  {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
+                </Text>
+                <Text style={styles.time}>{fmtTime(item.sent)}</Text>
+              </View>
+            );
+          }
           return (
-            <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
-              {!mine ? <Text style={styles.sender}>{nameOf(item.sender)}</Text> : null}
-              <Text style={styles.body}>
-                {item.text}
-                {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
-              </Text>
-              <Text style={styles.time}>{fmtTime(item.sent)}</Text>
+            <View style={styles.theirRow}>
+              <Avatar idKey={item.sender.toHexString()} name={nameOf(item.sender)} emoji={isAgent ? '🤖' : undefined} size={28} />
+              <View style={[styles.bubble, styles.theirs]}>
+                <Text style={styles.sender}>{nameOf(item.sender)}</Text>
+                <Text style={styles.body}>
+                  {item.text}
+                  {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
+                </Text>
+                <Text style={styles.time}>{fmtTime(item.sent)}</Text>
+              </View>
             </View>
           );
         }}
@@ -137,46 +146,39 @@ export function Thread({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  header: { padding: 16, borderBottomColor: colors.border, borderBottomWidth: 1 },
-  back: { color: colors.accent, fontSize: 14, marginBottom: 4 },
-  title: { color: colors.text, fontSize: 18, fontWeight: '700' },
-  meta: { color: colors.faint, fontSize: 12, marginTop: 2 },
-  addRow: { flexDirection: 'row', gap: 8, padding: 12 },
-  addInput: {
-    flex: 1,
-    backgroundColor: colors.panel,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    color: colors.text,
-    height: 38,
-    fontSize: 12,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    padding: space.lg,
+    borderBottomColor: colors.border,
+    borderBottomWidth: 1,
   },
-  addBtn: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, justifyContent: 'center' },
-  addBtnText: { color: colors.dim, fontWeight: '600' },
-  roleBtn: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, justifyContent: 'center' },
-  roleBtnText: { color: colors.dim, fontWeight: '600', fontSize: 12 },
-  list: { flex: 1, paddingHorizontal: 12 },
-  empty: { color: colors.faint, textAlign: 'center', marginTop: 24 },
-  bubble: { maxWidth: '82%', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 4 },
-  mine: { alignSelf: 'flex-end', backgroundColor: colors.mine },
+  back: { color: colors.accent, fontSize: 14 },
+  title: { color: colors.text, fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  membersLink: { color: colors.dim, fontSize: 12 },
+  list: { flex: 1, paddingHorizontal: space.md },
+  empty: { color: colors.faint, textAlign: 'center', marginTop: space.xl },
+  theirRow: { flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, marginVertical: space.xs },
+  bubble: { maxWidth: '82%', borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm },
+  mine: { alignSelf: 'flex-end', backgroundColor: colors.mine, marginVertical: space.xs },
   theirs: { alignSelf: 'flex-start', backgroundColor: colors.panel },
   sender: { color: colors.accent, fontSize: 12, fontWeight: '600', marginBottom: 2 },
   body: { color: colors.text, fontSize: 15 },
   cursor: { color: colors.accent },
   time: { color: colors.faint, fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
-  composer: { flexDirection: 'row', gap: 8, padding: 12, borderTopColor: colors.border, borderTopWidth: 1 },
+  composer: { flexDirection: 'row', gap: space.sm, padding: space.md, borderTopColor: colors.border, borderTopWidth: 1 },
   input: {
     flex: 1,
     backgroundColor: colors.panel,
     borderColor: colors.border,
     borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    paddingHorizontal: space.lg,
     color: colors.text,
     height: 44,
   },
-  send: { backgroundColor: colors.accent, borderRadius: 20, paddingHorizontal: 18, justifyContent: 'center' },
-  sendText: { color: '#06101d', fontWeight: '700' },
+  send: { backgroundColor: colors.accent, borderRadius: radius.pill, paddingHorizontal: space.lg, justifyContent: 'center' },
+  sendText: { color: colors.onAccent, fontWeight: '700' },
 });

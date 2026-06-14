@@ -250,8 +250,9 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5
-│       · App.tsx · src/auth.ts · src/screens/{Login,ThreadList,Thread,AgentList,AgentEditor}.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3
+│       · App.tsx · src/auth.ts · src/components/Avatar.tsx
+│       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
@@ -325,8 +326,19 @@ replies with **its** system prompt + model (falling back to the seeded default);
 screens (provider chips + model field) reached from a `🤖 Agents` header link; agent
 DMs are titled with the persona name. The rewritten integration proves it **headlessly
 end-to-end** (author "Pirate Pete" → deploy → post → assert the mock gateway received
-the persona's system prompt + model). On-device persona authoring/reply is `V-8`. See
-`BLUEPRINT.md` §2 for the module graph.
+the persona's system prompt + model). On-device persona authoring/reply is `V-8`.
+**M1.3 (contacts + groups; closes M1's build phases):** `modules/spacetime` adds
+`remove_member`/`set_thread_title` (creator-gated) + a `create_dm` dedupe (one human
+DM per pair). The mobile app gets a **searchable user directory** (the `user` table is
+`public`, so `useTable` auto-subscribes to all users — no new View): a reusable
+`UserPicker` powers **New chat** (→ `create_dm`) and group **Add member**; a
+`ThreadMembers` screen lists members and does add/remove/rename/leave. **UI/UX pass:**
+`ThreadList` is now an inbox (deterministic `Avatar` with presence ring, last-message
+preview, relative time, last-activity sort, "＋ New chat" FAB, first-run name nudge);
+`Thread` has an avatar header → members, auto-scroll, agent-styled bubbles. New
+reducers verified via `spacetime call`; bundle clean (609→ ~2.05 MB). On-device is
+`V-9`; deeper chat polish is `BL-016`; a non-global contacts/visibility model is
+`BL-015`. See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
 resolve transitive deps under the workspace; Metro also needs

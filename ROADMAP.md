@@ -13,15 +13,14 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* **M0 closed.** **M1 is feature-complete except M1.3**: chat MVP (M1.1) +
-SpacetimeAuth login (M1.2 ✓) + Model Gateway v1 (M1.4 ✓) + agent reply loop (M1.6 ✓) +
-**Agent Studio** (M1.5 ✓ — users author personas and chat with them; the orchestrator
-replies as the bound persona). The full **build-an-agent → converse** North-Star loop
-works on real infra (verified headlessly end-to-end). Working under the autonomous
-build loop (CLAUDE.md §4). Open checks: `VERIFICATION.md` V-1/V-2/V-4/V-5/V-6/V-7/V-8;
-founder setup `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud), S-4 (provider key).
-**Next: M1.3** (group/membership management + contacts/user-search) closes M1; then
-**M2** (multi-agent group threads — needs agents-as-contacts, BL-014).
+*2026-06-13.* **M0 closed; all M1 build phases done** (M1.1 chat, M1.2 login, M1.3
+contacts/groups, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies). The full
+**build-an-agent → converse** North-Star loop + real messaging UX work on real infra
+(verified headlessly end-to-end + reducers via CLI). Remaining to *close* M1: the
+**milestone-close ritual** (drift sweep, re-snapshot, tag — CLAUDE §5/§7) + the
+founder on-device verification batch (V-1…V-9). Then **M2** (multi-agent group threads
+— needs agents-as-contacts, BL-014) or a polish/RAG track. Working under the autonomous
+build loop (CLAUDE.md §4). Founder setup `SETUP.md` S-1…S-4 in progress.
 
 ---
 
@@ -86,7 +85,12 @@ streamed 1:1 conversation with it on-device; the same app supports human↔human
   clean. Founder setup `SETUP.md` S-1…S-3; on-device login `V-5`. Orchestrator
   service account deferred to `OT-007` (was bundled here).*
 - **M1.3 (A)** Group/membership management + contacts/user-search (beyond
-  add-by-identity-hex).
+  add-by-identity-hex). ✓ *Done 2026-06-13 — searchable user directory (public `user`
+  table) → `UserPicker` for New chat + Add member; creator-gated `remove_member`/
+  `set_thread_title` + `create_dm` dedupe; `ThreadMembers` screen; plus a UI/UX pass
+  (avatars + presence, inbox with last-message/relative-time, name nudge, auto-scroll)
+  — DEC-023. CI 16/16; reducers verified via `spacetime call`. On-device `V-9`; deep
+  polish `BL-016`; visibility model `BL-015`.*
 - **M1.4 (B)** Model Gateway v1: Vercel AI SDK with **two providers** (Anthropic +
   one of OpenAI/Google), streaming + tool-calling interface; BYOK key store
   (encrypted) and resolution. ✓ *Done 2026-06-13 — `packages/gateway` on AI SDK v6:
