@@ -13,14 +13,16 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-13.* **M0 closed; all M1 build phases done** (M1.1 chat, M1.2 login, M1.3
-contacts/groups, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies). The full
+*2026-06-14.* **M0 closed; all six M1 build phases done** (M1.1 chat, M1.2 login, M1.3
+contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies). The full
 **build-an-agent → converse** North-Star loop + real messaging UX work on real infra
-(verified headlessly end-to-end + reducers via CLI). Remaining to *close* M1: the
-**milestone-close ritual** (drift sweep, re-snapshot, tag — CLAUDE §5/§7) + the
-founder on-device verification batch (V-1…V-9). Then **M2** (multi-agent group threads
-— needs agents-as-contacts, BL-014) or a polish/RAG track. Working under the autonomous
-build loop (CLAUDE.md §4). Founder setup `SETUP.md` S-1…S-4 in progress.
+(verified headlessly + reducers via `spacetime call`). **Milestone-close in progress:**
+drift sweep done (`.audit/sweep-2026-06-14.md` — no `[critical]`; 4 `[important]`
+doc-only findings awaiting routing); **`M1 [shipped]` tag HELD** until those are routed
++ the founder on-device V-checklist (V-1…V-9) passes (M1's bar is an on-device agent
+reply). Then **M2** (multi-agent group threads — needs agents-as-contacts, BL-014),
+**BL-016** (chat polish), or **M3** (RAG). Autonomous build loop (CLAUDE.md §4); founder
+setup `SETUP.md` S-1…S-4 in progress.
 
 ---
 

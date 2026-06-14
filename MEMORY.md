@@ -11,55 +11,31 @@
 
 ## Snapshot — where we are right now
 
-*Last refreshed: 2026-06-13.*
+*Last refreshed: 2026-06-14.*
 
-**M0 closed; M1 build phases done (milestone-close ritual pending).** Merged PRs
-#2–#12. **M1.3 done (this branch):** **contacts + group management** — a searchable
-user directory powers **New chat** + group **Add member** (`UserPicker`); creator-gated
-`remove_member`/`set_thread_title` + `create_dm` dedupe; a `ThreadMembers` screen; plus
-a **UI/UX elevation** (avatars + presence, inbox with last-message/relative-time,
-name nudge, auto-scroll) — DEC-023. CI 16/16; reducers verified via `spacetime call`;
-on-device is `V-9`. **Prior: M1.5** Agent Studio —
-**Agent Studio** — users author personas (name/system-prompt/provider/model) in mobile
-`AgentList`/`AgentEditor`; deploying one opens an agent DM and the orchestrator replies
-as that persona (`thread.agentId` → `selectPersona`; service-identity binding, DEC-022).
-Proven headlessly (integration: "Pirate Pete" drove the reply); on-device → `V-8`. CI
-16/16. **Earlier M1.6:** **agents now stream real replies into chat** — `modules/spacetime`
-gained a `run` table + `message.runId` + `agent_reply_begin/append/finish`; the
-orchestrator's `replyLoop.ts` reacts to a human message in a thread it's an `agent`
-member of, calls `gateway.stream`, and flushes ~50ms batched UPDATEs (`streaming`→
-`complete`); mobile shows a streaming cursor (DEC-021). Proven headlessly by the
-mock-gateway integration (real local STDB); live LLM reply on-device is `V-7`. CI
-16/16. **M1.4 recap:** the **Model Gateway is real** — `packages/gateway` implements `createModelGateway` with
-**streaming + tool-calling** on the **Vercel AI SDK v6** (provider registry:
-`anthropic` + `openai` live; `google`/`openai-compatible` inert) + **AES-256-GCM
-BYOK** key store + injected resolver (DEC-020). `embed`→M3.1; real LLM reply into
-STDB→M1.6. CI 16/16 (16 gateway tests, headless via `MockLanguageModelV3`); a real
-provider round-trip is the founder smoke `V-6` (key via `SETUP.md` S-4). Earlier:
-**M1.2** `apps/mobile` does real **SpacetimeAuth (OIDC) login** —
-`src/auth.ts` runs authorization-code + PKCE via `expo-auth-session` (issuer
-`auth.spacetimedb.com/oidc`), persists the refresh token in SecureStore, and passes
-the id token to `DbConnection.withToken()`; `App.tsx` gates the provider behind a
-`Login` screen → stable per-user `Identity` replaces the anonymous token (DEC-019).
-CI 16/16; Android bundle clean (606 modules). Inert until founder supplies
-`EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID` (**`SETUP.md` S-1**) + targets Maincloud
-`agentspace-hpm58`; on-device round-trip is `V-5`. New founder-owned **`SETUP.md`**
-ledger (`S-n`) is the setup twin of `VERIFICATION.md` (CLAUDE §4). Autonomous loop
-(DEC-013/016): plan-per-chunk → build → AI merges green PRs via API → next.
+**M0 closed; all six M1 build phases shipped; milestone-close in progress.** Merged
+PRs #2–#13. AgentSpace is a working app: sign in (SpacetimeAuth/OIDC, M1.2) → find
+people by name + DM/group chat (M1.1/M1.3) → author AI agents (Agent Studio, M1.5) →
+the orchestrator streams real LLM replies into chat as the bound persona (Model
+Gateway M1.4 + reply loop M1.6). Every layer is verified **headlessly** (CI 16/16 +
+real-local-STDB integrations + `spacetime call` reducer checks); **nothing has run
+on a device yet**. **Drift sweep done** (`.audit/sweep-2026-06-14.md`): no
+`[critical]`; four `[important]` **doc-only** findings (README/BLUEPRINT/VERIFICATION/
+`provider_keys`) awaiting founder routing. **`M1 [shipped]` tag HELD** until those
+fixes are routed + the founder's on-device V-checklist passes (M1's acceptance bar is
+an on-device agent reply, V-7/V-8).
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
-  Vercel-AI-SDK Model Gateway (BYOK) · Postgres + pgvector. pnpm
-  `node-linker=hoisted` (DEC-014).
-- **Open device checks:** V-1 (RN connect), V-2 (Views hide non-members), V-4
-  (mobile chat), V-5 (SpacetimeAuth login). Not blocking.
-- **Open device checks:** V-1/V-2/V-4/V-5/V-6/V-7/V-8/V-9 (founder will batch them).
-- **Open founder setup:** `SETUP.md` S-1/S-2/S-3 (SpacetimeAuth + Maincloud, before
-  V-5); S-4 (a provider API key, before V-6/V-7/V-8). Founder doing setup soon; will
-  hand back the SpacetimeAuth `client_id`. Not currently blocking the dev loop.
-- **Next:** **M1 milestone-close ritual** (drift sweep `.audit/`, re-snapshot, tag) —
-  all M1 build phases are done; then **M2** (multi-agent group threads — needs
-  agents-as-contacts, BL-014) or a polish/RAG track.
+  Vercel-AI-SDK v6 Model Gateway (AES-256-GCM BYOK) · (Postgres + pgvector for M3 RAG).
+  pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
+- **Open founder work:** `SETUP.md` S-1…S-3 (SpacetimeAuth + Maincloud) → V-5;
+  S-4 (a provider key) → V-6/V-7/V-8. Then the on-device batch V-1…V-9. Founder doing
+  setup soon (will hand back the SpacetimeAuth `client_id`) — not blocking the dev loop.
+- **Next:** founder routes the 4 `[important]` sweep findings (likely one docs PR) +
+  runs the V-checklist → then tag `M1 [shipped]`. Build-wise: **M2** (multi-agent group
+  threads — needs agents-as-contacts, BL-014), **BL-016** (deep chat polish, after
+  on-device review), or **M3** (RAG).
 
 ---
 
@@ -478,6 +454,25 @@ on-device UX is `V-9`.
   `chat.ts` (DEC-023). Founder asked for the world-class pass; deeper polish → BL-016.
 - **Verified:** CI 16/16; Android bundle clean (2.05 MB). On-device → `V-9`.
 - **Next:** **M1 milestone-close** (drift sweep + re-snapshot + tag), then M2.
+
+### 2026-06-14 — M1 milestone-close: drift sweep + re-snapshot (+ M1 retro)
+- Ran the mandatory drift sweep (`.audit/sweep-2026-06-14.md`): **no `[critical]`**;
+  4 `[important]` doc-only findings (F-1 README stale at M0; F-2 BLUEPRINT §2 omits
+  `stdb-bindings`; F-3 VERIFICATION V-1 describes the retired probe + deprecated flag;
+  F-4 BLUEPRINT §3 lists `provider_keys` as a current table) + a few `[nice]`. Cataloged
+  only — founder routes (§7/§10). Re-snapshotted MEMORY + ROADMAP; **tag held**.
+- **M1 retro.** Shipped six phases in one session (PRs #8–#13): chat, OIDC login,
+  Model Gateway+BYOK, agent reply loop, Agent Studio, contacts/groups+UX — the whole
+  build-an-agent→converse North-Star loop. **Worked well:** plan-per-chunk → headless
+  verification (CI + local-STDB integrations + `spacetime call`) → AI-merge-on-green;
+  the `SETUP.md`/`VERIFICATION.md` ledgers kept founder-side work batched without
+  blocking; per-PR code-reality updates kept drift tiny (sweep found only doc hygiene).
+  **Friction:** the `spacetime` CLI flag (`-p` not `--project-path`) and a Node-22.22
+  type-stripping crash from Expo config plugins — both fixed. **The one open risk:**
+  nothing is on-device-verified yet (V-1…V-9) — the most valuable next action is the
+  founder's verification batch.
+- **Next:** founder routes F-1…F-4 + runs V-checklist → tag `M1 [shipped]`; then M2 /
+  BL-016 / M3.
 
 ---
 
