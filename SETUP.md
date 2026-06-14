@@ -80,17 +80,55 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   container is logged in as a different identity, **not your `blokzdev` Maincloud
   account** (which owns `agentspace-hpm58`). So this step is **yours**: run it from a
   machine where `spacetime login` is your Maincloud/`blokzdev` account.
-- **Steps (founder):**
-  1. From `modules/spacetime/` (logged in as `blokzdev`):
+- **Where:** **any terminal** with the repo checked out + the SpacetimeDB CLI — it does
+  **not** need an IDE. (Needs the module source, so run from `modules/spacetime/`, or
+  use `-p <path-to>/modules/spacetime` from anywhere.)
+- **Steps (founder) — full sequence:**
+  1. **Install the CLI** (once), if not already:
+     `curl -sSf https://install.spacetimedb.com | sh` (then ensure `~/.local/bin` is on
+     `PATH`). Check: `spacetime --version` (we build against **2.5.0**).
+  2. **Log into your Maincloud/`blokzdev` account** (this is the step the container
+     couldn't do): `spacetime login` → opens a browser → authorize as `blokzdev`.
+     Verify: `spacetime login show` (should print your account identity) and
+     `spacetime server list` (should list `maincloud` → `maincloud.spacetimedb.com`).
+  3. **Publish** from the repo's `modules/spacetime/`:
      `spacetime publish agentspace-hpm58 -p . --server maincloud --yes`
-  2. If it warns about a **breaking schema change with existing data**, decide whether
-     to wipe: add `--delete-data=on-conflict` (destroys current data — only if you're OK
-     with that). For a fresh DB there's nothing to lose.
-  3. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
-     Maincloud console shows the tables (`user`, `thread`, `agent`, …).
-- **Give back to the AI:** confirm it published. The env values are already set
-  (`apps/mobile/.env.local`: host `wss://maincloud.spacetimedb.com`, db
-  `agentspace-hpm58`). Then V-5/V-7/V-8 are ready.
+  4. If it warns about a **breaking schema change with existing data**, add
+     `--delete-data=on-conflict` (destroys current Maincloud data — only if you're OK
+     with that; a fresh DB has nothing to lose).
+  5. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
+     Maincloud console shows the tables (`user`, `thread`, `agent`, `provider_key`, …).
+- **Give back to the AI:** confirm it published. The app env is already set
+  (`apps/mobile/.env.local`). Then **V-5** (login) is ready; **V-7/V-8** also need the
+  orchestrator running against Maincloud — see **S-5**.
+
+---
+
+### S-5 — Run the orchestrator against Maincloud (for live agent replies)  ·  added 2026-06-14 · M1.7  ·  [ ] (only for V-7/V-8)
+- **Why:** the orchestrator is the process that actually generates agent replies. It is
+  **not hosted anywhere yet** (OT-005 / a deploy is future work), so for the on-device
+  agent-reply tests (V-7/V-8) you run it **on your machine, pointed at Maincloud**, for
+  the duration of the test. (V-5 — login only — does **not** need it.)
+- **Where:** a terminal in the repo (Node ≥ 22 + `pnpm install` done). No `.env` key
+  needed — BYOK keys are entered **in the app** (🔑 Keys); the orchestrator no longer
+  reads `.env`.
+- **Steps:**
+  1. After S-3 is published, run:
+     ```
+     AGENTSPACE_STDB_HOST=wss://maincloud.spacetimedb.com \
+     AGENTSPACE_STDB_DB=agentspace-hpm58 \
+     pnpm --filter @agentspace/orchestrator start
+     ```
+     It connects (anonymous identity, persisted), prints `connected as …`, registers its
+     BYOK public key, and logs `reply loop subscribed`. **Leave it running** while you test.
+  2. In the app: 🔑 **Keys** → add your provider key (it seals to the orchestrator's
+     pubkey) → 🤖 **Agents** → create a persona → **Chat**.
+- **Caveat (v1):** the orchestrator's box keypair is cached in a temp file; if you
+  **restart** the orchestrator it may regenerate the keypair, after which previously
+  saved keys can't be decrypted — just re-enter your key in 🔑 Keys. (Durable backing =
+  BL-011.)
+- **Give back to the AI:** nothing — this is operational. Tell me if it fails to connect
+  or the agent replies "⚠️ add an API key…".
 
 ---
 
@@ -126,6 +164,13 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   S-4 (`ANTHROPIC_API_KEY`, optional `AGENTSPACE_GATEWAY_KEK`) — copy to an untracked
   root `.env`.
 
-*Remaining: S-3 (founder Maincloud publish) and S-4 (provider key). After S-1…S-3 +
-the env values, the on-device login check is `VERIFICATION.md` V-5; after S-4, the
-gateway smoke is V-6; V-7/V-8 (live agent reply) need S-3 + S-4.*
+## On-device test path (after S-1/S-2 ✓)
+
+1. **S-3** (publish to Maincloud) → unblocks **V-5** (login persists) once you build a
+   real dev build (`expo run:android`, not Expo Go).
+2. **S-5** (run the orchestrator against Maincloud) + add your key in 🔑 **Keys** →
+   unblocks **V-7/V-8** (your agent replies with your key — the real BYOK path).
+3. **S-4** is now **optional** — only for the standalone gateway smoke (**V-6**).
+
+*Done: S-1, S-2 (client_id wired). Remaining: **S-3** (you) → then **S-5** + on-device
+V-checklist → I tag `M1 [shipped]`.*
