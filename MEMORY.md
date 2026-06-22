@@ -362,6 +362,30 @@ auth (OT-007) + durable KEK/keypair backing (BL-011). This posture (per-actor, r
 reducer/View-scoped) is intentional and better than a shared static key. Recorded in
 BLUEPRINT §8.1; doc-only (no code change).
 
+### DEC-027 — Orchestrator hosting: central always-on for v1; on-device/serverless are future modes
+*2026-06-22.* Founder asked whether the orchestrator could run **on-device/edge** or as a
+**Vercel serverless** app. Grounded in the code: the orchestrator is a **persistent, stateful,
+long-running WebSocket subscriber** (keeps an open Maincloud connection + in-memory box
+keypair / in-flight `Set` / ~50ms batchers + a file-persisted token; a reply holds it busy
+1–60s) and is **Node-only** (`node:fs`/`node:os`/AI-SDK adapters/`tsx`). The module is also
+**central by design** today (singleton `service`, one `agent`-member identity; per-agent
+identities = BL-014). **Decision (founder-ratified):** v1 ships **one small, cheap, always-on
+central service** — "always-on ≠ expensive" (mostly idle on a socket → free-tier container);
+it alone delivers **always-available agents, group replies, and scheduled workflows**. The
+**specific** host (Fly/Railway/Render/Maincloud-managed/self-host) stays **OT-005**; needs
+OT-007 (real service identity) + BL-011 (durable key backing). **Three future optional modes
+on one self-host-vs-always-on spectrum**, captured in BACKLOG: (a) **phone on-device** (BL-017
+— same Android device as the app via `nodejs-mobile`/Hermes port + a local SLM via BL-001;
+**capability/tier-gated** with cloud fallback; **defining caveat: foreground-only**, since the
+limiter is Android background execution — Doze/OEM killers — not compute, so it can't be
+always-available); (b) **desktop self-host** (BL-018 — the *existing* Node orchestrator on the
+user's own always-on PC/GPU pointed at local Ollama via the gateway `openai-compatible` path,
+DEC-009/DEC-020; most feasible "nothing leaves my hardware"); (c) **event-driven serverless**
+(BL-019 — stateless per-turn functions, contingent on a SpacetimeDB push/webhook trigger;
+DEC-008 flagged `procedures` HTTP as unstable). **Product surface = the Android app** (DEC-005;
+**no "Windows app"** — Windows is the founder's dev machine). On-device *model inference* is a
+separate, already-deferred axis (DEC-009/BL-001) the local modes compose with. Doc-only.
+
 ---
 
 ## Session Journal (append-only)
@@ -581,6 +605,17 @@ BLUEPRINT §8.1; doc-only (no code change).
 - **Next:** founder runs **S-3** (publish, now Windows-ready) → **S-5** + on-device
   V-5/V-7/V-8 → I tag `M1 [shipped]`.
 
+### 2026-06-22 — Doc: orchestrator hosting model (DEC-027)
+- Founder asked if the orchestrator could run on-device/edge or as Vercel serverless. Explored
+  the runtime (persistent stateful Node subscriber) + the central-by-design module, then
+  ratified **central always-on for v1** (cheap free-tier container) with three future modes
+  captured as **BL-017** (phone on-device — same device, tier-gated, foreground-only),
+  **BL-018** (desktop self-host — user's PC/GPU + Ollama), **BL-019** (event-driven serverless).
+  Wrote **DEC-027**, a **BLUEPRINT §4.1** deployment-topology subsection, the BACKLOG items, a
+  ROADMAP §5 note, and narrowed **OT-005** to the specific-host choice. Clarified there's **no
+  Windows app** (Windows = dev machine; product = Android, DEC-005). Doc-only.
+- **Next:** unchanged — founder runs **S-5** + on-device V-5/V-7/V-8 → tag `M1 [shipped]`.
+
 ---
 
 ## Open Threads
@@ -599,12 +634,14 @@ BLUEPRINT §8.1; doc-only (no code change).
 - **OT-004** — *Streaming write cadence & cost.* Confirm batched row UPDATEs
   (~50ms) for partial agent tokens don't strain SpacetimeDB/energy budget at
   realistic concurrency. Unblocks: M2 streaming work.
-- **OT-005** — *Hosting & data stores.* Decide SpacetimeDB host (Maincloud Pro
-  vs self-host), orchestrator host, and the Postgres/pgvector provider. Unblocks:
-  M0 infra / M3 RAG. (Pricing/limits cited in research are reported-not-verified.)
-  Now also owns the **durable BYOK key store**: M1.4's gateway uses an in-memory
-  AES-256-GCM store under an env KEK; the Postgres/KMS backing (`provider_keys.secret_ref`)
-  lands with this decision (DEC-020).
+- **OT-005** — *Hosting & data stores.* The orchestrator **hosting model is now decided —
+  central always-on (DEC-027)**; OT-005 narrows to the **specific** choices: SpacetimeDB host
+  (Maincloud Pro vs self-host), the **specific** orchestrator host (Fly/Railway/Render/
+  Maincloud-managed/micro-VM), and the Postgres/pgvector provider. Unblocks: M0 infra / M3 RAG.
+  (Pricing/limits cited in research are reported-not-verified.) Also owns the **durable BYOK
+  key store**: M1.4's gateway uses an in-memory AES-256-GCM store under an env KEK; the
+  Postgres/KMS backing (`provider_keys.secret_ref`) lands with this decision (DEC-020/BL-011).
+  Future orchestrator modes (on-device/desktop-self-host/serverless) = BL-017/018/019.
 - **OT-006** — *Local model structured output.* OpenAI-compatible local providers
   lack the AI SDK's structured-output mode; decide the validation/JSON-repair
   strategy for local agents. Unblocks: M5.

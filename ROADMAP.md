@@ -195,6 +195,9 @@ and per-user usage is metered with quotas.
 ## §5 Strategic skips (not in v1)
 
 - **On-device / edge inference** — own milestone post-v1 (heavy; device-perf risk).
+- **Orchestrator hosting** — v1 is a single **central always-on** service (DEC-027); the three
+  alternative modes (**phone on-device** BL-017 · **desktop self-host** BL-018 · **serverless**
+  BL-019) are post-v1. The *specific* v1 host is OT-005.
 - **iOS** — RN keeps the door open; not a v1 target.
 - **Agent marketplace / sharing** — post-v1.
 - **Voice / video calls** — out of scope for v1.
