@@ -262,7 +262,7 @@ AgentSpace/
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
 │   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7)
-│       · src/{index,replyLoop,prompt,byok,spacetime}.ts · scripts/integration.ts
+│       · src/{index,main,replyLoop,prompt,byok,spacetime}.ts · scripts/integration.ts
 ├── modules/
 │   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5)
 │       · src/index.ts · bindings/ (generated, committed)
