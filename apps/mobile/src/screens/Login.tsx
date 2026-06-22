@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../chat';
 import { SPACETIMEAUTH_CONFIGURED } from '../config';
 

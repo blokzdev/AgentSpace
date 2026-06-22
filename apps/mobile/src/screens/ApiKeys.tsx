@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Linking, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReducer, useTable } from 'spacetimedb/react';
 import { PROVIDER_CATALOG } from '@agentspace/shared';
 import { reducers, tables } from '../../module_bindings';
@@ -23,6 +24,7 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [mdrafts, setMdrafts] = useState<Record<string, Record<string, string>>>({});
+  const [keyError, setKeyError] = useState<string | null>(null);
 
   const hasKey = (provider: string): boolean => myKeys.some((k) => k.provider === provider);
 
@@ -32,11 +34,18 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
   );
 
   const seal = (provider: string, raw: string): void => {
-    if (!ready) return;
+    if (!ready) {
+      setKeyError('Agent service not ready (no public key yet).');
+      return;
+    }
     try {
-      void setProviderKey({ provider, sealed: sealForOrchestrator(raw, pubKey) });
-    } catch {
-      // sealing failed (bad pubkey) — ignored; the orchestrator may not be ready
+      const sealed = sealForOrchestrator(raw, pubKey);
+      void setProviderKey({ provider, sealed });
+      setKeyError(null);
+    } catch (e) {
+      // Surface the failure instead of swallowing it (otherwise the key silently
+      // fails to save and the user has no idea why).
+      setKeyError(`Could not save ${provider} key: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -76,6 +85,7 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
         {!ready ? (
           <Text style={styles.warn}>⚠️ The agent service isn’t running yet — keys can’t be saved until it is.</Text>
         ) : null}
+        {keyError ? <Text style={styles.warn}>⚠️ {keyError}</Text> : null}
 
         {ordered.map((p) => (
           <View key={p.id} style={styles.card}>

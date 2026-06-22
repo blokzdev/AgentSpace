@@ -36,6 +36,17 @@ describe('buildPrompt', () => {
       { role: 'user', content: 'hi' },
     ]);
   });
+
+  it('drops trailing assistant turns so the conversation ends with a user message', () => {
+    const rows: PromptRow[] = [
+      { isAgent: false, text: 'hello', sentMicros: 1n },
+      { isAgent: true, text: '⚠️ Sorry — I could not generate a reply.', sentMicros: 2n },
+    ];
+    expect(buildPrompt(rows)).toEqual([
+      { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
+      { role: 'user', content: 'hello' },
+    ]);
+  });
 });
 
 describe('newRunId', () => {

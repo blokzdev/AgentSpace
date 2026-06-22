@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReducer, useTable } from 'spacetimedb/react';
 import { DEFAULT_MODEL, PROVIDER_CATALOG, providerInfo } from '@agentspace/shared';
 import { reducers, tables } from '../../module_bindings';

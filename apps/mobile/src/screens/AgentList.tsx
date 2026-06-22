@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useReducer, useTable } from 'spacetimedb/react';
 import { reducers, tables } from '../../module_bindings';
 import { colors } from '../chat';
