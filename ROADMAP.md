@@ -139,7 +139,10 @@ with presence.
     for the new column) before testing. On-device `V-11` (Ollama on the host; the emulator
     needs no GPU).*
   - **M1.8.3** Multi-credential providers (Bedrock/Azure/Vertex) — structured creds **sealed
-    as JSON** (no `provider_key` schema change) + multi-field key forms. `V-12`.
+    as JSON** (no `provider_key` schema change) + multi-field key forms. ✓ *Done 2026-06-22
+    — `ProviderFactory` parses the JSON credential into the SDK settings; `ApiKeys` renders a
+    field form per provider; new **`PROVIDERS.md`** documents getting every key. CI green
+    (gateway 20). `V-12`.*
 
 Human verification: `[gate]` build-an-agent → live 1:1 reply on-device **with the
 user's own BYOK key** (V-7/V-8 after M1.7).

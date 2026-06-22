@@ -26,4 +26,17 @@ describe('defaultProviders registry', () => {
     expect(factory).toBeTypeOf('function');
     expect(factory!('', 'llama3.2', { baseUrl: 'http://localhost:11434/v1' })).toBeTruthy();
   });
+
+  it('multi-credential factories construct from a sealed JSON credential', () => {
+    const cases: Record<string, string> = {
+      'amazon-bedrock': JSON.stringify({ region: 'us-east-1', accessKeyId: 'AKIA', secretAccessKey: 'sk' }),
+      azure: JSON.stringify({ resourceName: 'res', apiKey: 'k' }),
+      'google-vertex': JSON.stringify({ project: 'p', location: 'us-central1', apiKey: 'k' }),
+    };
+    for (const p of PROVIDER_CATALOG.filter((x) => x.kind === 'multi')) {
+      const factory = defaultProviders[p.id];
+      expect(factory, `missing factory for "${p.id}"`).toBeTypeOf('function');
+      expect(factory!(cases[p.id], p.defaultModel)).toBeTruthy();
+    }
+  });
 });

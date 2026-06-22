@@ -271,3 +271,23 @@ Notes: <founder fills: device + OS + result>
   use `localhost`, not `10.0.2.2`); a model error → `ollama pull` that model first. Capture the
   orchestrator logs.
 - **Notes (founder):** _model + result →_
+
+---
+
+### V-12 — A multi-credential provider replies (Bedrock / Azure / Vertex)  ·  added 2026-06-22 · M1.8.3 · *(optional)*
+- **Why:** M1.8.3 added the multi-credential providers (a **JSON** of fields, sealed like any
+  key — no schema change). This confirms one of them streams a reply on-device. **Optional** —
+  only if you have AWS / Azure / GCP access; the cloud (V-10) + local (V-11) paths already
+  cover the common cases. See **`PROVIDERS.md`** Tier 3 for getting each credential.
+- **Setup:** orchestrator running vs Maincloud (S-5); credentials per `PROVIDERS.md` for your
+  chosen provider.
+- **Steps:**
+  1. 🔑 **Keys** → **Multi-credential providers** → your provider → fill the fields (e.g.
+     Bedrock: `region` / Access Key ID / Secret Access Key) → **Save** (“✓ set”).
+  2. 🤖 **Agents** → **+ New** → pick that provider → set the **model** (Bedrock: a model id;
+     **Azure: your deployment name**; Vertex: `gemini-2.0-flash`) → **Create** → **Chat**.
+- **Pass when:** the reply streams in from that provider.
+- **If it fails:** auth error → a field is wrong or model access isn’t enabled (Bedrock: enable
+  model access in its console; Azure: the model is your **deployment** name, not the base id;
+  Vertex: the Vertex AI API is enabled for the project). Capture the orchestrator logs.
+- **Notes (founder):** _provider + result →_

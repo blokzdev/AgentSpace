@@ -18,6 +18,9 @@ import { createFireworks } from '@ai-sdk/fireworks';
 import { createDeepInfra } from '@ai-sdk/deepinfra';
 import { createCerebras } from '@ai-sdk/cerebras';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
+import { createAzure } from '@ai-sdk/azure';
+import { createVertex } from '@ai-sdk/google-vertex';
 import type { ModelProvider } from '@agentspace/shared';
 
 /** `credential` is a raw API key (kind 'apiKey'/'baseUrl') or a JSON blob (kind 'multi');
@@ -52,5 +55,14 @@ export const defaultProviders: ProviderRegistry = {
       baseURL: opts?.baseUrl ?? '',
       apiKey: apiKey || undefined,
     })(model),
-  // Multi-credential providers (Bedrock/Azure/Vertex) land in M1.8.3.
+  // Multi-credential providers (M1.8.3) — `credential` is a sealed JSON blob of the
+  // provider's `fields` (PROVIDER_CATALOG), parsed straight into the SDK settings.
+  'amazon-bedrock': (credential, model) =>
+    createAmazonBedrock(
+      JSON.parse(credential || '{}') as Parameters<typeof createAmazonBedrock>[0],
+    )(model),
+  azure: (credential, model) =>
+    createAzure(JSON.parse(credential || '{}') as Parameters<typeof createAzure>[0])(model),
+  'google-vertex': (credential, model) =>
+    createVertex(JSON.parse(credential || '{}') as Parameters<typeof createVertex>[0])(model),
 };

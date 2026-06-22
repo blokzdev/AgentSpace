@@ -24,7 +24,7 @@ export type MemberRole = (typeof MEMBER_ROLES)[number];
 export const MODEL_PROVIDERS = [
   'anthropic', 'openai', 'google', 'mistral', 'cohere', 'groq', 'xai',
   'deepseek', 'perplexity', 'togetherai', 'fireworks', 'deepinfra', 'cerebras',
-  'openai-compatible',
+  'openai-compatible', 'amazon-bedrock', 'azure', 'google-vertex',
 ] as const;
 export type ModelProvider = (typeof MODEL_PROVIDERS)[number];
 
@@ -115,6 +115,31 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
     defaultModel: 'llama3.2', suggestedModels: ['llama3.2', 'qwen2.5', 'mistral', 'deepseek-r1'],
     keyHint: 'optional', getKeyUrl: 'https://ollama.com/download',
     defaultBaseUrl: 'http://localhost:11434/v1' },
+  // Multi-credential cloud providers — sealed as a JSON blob of `fields` (M1.8.3).
+  { id: 'amazon-bedrock', label: 'Amazon Bedrock', kind: 'multi',
+    defaultModel: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    suggestedModels: ['anthropic.claude-3-5-sonnet-20241022-v2:0', 'amazon.nova-pro-v1:0', 'meta.llama3-3-70b-instruct-v1:0'],
+    keyHint: 'AWS credentials', getKeyUrl: 'https://console.aws.amazon.com/iam/home#/security_credentials',
+    fields: [
+      { id: 'region', label: 'AWS Region', placeholder: 'us-east-1' },
+      { id: 'accessKeyId', label: 'Access Key ID', secret: true, placeholder: 'AKIA…' },
+      { id: 'secretAccessKey', label: 'Secret Access Key', secret: true, placeholder: '…' },
+    ] },
+  { id: 'azure', label: 'Azure OpenAI', kind: 'multi',
+    defaultModel: 'gpt-4o', suggestedModels: ['gpt-4o', 'gpt-4o-mini', 'o3-mini'],
+    keyHint: 'resource + key', getKeyUrl: 'https://portal.azure.com/',
+    fields: [
+      { id: 'resourceName', label: 'Resource Name', placeholder: 'my-resource' },
+      { id: 'apiKey', label: 'API Key', secret: true, placeholder: '…' },
+    ] },
+  { id: 'google-vertex', label: 'Google Vertex AI', kind: 'multi',
+    defaultModel: 'gemini-2.0-flash', suggestedModels: ['gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-1.5-pro'],
+    keyHint: 'project + key', getKeyUrl: 'https://console.cloud.google.com/vertex-ai',
+    fields: [
+      { id: 'project', label: 'GCP Project ID', placeholder: 'my-project' },
+      { id: 'location', label: 'Location', placeholder: 'us-central1' },
+      { id: 'apiKey', label: 'API Key', secret: true, placeholder: '…' },
+    ] },
 ];
 
 /** Catalog lookup by provider id (undefined for an unknown/not-yet-enabled id). */
