@@ -162,11 +162,15 @@ OpenAI-compatible adapter for local runtimes (Ollama/vLLM/LM Studio).
   post-hoc JSON validation/repair.
 - **Tool reliability varies by provider** *(reported — verify)*; prefer Claude for
   complex tool chains, add validation/retry for others.
-- **v1 status (M1.4, DEC-020):** `createModelGateway({ resolveCredential, providers? })`
-  implements **streaming + tool-calling** over a **provider registry** — `anthropic`
-  + `openai` live on the AI SDK; `google` + `openai-compatible` registered but inert
-  (BACKLOG). `embed` is deferred to M3.1. The `streamText` `fullStream` is normalized
-  to `GatewayDelta` (text / tool-call / finish+usage).
+- **status (M1.4 → M1.8, DEC-020/DEC-028):** `createModelGateway({ resolveCredential,
+  providers? })` implements **streaming + tool-calling** over a **provider registry**
+  derived from the shared **`PROVIDER_CATALOG`** (the single source for the gateway + the
+  mobile UI). **M1.8.1:** all **13 single-API-key cloud providers** are live (anthropic,
+  openai, google, mistral, cohere, groq, xai, deepseek, perplexity, togetherai, fireworks,
+  deepinfra, cerebras). **M1.8.2/.3** add `openai-compatible` (local; per-agent `baseUrl`)
+  + multi-credential Bedrock/Azure/Vertex (**sealed-JSON** creds — no `provider_key` schema
+  change). `embed` is deferred to M3.1. The `streamText` `fullStream` is normalized to
+  `GatewayDelta` (text / tool-call / finish+usage).
 
 ### BYOK key custody
 
