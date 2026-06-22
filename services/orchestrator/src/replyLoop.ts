@@ -8,7 +8,12 @@ import { DbConnection } from '@agentspace/stdb-bindings';
 import { MissingKeyError } from './byok';
 import { buildPrompt, createBatcher, newRunId, selectPersona, type AgentRef, type PromptRow } from './prompt';
 
-const FLUSH_MS = 50;
+// Coalescing window for streamed UPDATEs. Each flush re-sends the full cumulative
+// text, so a too-aggressive cadence floods the subscription over a high-latency
+// host (Maincloud) and the client drops the tail of a long reply, leaving a
+// dangling streaming cursor (OT-004). ~200ms (≈5 updates/s) still reads as live
+// while keeping long replies within the subscription's delivery budget.
+const FLUSH_MS = 200;
 
 export interface ReplyLoopOptions {
   flushMs?: number;
@@ -81,7 +86,9 @@ async function handleReply(
     const persona = selectPersona([...conn.db.my_threads.iter()], agents, threadId);
     const rows: PromptRow[] = [];
     for (const m of conn.db.my_thread_messages.iter()) {
-      if (m.threadId === threadId) {
+      // Only completed turns are context — skip in-flight streams and failed
+      // agent replies (e.g. an earlier "⚠️ Sorry…") so they aren't fed back.
+      if (m.threadId === threadId && m.streamState === 'complete') {
         rows.push({ isAgent: m.sender.isEqual(self), text: m.text, sentMicros: m.sent.microsSinceUnixEpoch });
       }
     }
@@ -114,6 +121,12 @@ async function handleReply(
       }
     }
     batcher.stop();
+    // Let the streaming-update burst drain before the authoritative finish: each
+    // append re-sends the full cumulative text, so on a high-latency host
+    // (Maincloud) the client can drop the tail of a long reply mid-burst. The
+    // subscription recovers once the burst stops, so a briefly-delayed finish
+    // reliably lands the final `complete` state (no dangling cursor) — OT-004.
+    await new Promise((resolve) => setTimeout(resolve, 500));
     conn.reducers.agentReplyFinish({
       runId,
       text: acc,

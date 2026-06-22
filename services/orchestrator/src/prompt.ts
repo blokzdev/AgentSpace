@@ -24,6 +24,12 @@ export function buildPrompt(rows: PromptRow[], system: string = DEFAULT_SYSTEM_P
     if (r.text.length === 0) continue; // skip empty in-flight streaming rows
     turns.push({ role: r.isAgent ? 'assistant' : 'user', content: r.text });
   }
+  // The conversation must end with a user turn — most providers reject an
+  // assistant-prefill ending. Drop any trailing assistant turns (e.g. a prior
+  // failed/streamed agent reply that wasn't filtered upstream).
+  while (turns.length > 0 && turns[turns.length - 1].role === 'assistant') {
+    turns.pop();
+  }
   return [{ role: 'system', content: system }, ...turns];
 }
 

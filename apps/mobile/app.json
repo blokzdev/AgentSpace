@@ -2,13 +2,23 @@
   "expo": {
     "name": "AgentSpace",
     "slug": "agentspace-probe",
-    "scheme": "agentspace",
+    "scheme": "com.agentspace.probe",
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "android": {
       "package": "com.agentspace.probe"
-    }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "1.9.24"
+          }
+        }
+      ]
+    ]
   }
 }

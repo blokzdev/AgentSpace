@@ -2,7 +2,8 @@
 // SpacetimeAuth (OIDC) login (M1.2): the id token from the login flow is passed to
 // the connection via .withToken(); the SpacetimeDBProvider only mounts once signed in.
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { SpacetimeDBProvider, useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { Identity } from 'spacetimedb';
@@ -194,8 +195,9 @@ export default function App(): React.JSX.Element {
     [auth.idToken],
   );
 
+  let content: React.JSX.Element;
   if (auth.status === 'loading') {
-    return (
+    content = (
       <View style={styles.fill}>
         <SafeAreaView style={styles.center}>
           <ActivityIndicator color={colors.accent} />
@@ -204,25 +206,25 @@ export default function App(): React.JSX.Element {
         <StatusBar style="light" />
       </View>
     );
-  }
-
-  if (auth.status === 'signedOut' || connectionBuilder === null) {
-    return (
+  } else if (auth.status === 'signedOut' || connectionBuilder === null) {
+    content = (
       <View style={styles.fill}>
         <Login onSignIn={auth.login} busy={auth.busy} error={auth.error} />
         <StatusBar style="light" />
       </View>
     );
+  } else {
+    content = (
+      <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
+        <View style={styles.fill}>
+          <Root onSignOut={auth.logout} />
+          <StatusBar style="light" />
+        </View>
+      </SpacetimeDBProvider>
+    );
   }
 
-  return (
-    <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
-      <View style={styles.fill}>
-        <Root onSignOut={auth.logout} />
-        <StatusBar style="light" />
-      </View>
-    </SpacetimeDBProvider>
-  );
+  return <SafeAreaProvider>{content}</SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({

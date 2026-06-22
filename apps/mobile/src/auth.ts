@@ -65,7 +65,12 @@ async function clearTokens(): Promise<void> {
 
 export function useSpacetimeAuth(): SpacetimeAuth {
   const discovery = AuthSession.useAutoDiscovery(SPACETIMEAUTH_ISSUER);
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'agentspace', path: 'redirect' });
+  // SpacetimeAuth requires native clients on a Custom URI scheme to use a
+  // reverse-DNS scheme (a plain `agentspace://` is rejected with
+  // `invalid_redirect_uri`). Use the app's package id. MUST stay in sync with
+  // `apps/mobile/app.json` `expo.scheme` and the redirect URI registered on the
+  // SpacetimeAuth client (SETUP.md S-2): `com.agentspace.probe://redirect`.
+  const redirectUri = AuthSession.makeRedirectUri({ scheme: 'com.agentspace.probe', path: 'redirect' });
 
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [idToken, setIdToken] = useState<string | null>(null);

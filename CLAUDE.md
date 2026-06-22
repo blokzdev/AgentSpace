@@ -286,11 +286,23 @@ refresh token in SecureStore, and passes the resulting id token to
 Typechecks, lints, and **bundles clean for Android** (Metro, 606 modules, 2.0 MB
 Hermes). The flow is inert until the founder supplies `EXPO_PUBLIC_SPACETIMEAUTH_CLIENT_ID`
 (`SETUP.md` S-1) and must target Maincloud `agentspace-hpm58` (which trusts the
-issuer); the on-device round-trip is `V-5`. **app.json carries `scheme: "agentspace"`
-and no `plugins` array** — listing `expo-web-browser`/`expo-secure-store` as config
-plugins makes `expo export` `require` `expo-modules-core`'s TS source and crashes on
-Node ≥22.18 type-stripping; both modules autolink without a plugin entry. The
-orchestrator keeps its persisted-token identity (a real service account is `OT-007`).
+issuer). **On-device hardening (2026-06-22, local session):** the redirect **scheme is
+`com.agentspace.probe`** (reverse-DNS) — SpacetimeAuth's OIDC provider (node-oidc-provider)
+rejects a plain custom scheme like `agentspace://redirect` with `invalid_redirect_uri`, and
+a native client's whole redirect-URI set must be reverse-DNS (`apps/mobile/src/auth.ts` +
+`app.json` `scheme`; the founder registers `com.agentspace.probe://redirect` on the client).
+app.json now has a `plugins` array with **`expo-build-properties` pinning
+`android.kotlinVersion: "1.9.24"`** — RN 0.76.5's Kotlin compiler is 1.9.24 but Expo SDK 52's
+template defaults the ext to 1.9.25, so `expo-modules-core` picks a Compose-compiler extension
+that mismatches and the dev build fails; the pin aligns them. `polyfills.ts` adds a
+**`Promise.withResolvers` polyfill** (Hermes/RN 0.76 lacks it; the SpacetimeDB SDK uses it for
+**every reducer call**, so without it all on-device writes — save key, create agent, send
+message — silently throw). All screens use **`react-native-safe-area-context`** `SafeAreaView`
+(RN's own doesn't pad the Android status bar, so headers rendered under it and were untappable).
+**V-5 login + V-7/V-8 agent reply (BYOK Anthropic) verified on-device** against Maincloud via an
+Android dev build (`expo run:android`, JDK from Android Studio's JBR 21); the native dirs are
+CNG-generated and gitignored. The orchestrator keeps its persisted-token identity (a real
+service account is `OT-007`).
 **M1.4:** the **Model Gateway** is real — `packages/gateway` implements
 `createModelGateway({ resolveCredential, providers? })` with **streaming +
 tool-calling** on the **Vercel AI SDK v6** over a provider registry, normalizing
