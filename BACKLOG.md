@@ -115,6 +115,39 @@
   indicators beyond the streaming cursor, animations/skeletons/haptics, light theme,
   swipe actions, image/attachment rendering.
 
+### BL-017 — Phone on-device "local agent" mode
+- **Source:** DEC-027 (v1 is central always-on; on-device is a future mode).
+- **What:** run the orchestrator on the **same Android device** as the app (no separate PC) —
+  via **`nodejs-mobile`** (embeds Node in the RN app) or a **Hermes port** of the reply loop —
+  optionally with a local **SLM** (BL-001) so neither key nor prompt leaves the device.
+- **Trigger:** v1 shipped + demand for a max-privacy, single-device personal assistant.
+- **Constraints:** **device-capability/tier-gated** (quantized SLM only on capable phones) with
+  **graceful cloud/central fallback**; **foreground-only** — Android background-execution limits
+  (Doze / OEM battery-killers), *not* compute, mean it can't be always-available (no replies
+  while asleep, no group/other-user replies, no scheduled workflows).
+- **Promotion:** an RN-runnable orchestrator runtime + per-agent identity (BL-014) + on-device
+  inference (BL-001); pairs with desktop self-host (BL-018) on the self-host spectrum.
+
+### BL-018 — Desktop self-host orchestrator
+- **Source:** DEC-027.
+- **What:** run the **existing** Node orchestrator on the user's own **always-on** PC/GPU (e.g.,
+  an RTX 4070) pointed at **local Ollama/vLLM** via the gateway's `openai-compatible` path
+  (DEC-009/DEC-020). The most feasible "nothing leaves my hardware" mode — no RN port — and
+  always-on while the PC is on.
+- **Trigger:** power-user / self-host demand; pairs with local-model support (BL-010 at M5).
+- **Promotion:** a packaging/onboarding task (a one-command self-host bundle pointed at the
+  user's Maincloud DB + local model) + per-agent identity (BL-014) for multi-agent.
+
+### BL-019 — Event-driven serverless orchestrator
+- **Source:** DEC-027 (today's orchestrator is a persistent subscriber — the opposite of
+  request-scoped serverless).
+- **Trigger:** a reliable SpacetimeDB **outbound push/webhook** trigger matures (DEC-008 flags
+  `procedures` HTTP as unstable today).
+- **Promotion:** invert to **stateless per-turn functions** (DB event → function resolves
+  persona+key → LLM → stream reply back → exit) for scale-to-zero / no idle cost; resolve the
+  streaming-duration limits (a long reply vs function max-duration) and identity/keypair custody
+  in a stateless context.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

@@ -195,6 +195,55 @@ never logged. The gateway already ships an AES-256-GCM **`EncryptedKeyStore`**
 + keypair/KEK rotation stay **BL-011**. (Mobile seal + orchestrator open are coupled —
 `apps/mobile/src/byok.ts` ↔ `services/orchestrator/src/byok.ts`.)
 
+### 4.1 Deployment topology & hosting (v1: central always-on — DEC-027)
+
+**Topology.** The app and the orchestrator are **two independent clients of the same
+Maincloud database** — they never talk directly, only *through* SpacetimeDB. The orchestrator
+connects **out** to Maincloud exactly like the app does (it is not a local DB):
+
+```
+   📱 app  ──┐                                  ┌── 🖥️ orchestrator (Node)
+             ▼   wss://maincloud.spacetimedb.com ▼   subscribe Views · call reducers
+            ☁️  Maincloud STDB (agentspace-hpm58)  ──► 🤖 provider (BYOK)  · the "thinking"
+```
+
+A reply round-trips through the DB: human message → DB → orchestrator (subscribed) sees it →
+LLM call → streamed `agent_reply_*` UPDATEs → DB → app (subscribed) renders it live.
+
+**v1 = one small, *always-on* central service.** The orchestrator is a **persistent, stateful,
+long-running subscriber** (holds an open WS + in-memory keypair/in-flight `Set`/~50ms batchers
++ a file-persisted token; Node-only — `node:fs`/`node:os`/AI-SDK/`tsx`), and the module is
+central by design (singleton `service`, one `agent`-member identity — DEC-022; per-agent
+identities = BL-014). So v1 hosts it as a single always-on process. **"Always-on" ≠ expensive:**
+it is mostly idle on a socket (the heavy cost is the user's own BYOK provider), so a **free-tier
+container** (Fly/Railway/Render/micro-VM) suffices. This is the only model that delivers
+**always-available agents, group replies, and scheduled workflows** (an agent must answer when
+your phone is asleep / answer *other* people / fire at 9am). Needs OT-007 (real service
+identity) + BL-011 (durable key backing); the **specific host stays OT-005**.
+
+**The mode spectrum** (product surface = the **Android app**, DEC-005; there is **no "Windows
+app"** — Windows is a dev machine). The real axis is **always-on vs foreground-only**, not "PC
+vs phone":
+
+| Mode | Hosts where | Always-on? | Inference | Status |
+|------|-------------|-----------|-----------|--------|
+| **Central** (v1) | our tiny cloud container | ✅ yes | cloud BYOK | **now** |
+| **Desktop self-host** | user's own PC/GPU | ✅ while PC on | local Ollama (gateway `openai-compatible`) | BL-018 |
+| **Phone on-device** | the **same** Android device (`nodejs-mobile`/Hermes) | ❌ foreground-only | local SLM (BL-001) | BL-017 |
+| **Serverless** | central, scale-to-zero functions | event-driven | cloud BYOK | BL-019 |
+
+**Phone on-device** is genuinely "everything on one device" (no separate PC) and is
+**capability/tier-gated** (a quantized SLM only runs on capable phones) **with graceful
+fallback to cloud/central**. Its **defining limiter is Android background execution, not
+compute** — Doze / App-Standby / OEM battery-killers suspend background app processes, and a
+foreground service is battery-hungry/OEM-fragile — so it is realistically **foreground-only**
+(a private single-device assistant you chat with while the app is open), never the
+always-available backbone. **Serverless** (incl. Vercel) is the opposite of today's persistent
+subscriber and only becomes viable after a re-architecture to **stateless per-turn functions**
+triggered by a SpacetimeDB push/webhook (DEC-008 flags `procedures` HTTP as unstable). No
+GitHub Secrets are needed today; future **deployment** secrets appear only when hosted (§8.1 /
+OT-005/OT-007/BL-011).
+
 ---
 
 ## 5. Streaming model

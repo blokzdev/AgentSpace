@@ -132,10 +132,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 ---
 
 ### S-5 — Run the orchestrator against Maincloud (for live agent replies)  ·  added 2026-06-14 · M1.7  ·  [ ] (only for V-7/V-8)
-- **Why:** the orchestrator is the process that actually generates agent replies. It is
-  **not hosted anywhere yet** (OT-005 / a deploy is future work), so for the on-device
-  agent-reply tests (V-7/V-8) you run it **on your machine, pointed at Maincloud**, for
-  the duration of the test. (V-5 — login only — does **not** need it.)
+- **Why:** the orchestrator is the process that actually generates agent replies. The v1
+  plan is a **central always-on host** (DEC-027 / BLUEPRINT §4.1), but it is **not hosted
+  anywhere yet** (the specific host = OT-005), so for the on-device agent-reply tests
+  (V-7/V-8) you run it **on your machine, pointed at Maincloud**, for the duration of the
+  test. (V-5 — login only — does **not** need it.)
 - **Where:** a terminal in the repo (Node ≥ 22 + `pnpm install` done). No `.env` key
   needed — BYOK keys are entered **in the app** (🔑 Keys); the orchestrator no longer
   reads `.env`.
