@@ -24,12 +24,15 @@ their own provider key in a 🔑 Keys screen; it's **box-sealed client-side** to
 orchestrator's pubkey and stored as **ciphertext only** in `provider_key` (raw key never
 in STDB); the orchestrator decrypts per-(owner,provider) in-memory. Proven headlessly
 end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M1.7) are
-done.** **`M1 [shipped]` tag HELD** only on the on-device V-checklist (esp. V-7/V-8 on
-the real BYOK path).
+done**; **M1.8.1** then shipped the full multi-provider catalog (13 single-API-key cloud
+providers + a shared `PROVIDER_CATALOG` + model-picker UI, DEC-028; M1.8.2/.3 = local +
+multi-cred, next). **`M1 [shipped]` tag HELD** only on the on-device V-checklist (esp.
+V-7/V-8 on the real BYOK path).
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
-  Vercel-AI-SDK v6 Model Gateway (AES-256-GCM BYOK) · (Postgres + pgvector for M3 RAG).
+  Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
+  (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
 - **Open founder work:** S-1/S-2/**S-3 done** — module **published to Maincloud
   `agentspace-hpm58`** (2026-06-22; db identity `c200c0ee…`; all 8 tables + 8 views;
@@ -38,8 +41,9 @@ the real BYOK path).
   optional (gateway smoke / V-6 only).
 - **Next:** all M1 build phases done; **S-3 published**. Founder runs **S-5** (orchestrator
   vs Maincloud) + enters a key in 🔑 Keys → on-device **V-5/V-7/V-8** → tag `M1 [shipped]`.
-  Build-wise: **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish,
-  after on-device review) / **BL-011** (durable key backing).
+  Build-wise: **M1.8.2/.3** (local/openai-compatible + multi-cred providers) / **M2**
+  (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable
+  key backing).
 
 ---
 
@@ -386,6 +390,24 @@ DEC-008 flagged `procedures` HTTP as unstable). **Product surface = the Android 
 **no "Windows app"** — Windows is the founder's dev machine). On-device *model inference* is a
 separate, already-deferred axis (DEC-009/BL-001) the local modes compose with. Doc-only.
 
+### DEC-028 — Full multi-provider BYOK via a shared provider catalog + tiered credentials
+*2026-06-22.* Founder: support **all Vercel AI SDK providers** (all 3 tiers) before the local
+session, with a UI/UX refresh. **Design:** a single **`PROVIDER_CATALOG`** in
+`@agentspace/shared` (`{id,label,kind,defaultModel,suggestedModels,keyHint,getKeyUrl,fields?}`)
+is the one source of truth the gateway registry (`providers.ts`) **and** both mobile screens
+(`AgentEditor`/`ApiKeys`) derive from — killing the prior 4-way triplication. **Credential
+model stays clean:** `provider_key.sealed` is opaque, so multi-credential providers seal a
+**JSON blob** — **no `provider_key` schema change, no `CredentialResolver` signature change**
+(the resolved string is a key for Tier-1/2, JSON for Tier-3). Three tiers shipped as
+M1.8.1/.2/.3: (1) **single-API-key cloud** — 13 providers, each `createX({apiKey})(model)`,
+**no STDB change** (provider/model are free-form strings); (2) **openai-compatible/local** — a
+per-agent `baseUrl` (agent-table column) + `createOpenAICompatible`; (3) **multi-credential**
+Bedrock/Azure/Vertex (sealed JSON + multi-field UI). Curated `suggestedModels` chips + a
+free-text model field (catalogs drift — never hardcode an allowlist). Supersedes DEC-020's
+"anthropic+openai only" scope. Verified headlessly (gateway per-provider factory coverage +
+catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live round-trips =
+`V-10/11/12`.
+
 ---
 
 ## Session Journal (append-only)
@@ -632,6 +654,21 @@ separate, already-deferred axis (DEC-009/BL-001) the local modes compose with. D
 - **Next (LOCAL session):** bootstrap (read this file + CLAUDE.md), run the headless integration,
   start the orchestrator vs Maincloud, stand up the Android emulator/device, drive V-7/V-8 with
   evidence (logs + screenshots); propose ticking V-5/V-7/V-8 → founder tags `M1 [shipped]`.
+
+### 2026-06-22 — M1.8.1: provider catalog + 13 single-key cloud providers
+- Built Phase M1.8.1 (DEC-028): shared **`PROVIDER_CATALOG`** (single source) + `providerInfo()`;
+  `MODEL_PROVIDERS` 4→14. Gateway `providers.ts` now has live factories for **13 single-API-key
+  providers** (anthropic, openai, google, mistral, cohere, groq, xai, deepseek, perplexity,
+  togetherai, fireworks, deepinfra, cerebras) — all on `@ai-sdk/provider@3` (V3 spec) via new
+  `@ai-sdk/*` deps. Mobile: `AgentEditor` provider grid + curated model-suggestion chips + a
+  "no key → 🔑 Keys" hint (new `onApiKeys` nav); `ApiKeys` renders all catalog providers
+  configured-first with "Get a key →" links — both now **import the catalog from
+  `@agentspace/shared`** (added as a mobile dep; BLUEPRINT §2 allows `shared ◀ mobile`).
+- **Verified:** `pnpm run ci` green (16/16; gateway 18 / shared 4 tests incl. per-provider
+  factory coverage + catalog integrity); Android export clean (633 modules). **No STDB change**
+  (free-form strings). Live non-anthropic round-trip = `V-10`.
+- **Next:** **M1.8.2** (local/openai-compatible `baseUrl`) then **M1.8.3** (multi-cred), as
+  separate PRs; then the local session resumes V-7/V-8.
 
 ---
 

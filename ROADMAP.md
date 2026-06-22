@@ -122,6 +122,20 @@ with presence.
   `envResolver`/`.env` now only the gateway smoke (V-6). CI 16/16 (14 orch tests);
   headless integration proves seal→ciphertext→decrypt→reply. On-device `V-7/V-8`.
   Durable Postgres/KMS backing `BL-011`; orchestrator service account `OT-007`.*
+- **M1.8 (B)** **Full multi-provider BYOK + model UX** (DEC-028): expand the gateway from
+  2 providers to the whole Vercel-AI-SDK catalog + refresh the provider/model UI.
+  - **M1.8.1** Single-API-key cloud providers (13: Anthropic, OpenAI, Google, Mistral,
+    Cohere, Groq, xAI, DeepSeek, Perplexity, Together, Fireworks, DeepInfra, Cerebras) + a
+    shared **`PROVIDER_CATALOG`** (single source for the gateway registry + both mobile
+    screens) + curated-model suggestion chips + per-provider key cards ("Get a key →").
+    ✓ *Done 2026-06-22 — `provider`/`model` are free-form strings so **no STDB change**; CI
+    green (gateway per-provider coverage + catalog-integrity tests); Android bundle clean
+    (633 modules). Live round-trip `V-10`.*
+  - **M1.8.2** Local / **openai-compatible** (Ollama/vLLM/LM Studio) — per-agent `baseUrl`
+    (agent-table column + regenerated bindings) + `createOpenAICompatible`. On-device `V-11`
+    (Ollama on the host; the emulator needs no GPU).
+  - **M1.8.3** Multi-credential providers (Bedrock/Azure/Vertex) — structured creds **sealed
+    as JSON** (no `provider_key` schema change) + multi-field key forms. `V-12`.
 
 Human verification: `[gate]` build-an-agent → live 1:1 reply on-device **with the
 user's own BYOK key** (V-7/V-8 after M1.7).

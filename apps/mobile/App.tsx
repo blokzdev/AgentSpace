@@ -164,7 +164,13 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
         />
       );
     case 'agentEditor':
-      return <AgentEditor agentId={screen.agentId} onBack={() => setScreen({ name: 'agents' })} />;
+      return (
+        <AgentEditor
+          agentId={screen.agentId}
+          onBack={() => setScreen({ name: 'agents' })}
+          onApiKeys={() => setScreen({ name: 'apiKeys' })}
+        />
+      );
     case 'apiKeys':
       return <ApiKeys onBack={() => setScreen({ name: 'threads' })} />;
     default:

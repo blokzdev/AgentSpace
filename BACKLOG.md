@@ -64,12 +64,12 @@
   resolution (re-validate the mobile bundle), a codegen post-process that adds
   annotations, or upstream SpacetimeDB codegen improvements.
 
-### BL-010 — More gateway providers (Google + OpenAI-compatible/local)
+### BL-010 — More gateway providers — ✅ promoted to M1.8 (DEC-028)
 - **Source:** DEC-020 (M1.4 shipped anthropic + openai only).
-- **Trigger:** an agent needs Gemini, or M5 local models (Ollama/vLLM/LM Studio).
-- **Promotion:** add factories to `packages/gateway/src/providers.ts` (the registry
-  already reserves `google`/`openai-compatible`); local lands with BL-006 (structured
-  output) at M5.
+- **Status:** **promoted.** **M1.8.1** shipped all **13 single-API-key cloud providers** +
+  a shared `PROVIDER_CATALOG`; **M1.8.2** = `openai-compatible`/local (per-agent `baseUrl`);
+  **M1.8.3** = multi-credential Bedrock/Azure/Vertex. Local **structured-output** handling is
+  still **BL-006 / OT-006** (local ships text + tool calls; JSON mode flagged, not solved).
 
 ### BL-011 — Durable BYOK key-store *backing* (Postgres/KMS)
 - **Note:** the per-user BYOK **feature** is promoted to **ROADMAP M1.7** (key-entry

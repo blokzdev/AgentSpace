@@ -292,9 +292,14 @@ Node ≥22.18 type-stripping; both modules autolink without a plugin entry. The
 orchestrator keeps its persisted-token identity (a real service account is `OT-007`).
 **M1.4:** the **Model Gateway** is real — `packages/gateway` implements
 `createModelGateway({ resolveCredential, providers? })` with **streaming +
-tool-calling** on the **Vercel AI SDK v6** over a provider registry (`anthropic` +
-`openai` live; `google`/`openai-compatible` registered-but-inert), normalizing
-`streamText().fullStream` to a `GatewayDelta` union. **BYOK:** `src/credentials.ts`
+tool-calling** on the **Vercel AI SDK v6** over a provider registry, normalizing
+`streamText().fullStream` to a `GatewayDelta` union. **M1.8.1 (DEC-028):** the registry
+is driven by a shared **`PROVIDER_CATALOG`** (`@agentspace/shared`) and now has **13
+single-API-key cloud providers live** (anthropic, openai, google, mistral, cohere, groq,
+xai, deepseek, perplexity, togetherai, fireworks, deepinfra, cerebras — all on
+`@ai-sdk/provider@3`); `openai-compatible`/local (per-agent `baseUrl`) = M1.8.2 and
+multi-credential Bedrock/Azure/Vertex (sealed-JSON creds) = M1.8.3. `provider`/`model` are
+free-form strings end-to-end, so adding cloud providers needs **no STDB change**. **BYOK:** `src/credentials.ts`
 seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
 and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.

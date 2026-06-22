@@ -9,21 +9,21 @@ import {
   View,
 } from 'react-native';
 import { useReducer, useTable } from 'spacetimedb/react';
+import { DEFAULT_MODEL, PROVIDER_CATALOG, providerInfo } from '@agentspace/shared';
 import { reducers, tables } from '../../module_bindings';
 import { colors } from '../chat';
-
-// Mirrors MODEL_PROVIDERS in @agentspace/shared (the gateway rejects others).
-const PROVIDERS = ['anthropic', 'openai', 'google', 'openai-compatible'] as const;
-const DEFAULT_MODEL_ID = 'claude-opus-4-8';
 
 export function AgentEditor({
   agentId,
   onBack,
+  onApiKeys,
 }: {
   agentId: bigint | null;
   onBack: () => void;
+  onApiKeys: () => void;
 }): React.JSX.Element {
   const [agents] = useTable(tables.my_agents);
+  const [myKeys] = useTable(tables.my_provider_keys);
   const createAgent = useReducer(reducers.createAgent);
   const updateAgent = useReducer(reducers.updateAgent);
 
@@ -34,10 +34,19 @@ export function AgentEditor({
 
   const [name, setName] = useState(existing?.name ?? '');
   const [systemPrompt, setSystemPrompt] = useState(existing?.systemPrompt ?? '');
-  const [provider, setProvider] = useState<string>(existing?.provider ?? 'anthropic');
-  const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL_ID);
+  const [provider, setProvider] = useState<string>(existing?.provider ?? DEFAULT_MODEL.provider);
+  const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL.model);
 
+  const info = providerInfo(provider);
+  const hasKey = myKeys.some((k) => k.provider === provider);
   const canSave = name.trim().length > 0 && model.trim().length > 0;
+
+  // Switching provider swaps in that provider's default model (a no-op tap keeps yours).
+  const selectProvider = (id: string): void => {
+    if (id === provider) return;
+    setProvider(id);
+    setModel(providerInfo(id)?.defaultModel ?? '');
+  };
 
   const onSave = (): void => {
     if (!canSave) return;
@@ -81,28 +90,50 @@ export function AgentEditor({
 
         <Text style={styles.label}>Provider</Text>
         <View style={styles.chips}>
-          {PROVIDERS.map((p) => (
+          {PROVIDER_CATALOG.map((p) => (
             <Pressable
-              key={p}
-              style={[styles.chip, provider === p && styles.chipOn]}
-              onPress={() => {
-                setProvider(p);
-              }}
+              key={p.id}
+              style={[styles.chip, provider === p.id && styles.chipOn]}
+              onPress={() => selectProvider(p.id)}
             >
-              <Text style={[styles.chipText, provider === p && styles.chipTextOn]}>{p}</Text>
+              <Text style={[styles.chipText, provider === p.id && styles.chipTextOn]}>{p.label}</Text>
             </Pressable>
           ))}
         </View>
 
+        {!hasKey ? (
+          <Pressable onPress={onApiKeys} hitSlop={8}>
+            <Text style={styles.warn}>
+              ⚠️ No key for {info?.label ?? provider} — tap to add one in 🔑 Keys
+            </Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.ok}>✓ Key set for {info?.label ?? provider}</Text>
+        )}
+
         <Text style={styles.label}>Model</Text>
         <TextInput
           style={styles.input}
-          placeholder="claude-opus-4-8"
+          placeholder={info?.defaultModel ?? 'model id'}
           placeholderTextColor={colors.faint}
           autoCapitalize="none"
+          autoCorrect={false}
           value={model}
           onChangeText={setModel}
         />
+        {info && info.suggestedModels.length > 0 ? (
+          <View style={styles.chips}>
+            {info.suggestedModels.map((m) => (
+              <Pressable
+                key={m}
+                style={[styles.modelChip, model === m && styles.chipOn]}
+                onPress={() => setModel(m)}
+              >
+                <Text style={[styles.modelChipText, model === m && styles.chipTextOn]}>{m}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
 
         <Pressable style={[styles.save, !canSave && styles.saveOff]} disabled={!canSave} onPress={onSave}>
           <Text style={styles.saveText}>{agentId === null ? 'Create agent' : 'Save changes'}</Text>
@@ -130,12 +161,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipText: { color: colors.dim, fontSize: 13 },
-  chipTextOn: { color: '#06101d', fontWeight: '700' },
+  chipTextOn: { color: colors.onAccent, fontWeight: '700' },
+  modelChip: { backgroundColor: colors.panel2, borderColor: colors.border, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  modelChipText: { color: colors.dim, fontSize: 12 },
+  warn: { color: colors.danger, fontSize: 13, marginTop: 8 },
+  ok: { color: colors.online, fontSize: 13, marginTop: 8 },
   save: { backgroundColor: colors.accent, borderRadius: 10, height: 48, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
   saveOff: { opacity: 0.5 },
-  saveText: { color: '#06101d', fontWeight: '700', fontSize: 16 },
+  saveText: { color: colors.onAccent, fontWeight: '700', fontSize: 16 },
 });

@@ -125,6 +125,15 @@ and `embed` are **not yet built** — `embed` is M3.1; non-streamed callers cons
 `stream`. The `credentialRef` is resolved server-side by an injected
 `CredentialResolver` (BYOK; BLUEPRINT §4).
 
+**Provider catalog + credential shapes (M1.8, DEC-028).** The supported providers are a
+single **`PROVIDER_CATALOG`** in `@agentspace/shared` (`{id,label,kind,defaultModel,
+suggestedModels,keyHint,getKeyUrl,fields?}`) that the gateway registry **and** the mobile UI
+derive from. `CredentialResolver` stays `(ref) => Promise<string>`: the resolved string is a
+**raw API key** for `kind:'apiKey'` (M1.8.1, 13 cloud providers) and a `kind:'baseUrl'` local
+endpoint (M1.8.2, key optional), and a **JSON blob** for `kind:'multi'` (M1.8.3 —
+Bedrock/Azure/Vertex; the adapter `JSON.parse`s it). `provider`/`model` are free-form strings
+(no allowlist); the model field is free-text with curated `suggestedModels`.
+
 ---
 
 ## 5. Tool / toolkit schema
