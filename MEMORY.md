@@ -11,7 +11,7 @@
 
 ## Snapshot — where we are right now
 
-*Last refreshed: 2026-06-14.*
+*Last refreshed: 2026-06-22.*
 
 **M0 closed; all six M1 build phases shipped; milestone-close in progress.** Merged
 PRs #2–#13. AgentSpace is a working app: sign in (SpacetimeAuth/OIDC, M1.2) → find
@@ -31,14 +31,15 @@ the real BYOK path).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (AES-256-GCM BYOK) · (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** S-1/S-2 **done** (client_id wired + validated, PR #15);
-  **S-3** (Maincloud publish — AI is 401-blocked, founder runs it) + **S-4** (interim
-  key) pending → unblock V-5/V-6. The full on-device batch (V-4/V-5/V-7/V-8/V-9) ideally
-  runs *after* M1.7 so V-7/V-8 use the real BYOK path.
-- **Next:** all M1 build phases done. Founder runs **S-3** (Maincloud publish) + **S-4**
-  (now optional — keys go in-app) → on-device **V-5/V-7/V-8** on the real BYOK path →
-  tag `M1 [shipped]`. Build-wise: **M2** (multi-agent groups, BL-014) / **M3** (RAG) /
-  **BL-016** (chat polish, after on-device review) / **BL-011** (durable key backing).
+- **Open founder work:** S-1/S-2/**S-3 done** — module **published to Maincloud
+  `agentspace-hpm58`** (2026-06-22; db identity `c200c0ee…`; all 8 tables + 8 views;
+  founder CLI 2.6.0). Remaining: **S-5** (run the orchestrator vs Maincloud) + the
+  on-device V-batch (V-5 login, V-7/V-8 agent reply on the real BYOK path). **S-4**
+  optional (gateway smoke / V-6 only).
+- **Next:** all M1 build phases done; **S-3 published**. Founder runs **S-5** (orchestrator
+  vs Maincloud) + enters a key in 🔑 Keys → on-device **V-5/V-7/V-8** → tag `M1 [shipped]`.
+  Build-wise: **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish,
+  after on-device review) / **BL-011** (durable key backing).
 
 ---
 
@@ -552,6 +553,20 @@ BLUEPRINT §8.1; doc-only (no code change).
   founder's request, captured it durably: new **BLUEPRINT §8.1** (three identity-token
   paths + the no-`.env`/CI-secret posture) + **DEC-026** + a SETUP.md pointer. Doc-only.
 - **Next:** unchanged — founder S-3 + on-device V-checklist → tag `M1 [shipped]`.
+
+### 2026-06-22 — S-3 done: module published to Maincloud (+ doc gap fixed)
+- Founder published `modules/spacetime` to Maincloud **`agentspace-hpm58`** (db identity
+  `c200c0eea8579360068efe51acaffc85ee5e216ecea5226810a91de45387b15d`; all **8 tables + 8
+  views** per the migration plan). Founder CLI **2.6.0** (newer than our 2.5.0 build target;
+  published cleanly). **S-3 marked `[x]`.**
+- **Doc gap fixed:** S-3 omitted the `pnpm install` prerequisite — the first publish failed
+  `Could not resolve 'spacetimedb/server'` / `tsc not found` (deps not installed). Added a
+  REQUIRED "install deps" step to S-3 + flagged the benign `tsc not found` /
+  `verbatimModuleSyntax` warnings (the build succeeds after them). The founder's stray
+  `pnpm install` from inside `modules\spacetime` was harmless — pnpm is workspace-aware
+  (installs to the repo-root `node_modules`; nothing to clean up, `node_modules/` gitignored).
+- **Next:** founder runs **S-5** (orchestrator vs Maincloud) + enters a key in 🔑 Keys →
+  on-device **V-5/V-7/V-8** → tag `M1 [shipped]`. S-4 optional.
 
 ### 2026-06-14 — SETUP.md → Windows 11 / PowerShell (founder's local env)
 - Founder's machine is **Windows 11** (Lenovo Legion 7i Slim, RTX 4070). Rewrote SETUP.md

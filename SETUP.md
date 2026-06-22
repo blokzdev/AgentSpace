@@ -78,7 +78,14 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-3 — Publish the module to Maincloud `agentspace-hpm58`  ·  added 2026-06-13 · M1.2  ·  [ ] (FOUNDER — AI is blocked)
+### S-3 — Publish the module to Maincloud `agentspace-hpm58`  ·  added 2026-06-13 · M1.2  ·  [x] (founder 2026-06-22)
+> **DONE.** Published to Maincloud `agentspace-hpm58` (database identity
+> `c200c0eea8579360068efe51acaffc85ee5e216ecea5226810a91de45387b15d`) — all **8 tables +
+> 8 views** created per the migration plan. Founder CLI was **2.6.0** (newer than our 2.5.0
+> build target; published cleanly). **Doc gap fixed (step 2):** the first attempt failed
+> `Could not resolve 'spacetimedb/server'` / `tsc not found` because the repo's deps weren't
+> installed — `pnpm install` from the repo root resolves it. The `tsc not found` /
+> `verbatimModuleSyntax` lines are **cosmetic** (watch for `Build finished successfully`).
 - **Why:** `DbConnection.withToken(idToken)` only succeeds against a server that
   **trusts the SpacetimeAuth issuer** — that's Maincloud, not a local
   `spacetime start`. So login + the agent reply loop must run against Maincloud.
@@ -94,18 +101,29 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   1. **Install the CLI** (once), if not already — in **PowerShell**:
      `iwr https://windows.spacetimedb.com -useb | iex` (the installer adds `spacetime` to
      your `PATH`; **open a new terminal** afterwards so it picks up). Check:
-     `spacetime --version` (we build against **2.5.0**). *(macOS/Linux equivalent:
-     `curl -sSf https://install.spacetimedb.com | sh`.)*
-  2. **Log into your Maincloud/`blokzdev` account** (this is the step the container
+     `spacetime --version` (we build against **2.5.0**; a newer CLI like **2.6.0** also
+     publishes fine). *(macOS/Linux equivalent: `curl -sSf https://install.spacetimedb.com | sh`.)*
+  2. **Install the repo's dependencies — REQUIRED.** The publish *compiles* the TS module,
+     which needs `typescript` + the `spacetimedb` package present; skipping this is what
+     causes `Could not resolve 'spacetimedb/server'`. Needs **Node ≥ 22** + **pnpm**
+     (`corepack enable`, or `npm i -g pnpm`). Then, **from the repo root**
+     (`E:\Cloud\AgentSpace`): `pnpm install`. *(pnpm is workspace-aware — running it from a
+     subfolder like `modules\spacetime` still installs the whole workspace into the
+     repo-root `node_modules`, so the CWD doesn't matter and nothing per-folder is created
+     under our hoisted linker.)*
+  3. **Log into your Maincloud/`blokzdev` account** (this is the step the container
      couldn't do): `spacetime login` → opens a browser → authorize as `blokzdev`.
      Verify: `spacetime login show` (should print your account identity) and
      `spacetime server list` (should list `maincloud` → `maincloud.spacetimedb.com`).
-  3. **Publish** from the repo's `modules\spacetime` (`cd modules\spacetime` first):
-     `spacetime publish agentspace-hpm58 -p . --server maincloud --yes`
-  4. If it warns about a **breaking schema change with existing data**, add
+  4. **Publish** from the repo's `modules\spacetime` (`cd modules\spacetime` first):
+     `spacetime publish agentspace-hpm58 -p . --server maincloud --yes`. Two messages here
+     are **cosmetic** and don't mean failure — `tsc not found in node_modules` (the CLI uses
+     its own TS transform; look for `Build finished successfully` right after) and the
+     `CONFIGURATION_FIELD_CONFLICT` / `verbatimModuleSyntax` warning.
+  5. If it warns about a **breaking schema change with existing data**, add
      `--delete-data=on-conflict` (destroys current Maincloud data — only if you're OK
      with that; a fresh DB has nothing to lose).
-  5. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
+  6. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
      Maincloud console shows the tables (`user`, `thread`, `agent`, `provider_key`, …).
 - **Give back to the AI:** confirm it published. The app env is already set
   (`apps/mobile/.env.local`). Then **V-5** (login) is ready; **V-7/V-8** also need the
@@ -180,13 +198,14 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   DEC-026). The only real secrets are per-user BYOK keys (entered in-app) + the optional
   dev `ANTHROPIC_API_KEY` above.
 
-## On-device test path (after S-1/S-2 ✓)
+## On-device test path (after S-1 / S-2 / S-3 ✓)
 
-1. **S-3** (publish to Maincloud) → unblocks **V-5** (login persists) once you build a
-   real dev build (`expo run:android`, not Expo Go).
+1. **S-3 ✓** (module published to Maincloud) → **V-5** (login persists) is ready once you
+   build a real dev build (`expo run:android`, not Expo Go).
 2. **S-5** (run the orchestrator against Maincloud) + add your key in 🔑 **Keys** →
    unblocks **V-7/V-8** (your agent replies with your key — the real BYOK path).
-3. **S-4** is now **optional** — only for the standalone gateway smoke (**V-6**).
+3. **S-4** is **optional** — only for the standalone gateway smoke (**V-6**).
 
-*Done: S-1, S-2 (client_id wired). Remaining: **S-3** (you) → then **S-5** + on-device
-V-checklist → I tag `M1 [shipped]`.*
+*Done: S-1, S-2, **S-3** (module published to Maincloud 2026-06-22). Remaining: **S-5**
+(run the orchestrator) + on-device V-checklist (V-5 / V-7 / V-8) → I tag `M1 [shipped]`.
+S-4 optional (gateway smoke / V-6 only).*
