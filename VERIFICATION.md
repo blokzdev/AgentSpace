@@ -225,3 +225,49 @@ Notes: <founder fills: device + OS + result>
   no presence); remove/rename does nothing → you’re not the group **creator** (only the
   creator can). Capture the screen + tell me.
 - **Notes (founder):** _devices + result →_
+
+---
+
+### V-10 — A non-Anthropic cloud provider replies on-device  ·  added 2026-06-22 · M1.8.1
+- **Why:** M1.8.1 made 13 single-API-key providers live behind one `PROVIDER_CATALOG`;
+  CI proves the wiring headlessly (per-provider factory coverage). This confirms a **real,
+  non-default provider** streams a reply on-device using **your** key for it.
+- **Setup:** orchestrator running vs Maincloud (S-5) + the app (V-7 setup). Pick a provider
+  you have a key for (e.g. **OpenAI**, **Groq**, **Mistral**, **Google**).
+- **Steps:**
+  1. 🔑 **Keys** → that provider’s card → paste your key → **Save** (use **Get a key →** if
+     you need one). Confirm “✓ key set”.
+  2. 🤖 **Agents** → **+ New** → pick that **provider** chip → tap a suggested **model** chip
+     (or type one) → name it → **Create** → **Chat** → send a message.
+- **Pass when:** the reply streams in (cursor → complete) from that provider; switching the
+  agent to a different provider+model and chatting again also works.
+- **If it fails:** `⚠️ add an API key…` → the key for that provider isn’t saved; a model
+  error → the model id isn’t served by that provider (tap a suggested model, or check the
+  provider’s docs). Capture the orchestrator logs + the provider/model.
+- **Notes (founder):** _provider + model + result →_
+
+---
+
+### V-11 — A local (Ollama / OpenAI-compatible) agent replies  ·  added 2026-06-22 · M1.8.2
+- **Why:** M1.8.2 added the **local** provider path (per-agent `base_url`; key optional).
+  This confirms an agent backed by a **model on your own machine** replies in-app — nothing
+  leaves your hardware. **The Android emulator needs no GPU:** the model runs in **Ollama on
+  the host (RTX 4070)**; the orchestrator (host) calls `localhost:11434`; the emulator is
+  just the chat client (emulator → STDB → orchestrator → Ollama → reply → STDB → emulator).
+- **Setup:**
+  1. Install **Ollama** + pull a model: `ollama pull llama3.2` (it serves
+     `http://localhost:11434/v1`). On the **same host**, run the orchestrator vs Maincloud (S-5).
+  2. **Re-publish the module to Maincloud** first (the `agent.base_url` column is new) —
+     `spacetime publish agentspace-hpm58 -p . --server maincloud --delete-data=on-conflict --yes`
+     (a fresh test DB loses nothing). *(Bindings are already regenerated + committed; no other
+     local command needed.)*
+- **Steps:**
+  1. 🤖 **Agents** → **+ New** → pick the **Local (OpenAI-compatible)** provider → a **Base URL**
+     field appears (default `http://localhost:11434/v1`) → set the **model** to your pulled
+     model (e.g. `llama3.2`) → **Create** → **Chat** → send a message.
+- **Pass when:** the reply streams from the local model (your GPU spins up; no cloud key used).
+- **If it fails:** `⚠️ …no base URL` → set the Base URL on the agent; no reply / connection
+  error → Ollama isn’t running or the URL is wrong (the orchestrator runs on the **host**, so
+  use `localhost`, not `10.0.2.2`); a model error → `ollama pull` that model first. Capture the
+  orchestrator logs.
+- **Notes (founder):** _model + result →_

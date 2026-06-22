@@ -98,7 +98,7 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | Table | Key fields | Visibility | Notes |
 |-------|-----------|-----------|-------|
 | `users` | `identity` (PK), `display_name`, `avatar`, `online` | View: self + co-members | one row per human Identity |
-| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5) |
+| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version`, `base_url` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5); `base_url`≠'' only for `provider='openai-compatible'` (local, M1.8.2) |
 | `agent_versions` | (deferred — BL-013) | — | v1 inlines config + a `version` counter; immutable history/run-pinning is BL-013 |
 | `service` | `id` (PK = 0), `identity`, `enc_pub_key` | View: `service_info` (public) | singleton: orchestrator identity (M1.5) + its NaCl **box public key** so clients seal BYOK keys to it (M1.7) |
 | `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5) |
@@ -167,10 +167,12 @@ OpenAI-compatible adapter for local runtimes (Ollama/vLLM/LM Studio).
   derived from the shared **`PROVIDER_CATALOG`** (the single source for the gateway + the
   mobile UI). **M1.8.1:** all **13 single-API-key cloud providers** are live (anthropic,
   openai, google, mistral, cohere, groq, xai, deepseek, perplexity, togetherai, fireworks,
-  deepinfra, cerebras). **M1.8.2/.3** add `openai-compatible` (local; per-agent `baseUrl`)
-  + multi-credential Bedrock/Azure/Vertex (**sealed-JSON** creds — no `provider_key` schema
-  change). `embed` is deferred to M3.1. The `streamText` `fullStream` is normalized to
-  `GatewayDelta` (text / tool-call / finish+usage).
+  deepinfra, cerebras). **M1.8.2:** `openai-compatible` (local — Ollama/vLLM/LM Studio) is
+  **live** via a per-agent `agent.base_url` + `createOpenAICompatible` (key optional; the
+  orchestrator resolves a keyless local provider to `''`). **M1.8.3** adds multi-credential
+  Bedrock/Azure/Vertex (**sealed-JSON** creds — no `provider_key` schema change). The
+  `ProviderFactory` is `(credential, model, opts?: { baseUrl? })`. `embed` is deferred to
+  M3.1. The `streamText` `fullStream` is normalized to `GatewayDelta` (text/tool-call/finish).
 
 ### BYOK key custody
 

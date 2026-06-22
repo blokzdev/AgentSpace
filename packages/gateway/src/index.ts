@@ -28,6 +28,8 @@ export interface GatewayRequest {
   tools?: ToolSpec[];
   /** Opaque handle the gateway resolves to a BYOK credential server-side. */
   credentialRef: string;
+  /** Endpoint for local/self-hosted providers (kind 'baseUrl', e.g. Ollama). */
+  baseUrl?: string;
 }
 
 export interface GatewayUsage {
@@ -115,7 +117,7 @@ export function createModelGateway(options: ModelGatewayOptions = {}): ModelGate
         throw new Error(`ModelGateway: no provider adapter for "${req.model.provider}"`);
       }
       const apiKey = await resolveCredential(req.credentialRef);
-      const model = factory(apiKey, req.model.model);
+      const model = factory(apiKey, req.model.model, { baseUrl: req.baseUrl });
       const { system, messages } = toModelMessages(req.messages);
 
       const result = streamText({ model, system, messages, tools: toToolSet(req.tools) });

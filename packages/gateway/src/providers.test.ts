@@ -20,4 +20,10 @@ describe('defaultProviders registry', () => {
       expect(model, `factory for "${p.id}" returned nothing`).toBeTruthy();
     }
   });
+
+  it('the local (openai-compatible) factory constructs from a baseURL, key optional', () => {
+    const factory = defaultProviders['openai-compatible'];
+    expect(factory).toBeTypeOf('function');
+    expect(factory!('', 'llama3.2', { baseUrl: 'http://localhost:11434/v1' })).toBeTruthy();
+  });
 });

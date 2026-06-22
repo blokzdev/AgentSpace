@@ -132,8 +132,12 @@ with presence.
     green (gateway per-provider coverage + catalog-integrity tests); Android bundle clean
     (633 modules). Live round-trip `V-10`.*
   - **M1.8.2** Local / **openai-compatible** (Ollama/vLLM/LM Studio) — per-agent `baseUrl`
-    (agent-table column + regenerated bindings) + `createOpenAICompatible`. On-device `V-11`
-    (Ollama on the host; the emulator needs no GPU).
+    (appended `agent.baseUrl` column + regenerated bindings) + `createOpenAICompatible`
+    (key optional; the orchestrator resolves a keyless local provider to `''`). ✓ *Done
+    2026-06-22 — CI green; headless integration re-proves the path on the new schema;
+    Android bundle clean. Founder re-publishes the module to Maincloud (`--delete-data`
+    for the new column) before testing. On-device `V-11` (Ollama on the host; the emulator
+    needs no GPU).*
   - **M1.8.3** Multi-credential providers (Bedrock/Azure/Vertex) — structured creds **sealed
     as JSON** (no `provider_key` schema change) + multi-field key forms. `V-12`.
 

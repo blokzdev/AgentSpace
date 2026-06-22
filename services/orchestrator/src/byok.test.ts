@@ -44,4 +44,9 @@ describe('createByokResolver', () => {
     await expect(resolve('aaaa:openai')).rejects.toBeInstanceOf(MissingKeyError);
     await expect(resolve('zzzz:anthropic')).rejects.toBeInstanceOf(MissingKeyError);
   });
+
+  it('resolves a keyless local (openai-compatible) provider to an empty credential', async () => {
+    await expect(resolve('aaaa:openai-compatible')).resolves.toBe('');
+    await expect(resolve('zzzz:openai-compatible')).resolves.toBe('');
+  });
 });

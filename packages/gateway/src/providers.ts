@@ -17,19 +17,20 @@ import { createTogetherAI } from '@ai-sdk/togetherai';
 import { createFireworks } from '@ai-sdk/fireworks';
 import { createDeepInfra } from '@ai-sdk/deepinfra';
 import { createCerebras } from '@ai-sdk/cerebras';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { ModelProvider } from '@agentspace/shared';
 
-export type ProviderFactory = (apiKey: string, model: string) => LanguageModel;
+/** `credential` is a raw API key (kind 'apiKey'/'baseUrl') or a JSON blob (kind 'multi');
+ *  `opts.baseUrl` is the endpoint for local/self-hosted providers (kind 'baseUrl'). */
+export type ProviderFactory = (
+  credential: string,
+  model: string,
+  opts?: { baseUrl?: string },
+) => LanguageModel;
 
 export type ProviderRegistry = Partial<Record<ModelProvider, ProviderFactory>>;
 
-function unsupported(name: ModelProvider): ProviderFactory {
-  return () => {
-    throw new Error(`Model provider "${name}" is not enabled in the Model Gateway yet`);
-  };
-}
-
-// Single-API-key cloud providers (M1.8.1) — each is `createX({ apiKey })(model)`.
+// Single-API-key cloud providers (M1.8.1) + local/openai-compatible (M1.8.2).
 export const defaultProviders: ProviderRegistry = {
   anthropic: (apiKey, model) => createAnthropic({ apiKey })(model),
   openai: (apiKey, model) => createOpenAI({ apiKey })(model),
@@ -44,6 +45,12 @@ export const defaultProviders: ProviderRegistry = {
   fireworks: (apiKey, model) => createFireworks({ apiKey })(model),
   deepinfra: (apiKey, model) => createDeepInfra({ apiKey })(model),
   cerebras: (apiKey, model) => createCerebras({ apiKey })(model),
-  // Local + multi-credential providers land in M1.8.2 / M1.8.3.
-  'openai-compatible': unsupported('openai-compatible'),
+  // Local / self-hosted (Ollama / vLLM / LM Studio) — needs a baseURL; key optional.
+  'openai-compatible': (apiKey, model, opts) =>
+    createOpenAICompatible({
+      name: 'openai-compatible',
+      baseURL: opts?.baseUrl ?? '',
+      apiKey: apiKey || undefined,
+    })(model),
+  // Multi-credential providers (Bedrock/Azure/Vertex) land in M1.8.3.
 };

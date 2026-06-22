@@ -20,6 +20,7 @@ export const Agent = __t.object("Agent", {
   version: __t.u64(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  baseUrl: __t.string(),
 });
 export type Agent = __Infer<typeof Agent>;
 

@@ -36,21 +36,31 @@ export function AgentEditor({
   const [systemPrompt, setSystemPrompt] = useState(existing?.systemPrompt ?? '');
   const [provider, setProvider] = useState<string>(existing?.provider ?? DEFAULT_MODEL.provider);
   const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL.model);
+  const [baseUrl, setBaseUrl] = useState(existing?.baseUrl ?? '');
 
   const info = providerInfo(provider);
+  const isLocal = info?.kind === 'baseUrl';
   const hasKey = myKeys.some((k) => k.provider === provider);
-  const canSave = name.trim().length > 0 && model.trim().length > 0;
+  const canSave =
+    name.trim().length > 0 && model.trim().length > 0 && (!isLocal || baseUrl.trim().length > 0);
 
-  // Switching provider swaps in that provider's default model (a no-op tap keeps yours).
+  // Switching provider swaps in that provider's default model + base URL (a no-op tap keeps yours).
   const selectProvider = (id: string): void => {
     if (id === provider) return;
     setProvider(id);
     setModel(providerInfo(id)?.defaultModel ?? '');
+    setBaseUrl(providerInfo(id)?.defaultBaseUrl ?? '');
   };
 
   const onSave = (): void => {
     if (!canSave) return;
-    const fields = { name: name.trim(), systemPrompt: systemPrompt.trim(), provider, model: model.trim() };
+    const fields = {
+      name: name.trim(),
+      systemPrompt: systemPrompt.trim(),
+      provider,
+      model: model.trim(),
+      baseUrl: isLocal ? baseUrl.trim() : '',
+    };
     if (agentId === null) {
       void createAgent(fields);
     } else {
@@ -101,7 +111,21 @@ export function AgentEditor({
           ))}
         </View>
 
-        {!hasKey ? (
+        {isLocal ? (
+          <>
+            <Text style={styles.label}>Base URL</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={info?.defaultBaseUrl ?? 'http://localhost:11434/v1'}
+              placeholderTextColor={colors.faint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              value={baseUrl}
+              onChangeText={setBaseUrl}
+            />
+            <Text style={styles.hint}>Runs on your machine (Ollama / vLLM / LM Studio). A key is usually not needed.</Text>
+          </>
+        ) : !hasKey ? (
           <Pressable onPress={onApiKeys} hitSlop={8}>
             <Text style={styles.warn}>
               ⚠️ No key for {info?.label ?? provider} — tap to add one in 🔑 Keys
@@ -170,6 +194,7 @@ const styles = StyleSheet.create({
   modelChipText: { color: colors.dim, fontSize: 12 },
   warn: { color: colors.danger, fontSize: 13, marginTop: 8 },
   ok: { color: colors.online, fontSize: 13, marginTop: 8 },
+  hint: { color: colors.faint, fontSize: 12, marginTop: 2 },
   save: { backgroundColor: colors.accent, borderRadius: 10, height: 48, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
   saveOff: { opacity: 0.5 },
   saveText: { color: colors.onAccent, fontWeight: '700', fontSize: 16 },
