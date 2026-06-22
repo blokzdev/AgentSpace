@@ -616,6 +616,23 @@ separate, already-deferred axis (DEC-009/BL-001) the local modes compose with. D
   Windows app** (Windows = dev machine; product = Android, DEC-005). Doc-only.
 - **Next:** unchanged — founder runs **S-5** + on-device V-5/V-7/V-8 → tag `M1 [shipped]`.
 
+### 2026-06-22 — Handoff to a LOCAL session for on-device V-7/V-8
+- The remote (cloud) container can't run the orchestrator as `blokzdev`/Maincloud or drive
+  Android, so we're switching to a **local Claude Code session in `E:\Cloud\AgentSpace`** to do
+  **S-5 + on-device V-5/V-7/V-8** (incl. Android-toolchain detect/setup). A full handoff prompt
+  was delivered in chat (bootstrap → headless integration → orchestrator vs Maincloud → Android
+  emulator/device → drive V-7/V-8; guardrails: founder ticks V-items, Memory Protocol at close).
+  **BYOK clarity (founder asked):** the provider key is entered **only in the app's 🔑 Keys**
+  surface (sealed → ciphertext in STDB → orchestrator decrypts in-memory) — the orchestrator
+  reads **no `.env` key**. The `.env` `ANTHROPIC_API_KEY` is **only** the optional standalone
+  gateway smoke (V-6), not part of V-7/V-8 or the M1 tag. Also fixed two founder-facing doc gaps
+  the founder hit live: S-5 now
+  requires `pnpm run build` (#23, the gateway `dist/` ERR_MODULE_NOT_FOUND), and V-7/V-8 now use
+  the in-app BYOK path, not the stale `.env` key (#24). PRs #20–#24 all doc-only, merged.
+- **Next (LOCAL session):** bootstrap (read this file + CLAUDE.md), run the headless integration,
+  start the orchestrator vs Maincloud, stand up the Android emulator/device, drive V-7/V-8 with
+  evidence (logs + screenshots); propose ticking V-5/V-7/V-8 → founder tags `M1 [shipped]`.
+
 ---
 
 ## Open Threads
