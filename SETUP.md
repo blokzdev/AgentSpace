@@ -24,6 +24,13 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 > `apps/mobile/.env.local` (Expo reads `EXPO_PUBLIC_*`); the AI will tell you the
 > exact variable name to set.
 
+> **Your local environment (2026-06-14).** You run on **Windows 11** (Lenovo Legion 7i
+> Slim, RTX 4070). The terminal commands below are written for **PowerShell** (the Win11
+> default); where a step is shell-specific it says so, and the macOS/Linux form is noted
+> in parentheses. Run from the repo root unless a step says otherwise. *(The RTX 4070
+> isn't used by anything today — cloud BYOK does the inference; local GPU models via
+> Ollama / the gateway's OpenAI-compatible path are post-v1, DEC-009 / OT-006.)*
+
 ---
 
 ### S-1 — Enable SpacetimeAuth on `agentspace-hpm58` + get the `client_id`  ·  added 2026-06-13 · M1.2  ·  [x] (founder 2026-06-14)
@@ -80,18 +87,20 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   container is logged in as a different identity, **not your `blokzdev` Maincloud
   account** (which owns `agentspace-hpm58`). So this step is **yours**: run it from a
   machine where `spacetime login` is your Maincloud/`blokzdev` account.
-- **Where:** **any terminal** with the repo checked out + the SpacetimeDB CLI — it does
-  **not** need an IDE. (Needs the module source, so run from `modules/spacetime/`, or
-  use `-p <path-to>/modules/spacetime` from anywhere.)
-- **Steps (founder) — full sequence:**
-  1. **Install the CLI** (once), if not already:
-     `curl -sSf https://install.spacetimedb.com | sh` (then ensure `~/.local/bin` is on
-     `PATH`). Check: `spacetime --version` (we build against **2.5.0**).
+- **Where:** **any PowerShell terminal** with the repo checked out + the SpacetimeDB CLI —
+  it does **not** need an IDE. (Needs the module source, so `cd` into `modules\spacetime`,
+  or use `-p <path-to>\modules\spacetime` from anywhere.)
+- **Steps (founder) — full sequence (PowerShell):**
+  1. **Install the CLI** (once), if not already — in **PowerShell**:
+     `iwr https://windows.spacetimedb.com -useb | iex` (the installer adds `spacetime` to
+     your `PATH`; **open a new terminal** afterwards so it picks up). Check:
+     `spacetime --version` (we build against **2.5.0**). *(macOS/Linux equivalent:
+     `curl -sSf https://install.spacetimedb.com | sh`.)*
   2. **Log into your Maincloud/`blokzdev` account** (this is the step the container
      couldn't do): `spacetime login` → opens a browser → authorize as `blokzdev`.
      Verify: `spacetime login show` (should print your account identity) and
      `spacetime server list` (should list `maincloud` → `maincloud.spacetimedb.com`).
-  3. **Publish** from the repo's `modules/spacetime/`:
+  3. **Publish** from the repo's `modules\spacetime` (`cd modules\spacetime` first):
      `spacetime publish agentspace-hpm58 -p . --server maincloud --yes`
   4. If it warns about a **breaking schema change with existing data**, add
      `--delete-data=on-conflict` (destroys current Maincloud data — only if you're OK
@@ -113,14 +122,16 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   needed — BYOK keys are entered **in the app** (🔑 Keys); the orchestrator no longer
   reads `.env`.
 - **Steps:**
-  1. After S-3 is published, run:
-     ```
-     AGENTSPACE_STDB_HOST=wss://maincloud.spacetimedb.com \
-     AGENTSPACE_STDB_DB=agentspace-hpm58 \
+  1. After S-3 is published, run — in **PowerShell** (set the env vars on their own lines;
+     the inline `VAR=val cmd` form is bash-only and **won't** work in PowerShell):
+     ```powershell
+     $env:AGENTSPACE_STDB_HOST = "wss://maincloud.spacetimedb.com"
+     $env:AGENTSPACE_STDB_DB   = "agentspace-hpm58"
      pnpm --filter @agentspace/orchestrator start
      ```
      It connects (anonymous identity, persisted), prints `connected as …`, registers its
      BYOK public key, and logs `reply loop subscribed`. **Leave it running** while you test.
+     *(macOS/Linux: prefix inline — `AGENTSPACE_STDB_HOST=… AGENTSPACE_STDB_DB=… pnpm …`.)*
   2. In the app: 🔑 **Keys** → add your provider key (it seals to the orchestrator's
      pubkey) → 🤖 **Agents** → create a persona → **Chat**.
 - **Caveat (v1):** the orchestrator's box keypair is cached in a temp file; if you
@@ -145,8 +156,9 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 - **Steps:**
   1. Get an API key from your chosen provider (Anthropic recommended — the default
      model is `claude-opus-4-8`).
-  2. Create an untracked `.env` at the repo root (or export in your shell) with the
-     matching variable: **`ANTHROPIC_API_KEY=sk-ant-…`** (or `OPENAI_API_KEY=…`).
+  2. Create an untracked `.env` at the repo root with the matching variable:
+     **`ANTHROPIC_API_KEY=sk-ant-…`** (or `OPENAI_API_KEY=…`) — same file on every OS. (Or
+     set it for the PowerShell session instead: `$env:ANTHROPIC_API_KEY = "sk-ant-…"`.)
      The smoke harness reads `<PROVIDER>_API_KEY` for the default model's provider.
 - **Give back to the AI:** nothing to paste — **keep the key secret**. Just confirm
   it's set, and I'll treat V-6 as ready for you to run.
@@ -158,8 +170,8 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 - **`apps/mobile/.env.example`** (tracked) + **`apps/mobile/.env.local`** (gitignored)
   carry the three `EXPO_PUBLIC_*` values (client_id + Maincloud host/db). These are
   **non-secret** — `EXPO_PUBLIC_*` is inlined into the app bundle. On your own build
-  machine, `cp apps/mobile/.env.example apps/mobile/.env.local` (the container's copy is
-  ephemeral/gitignored).
+  machine (PowerShell), `Copy-Item apps/mobile/.env.example apps/mobile/.env.local` (the
+  container's copy is ephemeral/gitignored).
 - **`.env.example`** (repo root, tracked) documents the **secret** server-side vars for
   S-4 (`ANTHROPIC_API_KEY`, optional `AGENTSPACE_GATEWAY_KEK`) — copy to an untracked
   root `.env`.

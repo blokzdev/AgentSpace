@@ -553,6 +553,19 @@ BLUEPRINT §8.1; doc-only (no code change).
   paths + the no-`.env`/CI-secret posture) + **DEC-026** + a SETUP.md pointer. Doc-only.
 - **Next:** unchanged — founder S-3 + on-device V-checklist → tag `M1 [shipped]`.
 
+### 2026-06-14 — SETUP.md → Windows 11 / PowerShell (founder's local env)
+- Founder's machine is **Windows 11** (Lenovo Legion 7i Slim, RTX 4070). Rewrote SETUP.md
+  commands for **PowerShell**: CLI install `iwr https://windows.spacetimedb.com -useb | iex`
+  (S-3); S-5 env vars as `$env:VAR = "…"` lines (the bash inline `VAR=val cmd` form doesn't
+  work in PowerShell); `Copy-Item` for the env-file copy; `$env:` note for the S-4 key;
+  macOS/Linux forms kept in parentheses. Added a "local environment" banner (noted the
+  RTX 4070 is unused today — cloud BYOK does inference; local GPU models are post-v1,
+  DEC-009/OT-006). **Confirmed S-1 + S-2 already done** (founder gave client_id
+  `client_033XyhtPkMcEQ4adazN6Cx`, redirect `agentspace://redirect`, login field blank =
+  public client) — already ticked since PR #15; no change. Doc-only.
+- **Next:** founder runs **S-3** (publish, now Windows-ready) → **S-5** + on-device
+  V-5/V-7/V-8 → I tag `M1 [shipped]`.
+
 ---
 
 ## Open Threads
