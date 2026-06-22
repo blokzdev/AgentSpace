@@ -141,15 +141,19 @@ Notes: <founder fills: device + OS + result>
 - **Why:** the reply loop is proven headlessly with a **mock** gateway (local STDB
   integration); this exercises it with a **real LLM** end-to-end — a human message
   produces a token-by-token agent reply rendered live in the mobile thread. Depends
-  on **`SETUP.md` S-4** (a provider key) and a published module + a running orchestrator.
+  on your provider key entered **in-app** (🔑 Keys, M1.7) + a published module + a
+  running orchestrator (**SETUP.md S-5**). *(`.env`/S-4 is smoke-only — V-6.)*
 - **Setup:**
   1. Publish the module to your target server (local: `pnpm --filter
      @agentspace/spacetime-module spacetime:publish:local` with `spacetime start`; or
      Maincloud per S-3).
-  2. Run the orchestrator against that server with a key:
-     `ANTHROPIC_API_KEY=sk-ant-… AGENTSPACE_STDB_HOST=ws://<host>:3000
-     AGENTSPACE_STDB_DB=<db> pnpm --filter @agentspace/orchestrator start`. Note the
-     printed **orchestrator identity** hex.
+  2. Build, then run the orchestrator against that server (**no `.env` key** — post-M1.7
+     it reads *your* key from STDB, sealed in-app). See **SETUP.md S-5**: `pnpm run build`,
+     then set `AGENTSPACE_STDB_HOST`/`AGENTSPACE_STDB_DB` and
+     `pnpm --filter @agentspace/orchestrator start`. Note the printed **orchestrator
+     identity** hex; it registers its **BYOK public key** on startup (so the app can seal
+     keys to it). *(The canonical named-persona flow is **V-8**; V-7 below uses the raw
+     orchestrator identity as a stand-in agent.)*
   3. In the mobile app (V-4 setup), create a thread, paste the orchestrator’s
      identity hex into the add-member field, **toggle the role chip to `🤖 Agent`**,
      and tap **Add**. *(Authoring named agents is M1.5; for V-7 the orchestrator
@@ -175,9 +179,10 @@ Notes: <founder fills: device + OS + result>
   persona in the app, deploy it, and confirm the orchestrator replies **as that
   persona** (its system prompt + model). The data path + persona injection are proven
   headlessly (integration); this is the on-device UX + a real model. Depends on a
-  running orchestrator (as V-7) + a provider key (`SETUP.md` S-4).
-- **Setup:** same as V-7 (publish the module; run the orchestrator with a key against
-  the same server). The orchestrator registers itself as the agent service on startup.
+  running orchestrator (**S-5**) + your provider key entered **in-app** (🔑 Keys).
+- **Setup:** same as V-7 (publish the module; build + run the orchestrator against the
+  same server — **no `.env` key**, add your key in-app). The orchestrator registers
+  itself as the agent service **and** publishes its BYOK public key on startup.
 - **Steps:**
   1. In the app, tap **🤖 Agents** (thread list header) → **+ New**.
   2. Create an agent with a distinctive persona — e.g. name "Pirate Pete", system
@@ -190,8 +195,9 @@ Notes: <founder fills: device + OS + result>
   the agent (**Edit**) and chatting again reflects the change.
 - **If it fails:** no reply → orchestrator not running / not registered as the service
   (it must start *before* you deploy, or re-deploy after); reply ignores the persona →
-  tell me (the binding/View didn’t resolve); a model error → the persona’s provider
-  key isn’t set (S-4). Capture orchestrator logs.
+  tell me (the binding/View didn’t resolve); `⚠️ add an API key…` or a model error → your
+  provider key isn’t set in-app (🔑 Keys), or the orchestrator regenerated its box keypair
+  on restart (re-enter the key — BL-011). Capture orchestrator logs.
 - **Notes (founder):** _persona + provider + result →_
 
 ---
