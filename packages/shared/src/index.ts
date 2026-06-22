@@ -64,6 +64,8 @@ export interface ProviderInfo {
   keyHint: string;
   /** Where the user obtains a key / credential. */
   getKeyUrl: string;
+  /** Placeholder/default endpoint for kind === 'baseUrl' (e.g. a local Ollama URL). */
+  defaultBaseUrl?: string;
   /** Multi-credential fields (kind === 'multi'). */
   fields?: readonly ProviderField[];
 }
@@ -108,6 +110,11 @@ export const PROVIDER_CATALOG: readonly ProviderInfo[] = [
   { id: 'cerebras', label: 'Cerebras', kind: 'apiKey', defaultModel: 'llama-3.3-70b',
     suggestedModels: ['llama-3.3-70b', 'llama3.1-8b'],
     keyHint: '…', getKeyUrl: 'https://cloud.cerebras.ai/platform/' },
+  // Local / self-hosted (Ollama / vLLM / LM Studio) — needs a baseURL; key optional (M1.8.2).
+  { id: 'openai-compatible', label: 'Local (OpenAI-compatible)', kind: 'baseUrl',
+    defaultModel: 'llama3.2', suggestedModels: ['llama3.2', 'qwen2.5', 'mistral', 'deepseek-r1'],
+    keyHint: 'optional', getKeyUrl: 'https://ollama.com/download',
+    defaultBaseUrl: 'http://localhost:11434/v1' },
 ];
 
 /** Catalog lookup by provider id (undefined for an unknown/not-yet-enabled id). */

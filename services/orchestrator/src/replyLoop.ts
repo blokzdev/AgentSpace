@@ -76,6 +76,7 @@ async function handleReply(
       provider: a.provider,
       model: a.model,
       owner: a.owner.toHexString(),
+      baseUrl: a.baseUrl,
     }));
     const persona = selectPersona([...conn.db.my_threads.iter()], agents, threadId);
     const rows: PromptRow[] = [];
@@ -88,10 +89,23 @@ async function handleReply(
     const model = persona.model;
     const credentialRef = `${persona.ownerHex}:${model.provider}`; // BYOK key per owner+provider (M1.7)
 
+    // A local (openai-compatible) persona needs a base URL to reach its endpoint (M1.8.2).
+    if (model.provider === 'openai-compatible' && persona.baseUrl.trim().length === 0) {
+      conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
+      conn.reducers.agentReplyFinish({
+        runId,
+        text: '⚠️ This agent uses a local (OpenAI-compatible) provider but has no base URL. Edit the agent and set one (e.g. http://localhost:11434/v1).',
+        ok: false,
+        inputTokens: 0n,
+        outputTokens: 0n,
+      });
+      return;
+    }
+
     conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
 
     let usage = { inputTokens: 0, outputTokens: 0 };
-    for await (const delta of gateway.stream({ model, credentialRef, messages })) {
+    for await (const delta of gateway.stream({ model, credentialRef, messages, baseUrl: persona.baseUrl })) {
       if (delta.type === 'text') {
         acc += delta.text;
         batcher.push(acc);

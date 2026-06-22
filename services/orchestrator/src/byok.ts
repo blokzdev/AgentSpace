@@ -92,6 +92,8 @@ export function createByokResolver(opts: {
         }
       }
     }
+    // Local (openai-compatible) endpoints don't require a key — resolve to empty (M1.8.2).
+    if (provider === 'openai-compatible') return Promise.resolve('');
     return Promise.reject(
       new MissingKeyError(`No ${provider || 'provider'} API key — the agent's owner must add one in Settings → API Keys`),
     );

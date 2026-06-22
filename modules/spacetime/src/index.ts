@@ -109,6 +109,7 @@ const agent = table(
     version: t.u64(),
     createdAt: t.timestamp(),
     updatedAt: t.timestamp(),
+    baseUrl: t.string(), // '' except for provider 'openai-compatible' (local endpoint) — M1.8.2; appended for clean migration
   }
 );
 
@@ -200,8 +201,8 @@ export const create_group = spacetimedb.reducer(
 // ── Agent Studio (M1.5) ──────────────────────────────────────────────────────
 
 export const create_agent = spacetimedb.reducer(
-  { name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string() },
-  (ctx, { name, systemPrompt, provider, model }) => {
+  { name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string() },
+  (ctx, { name, systemPrompt, provider, model, baseUrl }) => {
     if (!name) throw new SenderError('Agent name must not be empty');
     if (!model) throw new SenderError('Agent model must not be empty');
     ctx.db.agent.insert({
@@ -211,6 +212,7 @@ export const create_agent = spacetimedb.reducer(
       systemPrompt,
       provider: provider || 'anthropic',
       model,
+      baseUrl: baseUrl || '',
       version: 1n,
       createdAt: ctx.timestamp,
       updatedAt: ctx.timestamp,
@@ -219,8 +221,8 @@ export const create_agent = spacetimedb.reducer(
 );
 
 export const update_agent = spacetimedb.reducer(
-  { agentId: t.u64(), name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string() },
-  (ctx, { agentId, name, systemPrompt, provider, model }) => {
+  { agentId: t.u64(), name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string() },
+  (ctx, { agentId, name, systemPrompt, provider, model, baseUrl }) => {
     const a = ctx.db.agent.id.find(agentId);
     if (!a || !a.owner.isEqual(ctx.sender)) throw new SenderError('Not your agent');
     if (!name) throw new SenderError('Agent name must not be empty');
@@ -231,6 +233,7 @@ export const update_agent = spacetimedb.reducer(
       systemPrompt,
       provider: provider || 'anthropic',
       model,
+      baseUrl: baseUrl || '',
       version: a.version + 1n,
       updatedAt: ctx.timestamp,
     });

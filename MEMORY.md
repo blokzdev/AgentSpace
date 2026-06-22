@@ -24,10 +24,11 @@ their own provider key in a 🔑 Keys screen; it's **box-sealed client-side** to
 orchestrator's pubkey and stored as **ciphertext only** in `provider_key` (raw key never
 in STDB); the orchestrator decrypts per-(owner,provider) in-memory. Proven headlessly
 end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M1.7) are
-done**; **M1.8.1** then shipped the full multi-provider catalog (13 single-API-key cloud
-providers + a shared `PROVIDER_CATALOG` + model-picker UI, DEC-028; M1.8.2/.3 = local +
-multi-cred, next). **`M1 [shipped]` tag HELD** only on the on-device V-checklist (esp.
-V-7/V-8 on the real BYOK path).
+done**; **M1.8.1/.2** then shipped the multi-provider catalog (13 single-API-key cloud
+providers + a shared `PROVIDER_CATALOG` + model-picker UI) and the **local/openai-compatible**
+path (per-agent `agent.baseUrl` — the one additive STDB column; DEC-028); **M1.8.3** =
+multi-cred (Bedrock/Azure/Vertex), next. **`M1 [shipped]` tag HELD** only on the on-device
+V-checklist (esp. V-7/V-8 on the real BYOK path).
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
@@ -669,6 +670,23 @@ catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live r
   (free-form strings). Live non-anthropic round-trip = `V-10`.
 - **Next:** **M1.8.2** (local/openai-compatible `baseUrl`) then **M1.8.3** (multi-cred), as
   separate PRs; then the local session resumes V-7/V-8.
+
+### 2026-06-22 — M1.8.2: local / openai-compatible provider (per-agent baseUrl)
+- Built Phase M1.8.2 (DEC-028): the **first STDB change** of M1.8 — appended **`agent.baseUrl`**
+  (column at the **end** to avoid a reorder migration), threaded through `create_agent`/
+  `update_agent`, **rebuilt + regenerated + synced bindings** to all 3 locations. Gateway:
+  generalized `ProviderFactory` → `(credential, model, opts?:{baseUrl?})`, added
+  `createOpenAICompatible` (`@ai-sdk/openai-compatible`), `GatewayRequest.baseUrl`. Orchestrator:
+  `selectPersona`/`AgentRef`/`Persona` carry `baseUrl`; `replyLoop` passes it + guards an empty
+  baseUrl with a friendly error; `createByokResolver` resolves a **keyless** `openai-compatible`
+  to `''`. Mobile `AgentEditor`: a **Base URL** field appears for the local provider (curated
+  Ollama models: llama3.2/qwen2.5/…). Catalog entry `kind:'baseUrl'` + `defaultBaseUrl`.
+- **Verified:** `pnpm run ci` green (16/16; gateway 19 / orchestrator 16 incl. local-factory +
+  keyless-resolver + baseUrl-propagation tests); **headless integration re-passed on the new
+  schema** (published locally with `--delete-data`; Pirate Pete replied + BYOK decrypt); Android
+  bundle clean (633 modules). **Founder action (one-time):** re-publish the module to Maincloud
+  with `--delete-data=on-conflict` for the new column (V-11). Emulator needs no GPU (Ollama on host).
+- **Next:** **M1.8.3** (multi-credential Bedrock/Azure/Vertex — sealed-JSON, no schema change).
 
 ---
 

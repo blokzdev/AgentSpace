@@ -54,8 +54,8 @@ describe('selectPersona', () => {
     { id: 3n, agentId: 99n },
   ];
   const agents: AgentRef[] = [
-    { id: 42n, systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o', owner: 'abc123' },
-    { id: 99n, systemPrompt: '', provider: 'not-a-provider', model: 'x', owner: 'def456' },
+    { id: 42n, systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o', owner: 'abc123', baseUrl: '' },
+    { id: 99n, systemPrompt: '', provider: 'not-a-provider', model: 'x', owner: 'def456', baseUrl: '' },
   ];
 
   it('uses the bound persona prompt + model + owner', () => {
@@ -63,6 +63,19 @@ describe('selectPersona', () => {
       systemPrompt: 'You are Pirate Pete.',
       model: { provider: 'openai', model: 'gpt-4o' },
       ownerHex: 'abc123',
+      baseUrl: '',
+    });
+  });
+
+  it('carries a local (openai-compatible) persona base URL through', () => {
+    const local: AgentRef[] = [
+      { id: 7n, systemPrompt: 'local', provider: 'openai-compatible', model: 'llama3.2', owner: 'aaa', baseUrl: 'http://localhost:11434/v1' },
+    ];
+    expect(selectPersona([{ id: 5n, agentId: 7n }], local, 5n)).toEqual({
+      systemPrompt: 'local',
+      model: { provider: 'openai-compatible', model: 'llama3.2' },
+      ownerHex: 'aaa',
+      baseUrl: 'http://localhost:11434/v1',
     });
   });
 
@@ -71,6 +84,7 @@ describe('selectPersona', () => {
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       model: DEFAULT_MODEL,
       ownerHex: '',
+      baseUrl: '',
     });
   });
 
@@ -79,6 +93,7 @@ describe('selectPersona', () => {
       systemPrompt: DEFAULT_SYSTEM_PROMPT,
       model: DEFAULT_MODEL,
       ownerHex: '',
+      baseUrl: '',
     });
   });
 

@@ -15,4 +15,5 @@ export default {
   systemPrompt: __t.string(),
   provider: __t.string(),
   model: __t.string(),
+  baseUrl: __t.string(),
 };

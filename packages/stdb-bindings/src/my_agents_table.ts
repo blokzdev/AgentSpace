@@ -20,4 +20,5 @@ export default __t.row({
   version: __t.u64(),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  baseUrl: __t.string().name("base_url"),
 });

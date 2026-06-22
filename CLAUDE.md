@@ -297,9 +297,11 @@ tool-calling** on the **Vercel AI SDK v6** over a provider registry, normalizing
 is driven by a shared **`PROVIDER_CATALOG`** (`@agentspace/shared`) and now has **13
 single-API-key cloud providers live** (anthropic, openai, google, mistral, cohere, groq,
 xai, deepseek, perplexity, togetherai, fireworks, deepinfra, cerebras — all on
-`@ai-sdk/provider@3`); `openai-compatible`/local (per-agent `baseUrl`) = M1.8.2 and
-multi-credential Bedrock/Azure/Vertex (sealed-JSON creds) = M1.8.3. `provider`/`model` are
-free-form strings end-to-end, so adding cloud providers needs **no STDB change**. **BYOK:** `src/credentials.ts`
+`@ai-sdk/provider@3`). **M1.8.2:** `openai-compatible`/local is **live** via a per-agent
+`agent.baseUrl` (appended column) + `createOpenAICompatible` (key optional — a keyless local
+provider resolves to `''`); `ProviderFactory` is now `(credential, model, opts?:{baseUrl?})`.
+Multi-credential Bedrock/Azure/Vertex (sealed-JSON creds) = M1.8.3. Cloud providers are
+free-form strings (**no STDB change**); the local `baseUrl` was the one additive column. **BYOK:** `src/credentials.ts`
 seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
 and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.

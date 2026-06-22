@@ -102,6 +102,7 @@ async function run(): Promise<void> {
       systemPrompt: PERSONA.systemPrompt,
       provider: PERSONA.provider,
       model: PERSONA.model,
+      baseUrl: '',
     });
   };
   user.conn.db.service_info.onInsert(() => seed());
