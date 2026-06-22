@@ -169,10 +169,12 @@ OpenAI-compatible adapter for local runtimes (Ollama/vLLM/LM Studio).
   openai, google, mistral, cohere, groq, xai, deepseek, perplexity, togetherai, fireworks,
   deepinfra, cerebras). **M1.8.2:** `openai-compatible` (local — Ollama/vLLM/LM Studio) is
   **live** via a per-agent `agent.base_url` + `createOpenAICompatible` (key optional; the
-  orchestrator resolves a keyless local provider to `''`). **M1.8.3** adds multi-credential
-  Bedrock/Azure/Vertex (**sealed-JSON** creds — no `provider_key` schema change). The
-  `ProviderFactory` is `(credential, model, opts?: { baseUrl? })`. `embed` is deferred to
-  M3.1. The `streamText` `fullStream` is normalized to `GatewayDelta` (text/tool-call/finish).
+  orchestrator resolves a keyless local provider to `''`). **M1.8.3:** multi-credential
+  **Bedrock/Azure/Vertex** are **live** — the `ProviderFactory` parses a **sealed-JSON**
+  credential (the provider's catalog `fields`) into the SDK settings; **no `provider_key`
+  schema change**. So the gateway spans **16 providers** from one catalog (per-key acquisition
+  in `PROVIDERS.md`). `ProviderFactory` is `(credential, model, opts?: { baseUrl? })`. `embed`
+  is deferred to M3.1; `streamText` `fullStream` normalizes to `GatewayDelta`.
 
 ### BYOK key custody
 

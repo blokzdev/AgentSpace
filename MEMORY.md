@@ -24,11 +24,11 @@ their own provider key in a 🔑 Keys screen; it's **box-sealed client-side** to
 orchestrator's pubkey and stored as **ciphertext only** in `provider_key` (raw key never
 in STDB); the orchestrator decrypts per-(owner,provider) in-memory. Proven headlessly
 end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M1.7) are
-done**; **M1.8.1/.2** then shipped the multi-provider catalog (13 single-API-key cloud
-providers + a shared `PROVIDER_CATALOG` + model-picker UI) and the **local/openai-compatible**
-path (per-agent `agent.baseUrl` — the one additive STDB column; DEC-028); **M1.8.3** =
-multi-cred (Bedrock/Azure/Vertex), next. **`M1 [shipped]` tag HELD** only on the on-device
-V-checklist (esp. V-7/V-8 on the real BYOK path).
+done**; **M1.8 complete** (DEC-028) — the gateway now spans **16 providers** from one shared
+`PROVIDER_CATALOG`: 13 single-API-key cloud (M1.8.1) + local/openai-compatible via a per-agent
+`agent.baseUrl` (M1.8.2, the one additive STDB column) + multi-credential Bedrock/Azure/Vertex
+(M1.8.3, sealed-JSON). `PROVIDERS.md` documents getting every key. **`M1 [shipped]` tag HELD**
+only on the on-device V-checklist (esp. V-7/V-8 on the real BYOK path).
 
 - **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
@@ -687,6 +687,22 @@ catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live r
   bundle clean (633 modules). **Founder action (one-time):** re-publish the module to Maincloud
   with `--delete-data=on-conflict` for the new column (V-11). Emulator needs no GPU (Ollama on host).
 - **Next:** **M1.8.3** (multi-credential Bedrock/Azure/Vertex — sealed-JSON, no schema change).
+
+### 2026-06-22 — M1.8.3: multi-credential providers + PROVIDERS.md (M1.8 complete)
+- Built Phase M1.8.3 (DEC-028): **Bedrock / Azure / Vertex** via `@ai-sdk/amazon-bedrock`/
+  `azure`/`google-vertex`. Catalog entries `kind:'multi'` with a **`fields` spec**; the gateway
+  factory `JSON.parse`s the sealed credential straight into the SDK settings. **No `provider_key`
+  schema change, no orchestrator change** — the sealed blob is just a JSON string the resolver
+  returns and the factory parses. Mobile `ApiKeys` gained a **Multi-credential providers**
+  section (a field form per provider → seal `JSON.stringify`). The gateway now spans **16
+  providers** from one `PROVIDER_CATALOG`.
+- **New `PROVIDERS.md`** (founder-requested): per-provider get-a-key steps across all 3 tiers
+  (cloud / local-Ollama / multi-cred) + "providing keys to the AI" + the security posture;
+  registered in the CLAUDE §1 doc-graph + §9 layout.
+- **Verified:** `pnpm run ci` green (gateway **20** tests incl. multi-cred-factory-from-JSON +
+  catalog integrity over 16 providers); Android bundle clean. Live multi-cred round-trip = `V-12`
+  (optional). **M1.8 COMPLETE** (all 3 phases). **Next:** update + output the handoff prompt →
+  founder switches to the local session.
 
 ---
 

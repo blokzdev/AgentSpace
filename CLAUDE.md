@@ -43,6 +43,7 @@ the single source of truth for its topic and wins any conflict about it.
 | `BACKLOG.md` | Carryover queue: tactical deferrals with revisit triggers + launch gates | Forward-looking | Deferring work; checking launch readiness |
 | `SETUP.md` | Founder-owned action items: external setup only the human can do (register apps, dashboards, accounts, credentials) | Living / `S-n` ledger | The build needs a founder-side external action or a credential/ID handed back |
 | `VERIFICATION.md` | Founder-owned on-device / real-world checklist (`V-n`): what CI can't check | Living / `V-n` ledger | Batching a human/on-device verification the AI can't self-run |
+| `PROVIDERS.md` | Provider credential acquisition + entry: per-provider get-a-key steps (cloud / local / multi-cred) | Reference / living | Getting or entering a model-provider key/credential |
 
 The full doc suite now exists (authored 2026-06-13 alongside the ratified plan).
 A doc is still born only when it has something to own — do not add new doc types
@@ -244,7 +245,7 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 AgentSpace/
 ├── CLAUDE.md · MEMORY.md · ROADMAP.md · PRD.md       # operating + vision docs
 │   · BLUEPRINT.md · SPEC.md · BACKLOG.md · README.md
-│   · VERIFICATION.md · SETUP.md                       # founder-owned ledgers (V-n / S-n)
+│   · VERIFICATION.md · SETUP.md · PROVIDERS.md        # founder-owned ledgers (V-n / S-n) + provider key guide
 ├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
 │   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
@@ -300,8 +301,12 @@ xai, deepseek, perplexity, togetherai, fireworks, deepinfra, cerebras — all on
 `@ai-sdk/provider@3`). **M1.8.2:** `openai-compatible`/local is **live** via a per-agent
 `agent.baseUrl` (appended column) + `createOpenAICompatible` (key optional — a keyless local
 provider resolves to `''`); `ProviderFactory` is now `(credential, model, opts?:{baseUrl?})`.
-Multi-credential Bedrock/Azure/Vertex (sealed-JSON creds) = M1.8.3. Cloud providers are
-free-form strings (**no STDB change**); the local `baseUrl` was the one additive column. **BYOK:** `src/credentials.ts`
+**M1.8.3:** multi-credential **Bedrock/Azure/Vertex** are **live** — the `ProviderFactory`
+parses a **sealed-JSON** credential (the provider's catalog `fields`) into the SDK settings;
+`ApiKeys` renders a multi-field form; **no `provider_key` schema change**. So the gateway now
+spans **16 providers**, all from one `PROVIDER_CATALOG`; getting each key is documented in
+**`PROVIDERS.md`**. Cloud providers are free-form strings (**no STDB change**); the local
+`baseUrl` was the one additive column. **BYOK:** `src/credentials.ts`
 seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
 and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.

@@ -6,9 +6,11 @@ import { reducers, tables } from '../../module_bindings';
 import { sealForOrchestrator } from '../byok';
 import { colors, radius, space } from '../chat';
 
-// Single-API-key providers come straight from the shared catalog. Local
-// (openai-compatible) + multi-credential providers get their own UI in M1.8.2/.3.
+// Single-API-key providers (one secret) vs multi-credential providers (a form of
+// fields sealed as JSON). Local (openai-compatible) keys are optional → entered with
+// the Base URL in the agent editor, not here.
 const KEY_PROVIDERS = PROVIDER_CATALOG.filter((p) => p.kind === 'apiKey');
+const MULTI_PROVIDERS = PROVIDER_CATALOG.filter((p) => p.kind === 'multi');
 
 export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
   const [serviceInfo] = useTable(tables.service_info);
@@ -20,24 +22,41 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
   const ready = pubKey.length > 0;
 
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [mdrafts, setMdrafts] = useState<Record<string, Record<string, string>>>({});
 
   const hasKey = (provider: string): boolean => myKeys.some((k) => k.provider === provider);
 
-  // Configured providers first, then the rest in catalog order.
   const ordered = useMemo(
     () => [...KEY_PROVIDERS].sort((a, b) => Number(hasKey(b.id)) - Number(hasKey(a.id))),
     [myKeys],
   );
 
-  const onSave = (provider: string): void => {
-    const raw = (drafts[provider] ?? '').trim();
-    if (raw.length === 0 || !ready) return;
+  const seal = (provider: string, raw: string): void => {
+    if (!ready) return;
     try {
       void setProviderKey({ provider, sealed: sealForOrchestrator(raw, pubKey) });
-      setDrafts((d) => ({ ...d, [provider]: '' }));
     } catch {
       // sealing failed (bad pubkey) — ignored; the orchestrator may not be ready
     }
+  };
+
+  const onSaveKey = (provider: string): void => {
+    const raw = (drafts[provider] ?? '').trim();
+    if (raw.length === 0) return;
+    seal(provider, raw);
+    setDrafts((d) => ({ ...d, [provider]: '' }));
+  };
+
+  const onSaveMulti = (provider: string, fieldIds: string[]): void => {
+    const vals = mdrafts[provider] ?? {};
+    const obj: Record<string, string> = {};
+    for (const f of fieldIds) {
+      const v = (vals[f] ?? '').trim();
+      if (v.length === 0) return; // all fields required
+      obj[f] = v;
+    }
+    seal(provider, JSON.stringify(obj));
+    setMdrafts((d) => ({ ...d, [provider]: {} }));
   };
 
   return (
@@ -75,11 +94,7 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
                 value={drafts[p.id] ?? ''}
                 onChangeText={(t) => setDrafts((d) => ({ ...d, [p.id]: t }))}
               />
-              <Pressable
-                style={[styles.saveBtn, !ready && styles.btnOff]}
-                disabled={!ready}
-                onPress={() => onSave(p.id)}
-              >
+              <Pressable style={[styles.saveBtn, !ready && styles.btnOff]} disabled={!ready} onPress={() => onSaveKey(p.id)}>
                 <Text style={styles.saveText}>Save</Text>
               </Pressable>
             </View>
@@ -95,6 +110,55 @@ export function ApiKeys({ onBack }: { onBack: () => void }): React.JSX.Element {
             </View>
           </View>
         ))}
+
+        {MULTI_PROVIDERS.length > 0 ? (
+          <Text style={styles.section}>Multi-credential providers</Text>
+        ) : null}
+        {MULTI_PROVIDERS.map((p) => {
+          const fieldIds = (p.fields ?? []).map((f) => f.id);
+          return (
+            <View key={p.id} style={styles.card}>
+              <View style={styles.cardHead}>
+                <Text style={styles.provider}>{p.label}</Text>
+                {hasKey(p.id) ? <Text style={styles.set}>✓ set</Text> : <Text style={styles.unset}>not set</Text>}
+              </View>
+              {(p.fields ?? []).map((f) => (
+                <TextInput
+                  key={f.id}
+                  style={styles.input}
+                  placeholder={`${f.label}${f.placeholder ? ` (${f.placeholder})` : ''}`}
+                  placeholderTextColor={colors.faint}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry={f.secret}
+                  value={mdrafts[p.id]?.[f.id] ?? ''}
+                  onChangeText={(t) =>
+                    setMdrafts((d) => ({ ...d, [p.id]: { ...(d[p.id] ?? {}), [f.id]: t } }))
+                  }
+                />
+              ))}
+              <View style={styles.cardFoot}>
+                <Pressable onPress={() => void Linking.openURL(p.getKeyUrl)} hitSlop={8}>
+                  <Text style={styles.link}>Get credentials →</Text>
+                </Pressable>
+                <View style={styles.footActions}>
+                  {hasKey(p.id) ? (
+                    <Pressable onPress={() => void deleteProviderKey({ provider: p.id })} hitSlop={8}>
+                      <Text style={styles.remove}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={[styles.saveBtn, !ready && styles.btnOff]}
+                    disabled={!ready}
+                    onPress={() => onSaveMulti(p.id, fieldIds)}
+                  >
+                    <Text style={styles.saveText}>Save</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -108,6 +172,7 @@ const styles = StyleSheet.create({
   body: { padding: space.lg, gap: space.md },
   blurb: { color: colors.dim, fontSize: 13, lineHeight: 18 },
   warn: { color: colors.danger, fontSize: 13 },
+  section: { color: colors.dim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', marginTop: space.sm },
   card: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: space.sm },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   provider: { color: colors.text, fontSize: 16, fontWeight: '600' },
@@ -124,10 +189,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     height: 42,
   },
-  saveBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: space.lg, justifyContent: 'center' },
+  saveBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: space.lg, justifyContent: 'center', height: 42 },
   btnOff: { opacity: 0.5 },
   saveText: { color: colors.onAccent, fontWeight: '700' },
   cardFoot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  footActions: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   link: { color: colors.accent, fontSize: 13 },
   remove: { color: colors.danger, fontSize: 13, fontWeight: '600' },
 });
