@@ -137,12 +137,19 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   anywhere yet** (the specific host = OT-005), so for the on-device agent-reply tests
   (V-7/V-8) you run it **on your machine, pointed at Maincloud**, for the duration of the
   test. (V-5 — login only — does **not** need it.)
-- **Where:** a terminal in the repo (Node ≥ 22 + `pnpm install` done). No `.env` key
-  needed — BYOK keys are entered **in the app** (🔑 Keys); the orchestrator no longer
-  reads `.env`.
+- **Where:** a terminal in the repo (Node ≥ 22; `pnpm install` **and** `pnpm run build`
+  done — see step 1). No `.env` key needed — BYOK keys are entered **in the app**
+  (🔑 Keys); the orchestrator no longer reads `.env`.
 - **Steps:**
-  1. After S-3 is published, run — in **PowerShell** (set the env vars on their own lines;
-     the inline `VAR=val cmd` form is bash-only and **won't** work in PowerShell):
+  1. **Build the workspace once — REQUIRED.** The orchestrator runs from source (`tsx`) but
+     imports the **built** `@agentspace/gateway` + `@agentspace/shared` (their `package.json`
+     `main` is `./dist/index.js`); `pnpm install` does **not** build them. From the **repo
+     root**: `pnpm run build`. Skipping this fails with
+     `Cannot find module …\@agentspace\gateway\dist\index.js`. (Faster alternative — build
+     just the orchestrator's deps: `pnpm --filter "...@agentspace/orchestrator" build`.)
+     Re-run only after you pull new code.
+  2. Then run — in **PowerShell** (set the env vars on their own lines; the inline
+     `VAR=val cmd` form is bash-only and **won't** work in PowerShell):
      ```powershell
      $env:AGENTSPACE_STDB_HOST = "wss://maincloud.spacetimedb.com"
      $env:AGENTSPACE_STDB_DB   = "agentspace-hpm58"
@@ -151,7 +158,7 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
      It connects (anonymous identity, persisted), prints `connected as …`, registers its
      BYOK public key, and logs `reply loop subscribed`. **Leave it running** while you test.
      *(macOS/Linux: prefix inline — `AGENTSPACE_STDB_HOST=… AGENTSPACE_STDB_DB=… pnpm …`.)*
-  2. In the app: 🔑 **Keys** → add your provider key (it seals to the orchestrator's
+  3. In the app: 🔑 **Keys** → add your provider key (it seals to the orchestrator's
      pubkey) → 🤖 **Agents** → create a persona → **Chat**.
 - **Caveat (v1):** the orchestrator's box keypair is cached in a temp file; if you
   **restart** the orchestrator it may regenerate the keypair, after which previously
