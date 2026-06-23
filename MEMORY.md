@@ -1005,6 +1005,30 @@ reserved-but-unenforced; other users' agent names fall back to a generic label i
 - **Next:** founder runs the on-device V-15…V-19 (UI render + login) when convenient and **rotates the
   shared key**; then **M2.2** (presence/typing). Dials held at the DEC-031 defaults (tune after on-device V-16).
 
+### 2026-06-23 — On-device emulator drive: corrected the anon-login error; local-dev path added (BL-022)
+- Founder pushed back: in a prior session I drove the emulator via **anonymous SpacetimeAuth login**, so my
+  "on-device is blocked without your account" claim was wrong. **Confirmed it: drove the Pixel_8 via adb** —
+  "Sign in with SpacetimeAuth" → the hosted page's **"Anonymous login"** → "Authorize → Allow" → connected,
+  no credentials. Reached the inbox, entered the BYOK key (**✓ key set**), and the full M2.1 UI rendered:
+  AgentEditor + the **`respondsToAgents` toggle**, AgentPicker (distinct per-agent avatars + exclude-added),
+  the members screen, the **@mention typeahead** (everyone/Marina/Lyric), the composer. Sent `@Marina @Lyric …`.
+- The app's Maincloud socket kept dropping → **stuck "Connecting…"** (BL-022). Founder suggested **testing
+  against a local `spacetime start` server** (loopback = stable) and pushing verified work to Maincloud.
+  Implemented a small affordance: **local host ⇒ anonymous connect (no OIDC); Maincloud ⇒ SpacetimeAuth**
+  (`App.tsx` `LOCAL_DEV` + a persisted local anon token via `LocalDevTokenSync`). Against local the app
+  connected **instantly and stayed stable through the whole flow** — the founder's idea worked.
+- **On-device behavior CONFIRMED via the local DB** (episode 19): `@Marina @Lyric …` → **both agents replied,
+  tagged by agentId (Marina=12 factual, Lyric=13 rhyme), both runs succeeded, turns 8→6** — exactly M2.1.
+  **Marina's reply rendered correctly** (green avatar, "Marina", factual — no bleed). The live render of the
+  2nd bubble stalled (subscription froze after the first agent's deltas — **BL-022**, the dev-client/connection
+  resilience gap), so the 2-bubble shot wasn't captured live, but the DB proves the full behavior.
+- The **release-APK** path (more stable, no Metro) got past the SDK-path fix (needs `android/local.properties`
+  `sdk.dir`) but **fails JS bundling** (`createBundleReleaseJsAndAssets` → `export:embed` can't resolve
+  `../../index.ts` under pnpm-hoisted + package-exports — BL-009-adjacent). Personal memory
+  [[android-emulator-automation-gotchas]] updated.
+- **Next:** BL-022 (auto-reconnect) is the real reliability fix — promote to an M2.x on-device-hardening phase;
+  then the live multi-bubble render + the founder's remaining on-device V-ticks are trivial. Then M2.2.
+
 ---
 
 ## Open Threads

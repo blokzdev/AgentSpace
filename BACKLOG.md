@@ -171,6 +171,18 @@
   + the module dials but not yet checked in `agent_reply_begin`; add it to the enforcement boundary if
   rapid-fire agent turns need throttling beyond the episode budget.
 
+### BL-022 — On-device connection resilience (auto-reconnect, app + orchestrator)
+- **Source:** 2026-06-23 on-device verification — the app's Maincloud WebSocket dropped mid-session and
+  got stuck on "Connecting to AgentSpace…" (no auto-reconnect); the orchestrator's Maincloud socket also
+  dropped and the process exited.
+- **Trigger:** on-device reliability, or any always-on deployment (OT-005 / DEC-027) — a dropped socket
+  must self-heal rather than strand the app or kill the service.
+- **Promotion:** (a) **App** — on the SDK's `disconnect` (`isActive=false`), rebuild the `DbConnection`
+  with backoff and refresh the SpacetimeAuth id token (the provider currently builds the connection once
+  via `useMemo` and never retries). (b) **Orchestrator** — reconnect-with-backoff on a dropped Maincloud
+  socket instead of exiting (intersects OT-007 real service-account auth + DEC-027 always-on hosting).
+  Promotable to an **M2.x on-device-hardening phase**.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

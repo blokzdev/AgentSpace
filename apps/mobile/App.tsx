@@ -10,6 +10,7 @@ import { Identity } from 'spacetimedb';
 import { DbConnection, reducers, tables, type ErrorContext } from './module_bindings';
 import { SPACETIMEDB_DB_NAME, SPACETIMEDB_HOST } from './src/config';
 import { useSpacetimeAuth } from './src/auth';
+import * as SecureStore from 'expo-secure-store';
 import { colors } from './src/chat';
 import { Login } from './src/screens/Login';
 import { ThreadList } from './src/screens/ThreadList';
@@ -21,12 +22,21 @@ import { AgentList } from './src/screens/AgentList';
 import { AgentEditor } from './src/screens/AgentEditor';
 import { ApiKeys } from './src/screens/ApiKeys';
 
-function buildConnection(idToken: string): ReturnType<typeof DbConnection.builder> {
+// A local `spacetime start` server doesn't run SpacetimeAuth, so the app connects
+// ANONYMOUSLY there (no OIDC) — the server assigns an anonymous Identity, persisted
+// so it stays stable across reloads. Maincloud keeps the full SpacetimeAuth login.
+// The loopback connection (ws://10.0.2.2:3000) is stable, so this is the reliable
+// path for local development + on-device verification.
+const LOCAL_DEV = /(10\.0\.2\.2|127\.0\.0\.1|localhost)/.test(SPACETIMEDB_HOST);
+const LOCAL_TOKEN_KEY = 'agentspace.localdev.token';
+
+function buildConnection(token: string | undefined): ReturnType<typeof DbConnection.builder> {
   return DbConnection.builder()
     .withUri(SPACETIMEDB_HOST)
     .withDatabaseName(SPACETIMEDB_DB_NAME)
-    .withToken(idToken)
-    .onConnect((_conn: DbConnection, identity: Identity) => {
+    .withToken(token)
+    .onConnect((_conn: DbConnection, identity: Identity, tok: string) => {
+      if (LOCAL_DEV && tok) void SecureStore.setItemAsync(LOCAL_TOKEN_KEY, tok);
       console.info('connected as', identity.toHexString());
     })
     .onConnectError((_ctx: ErrorContext, err: Error) => {
@@ -44,6 +54,16 @@ type Screen =
   | { name: 'agents' }
   | { name: 'agentEditor'; agentId: bigint | null }
   | { name: 'apiKeys' };
+
+// Persist the local-dev anonymous token so the identity (and its agents/threads)
+// survives a reload. Lives inside the provider so it can read the live token.
+function LocalDevTokenSync(): null {
+  const { token } = useSpacetimeDB();
+  useEffect(() => {
+    if (LOCAL_DEV && token) void SecureStore.setItemAsync(LOCAL_TOKEN_KEY, token);
+  }, [token]);
+  return null;
+}
 
 function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   const { isActive, identity } = useSpacetimeDB();
@@ -211,13 +231,48 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
 
 export default function App(): React.JSX.Element {
   const auth = useSpacetimeAuth();
+  const [localToken, setLocalToken] = useState<string | undefined>(undefined);
+  const [localReady, setLocalReady] = useState(!LOCAL_DEV);
+  useEffect(() => {
+    if (!LOCAL_DEV) return;
+    void SecureStore.getItemAsync(LOCAL_TOKEN_KEY).then((t) => {
+      setLocalToken(t ?? undefined);
+      setLocalReady(true);
+    });
+  }, []);
+
   const connectionBuilder = useMemo(
-    () => (auth.idToken ? buildConnection(auth.idToken) : null),
-    [auth.idToken],
+    () =>
+      LOCAL_DEV
+        ? localReady
+          ? buildConnection(localToken)
+          : null
+        : auth.idToken
+          ? buildConnection(auth.idToken)
+          : null,
+    [auth.idToken, localReady, localToken],
   );
 
   let content: React.JSX.Element;
-  if (auth.status === 'loading') {
+  if (LOCAL_DEV) {
+    content = connectionBuilder ? (
+      <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
+        <LocalDevTokenSync />
+        <View style={styles.fill}>
+          <Root onSignOut={auth.logout} />
+          <StatusBar style="light" />
+        </View>
+      </SpacetimeDBProvider>
+    ) : (
+      <View style={styles.fill}>
+        <SafeAreaView style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={styles.dim}>Connecting (local dev)…</Text>
+        </SafeAreaView>
+        <StatusBar style="light" />
+      </View>
+    );
+  } else if (auth.status === 'loading') {
     content = (
       <View style={styles.fill}>
         <SafeAreaView style={styles.center}>

@@ -37,3 +37,6 @@ target/
 .env
 .env.local
 .env*.local
+
+# Local scratch (on-device verification screenshots / helpers)
+.tmp/
