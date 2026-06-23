@@ -252,7 +252,7 @@ AgentSpace/
 ├── .github/workflows/{ci,build-apk}.yml   # CI (lint·typecheck·build·test) + manual debug-signed release APK
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5; presence/typing M2.2
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5; presence/typing M2.2; branded login + guest path M2.9
 │       · App.tsx · src/auth.ts · src/byok.ts · src/reconnect.tsx · src/components/{Avatar,TypingDots}.tsx
 │       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,AgentPicker,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
@@ -271,7 +271,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing ✓; M2.3 context-isolation + NL address ✓; M2.4 public agent cards (lean, BL-021) built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing ✓; M2.3 context-isolation + NL address ✓; M2.4 public agent cards (lean, BL-021) ✓; M2.9 down-payment (branded login + guest path) built; OT-008 resolved — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -489,8 +489,27 @@ name+emoji from the card (own agents included, so an emoji edit never renders st
 ripple to M1.7/M2.1/M2.5; trivially reversible (additive column + additive view + a render swap, no data
 migration). Proven headless by **`scripts/verify-cards.ts`** (owner A sees owner B's cross-owner card
 "Lyric" 🎵 via the public view; no secret-prompt leak) + integration **A–G** regress clean; CI 16/16.
-On-device = `V-24` (needs the Maincloud `--delete-data` republish — `SETUP.md` S-8). The **full** per-agent
+On-device = `V-24` (**S-8 done 2026-06-23 — Maincloud current**). The **full** per-agent
 identity + real presence dots is committed for **after M2.9** (BL-014).
+
+**M2.9 down-payment (production auth groundwork; DEC-039):** the mobile login is now **ours**, not a single
+SpacetimeAuth button. `apps/mobile/src/screens/Login.tsx` is a branded screen with three actions — a
+**Google** button (inert behind `GOOGLE_CONFIGURED` until `SETUP.md` S-9 supplies
+`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`), the existing **SpacetimeAuth** button (Path-A fallback, `src/auth.ts`
+**unchanged**), and a working **"Continue as guest"** anonymous path. `App.tsx` generalizes the old
+`LOCAL_DEV` anonymous-connect into `makeBuilder(persistKey)` + a persisted `guest` flag/token, so a guest
+connects anonymously on Maincloud with a **stable identity across cold restart** (reusing `ConnectionGate` +
+a kept-token refresh). `src/config.ts` adds `GOOGLE_WEB_CLIENT_ID`/`GOOGLE_ANDROID_CLIENT_ID`/
+`GOOGLE_CONFIGURED` (mirrors `SPACETIMEAUTH_CONFIGURED`). **Native `@react-native-google-signin` + the module
+`aud`/`iss` guard (`ctx.senderAuth.jwt`) are the NEXT chunk** (M2.9.2), gated on S-9. *Why an `aud` guard:*
+SpacetimeDB derives Identity from `iss+sub` only and **does not check `aud`**, and Google's `iss` is shared
+by all Google apps — so the module must verify `aud == our Web client ID`. Issuer trust itself needs **no**
+Maincloud config (standard JWKS auto-fetch). No schema/bindings change; CI 16/16; bundle 2.19 MB. On-device =
+`V-25`. **OT-008 resolved** (test-harness): `services/orchestrator/scripts/_harness.ts` `assertWeOwnService`
+preflights the singleton-`service` ownership in `verify-reaper`/`integration`, so a stray-orchestrator
+clobber fails fast instead of an opaque timeout; the `register_service` "first-wins" comment was corrected to
+last-write-wins (behavioral hardening stays OT-007). **Deploy note (LG-10):** Maincloud publishes **must**
+pass `--server maincloud` (`modules/spacetime/spacetime.json` pins `server=local`).
 
 See `BLUEPRINT.md` §2 for the module graph.
 

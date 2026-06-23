@@ -25,25 +25,42 @@ import { ApiKeys } from './src/screens/ApiKeys';
 
 // A local `spacetime start` server doesn't run SpacetimeAuth, so the app connects
 // ANONYMOUSLY there (no OIDC) — the server assigns an anonymous Identity, persisted
-// so it stays stable across reloads. Maincloud keeps the full SpacetimeAuth login.
-// The loopback connection (ws://10.0.2.2:3000) is stable, so this is the reliable
-// path for local development + on-device verification.
+// so it stays stable across reloads. Maincloud keeps the full SpacetimeAuth login,
+// PLUS an explicit "Continue as guest" anonymous path (M2.9 — a testing affordance,
+// retired at launch). The loopback connection (ws://10.0.2.2:3000) is stable, so this
+// is the reliable path for local development + on-device verification.
 const LOCAL_DEV = /(10\.0\.2\.2|127\.0\.0\.1|localhost)/.test(SPACETIMEDB_HOST);
 const LOCAL_TOKEN_KEY = 'agentspace.localdev.token';
+const GUEST_TOKEN_KEY = 'agentspace.guest.token';
+const GUEST_FLAG_KEY = 'agentspace.guest';
 
-function buildConnection(token: string | undefined): ReturnType<typeof DbConnection.builder> {
-  return DbConnection.builder()
-    .withUri(SPACETIMEDB_HOST)
-    .withDatabaseName(SPACETIMEDB_DB_NAME)
-    .withToken(token)
-    .onConnect((_conn: DbConnection, identity: Identity, tok: string) => {
-      if (LOCAL_DEV && tok) void SecureStore.setItemAsync(LOCAL_TOKEN_KEY, tok);
-      console.info('connected as', identity.toHexString());
-    })
-    .onConnectError((_ctx: ErrorContext, err: Error) => {
-      console.warn('connect error:', err.message);
-    });
+const noop = (): void => {};
+
+// Connection builder. When `persistKey` is set, the (anonymous) token the server
+// assigns is cached so that identity stays stable across reconnects + restarts —
+// used by the local-dev and guest paths. The authed (SpacetimeAuth) path passes null
+// because its durable credential is the OIDC refresh token (src/auth.ts).
+function makeBuilder(
+  persistKey: string | null,
+): (token: string | undefined) => ReturnType<typeof DbConnection.builder> {
+  return (token) =>
+    DbConnection.builder()
+      .withUri(SPACETIMEDB_HOST)
+      .withDatabaseName(SPACETIMEDB_DB_NAME)
+      .withToken(token)
+      .onConnect((_conn: DbConnection, identity: Identity, tok: string) => {
+        if (persistKey && tok) void SecureStore.setItemAsync(persistKey, tok);
+        console.info('connected as', identity.toHexString());
+      })
+      .onConnectError((_ctx: ErrorContext, err: Error) => {
+        console.warn('connect error:', err.message);
+      });
 }
+
+// Stable references — ConnectionGate memoizes the builder on makeBuilder identity.
+const buildLocal = makeBuilder(LOCAL_TOKEN_KEY);
+const buildGuest = makeBuilder(GUEST_TOKEN_KEY);
+const buildAuthed = makeBuilder(null);
 
 type Screen =
   | { name: 'threads' }
@@ -237,6 +254,12 @@ export default function App(): React.JSX.Element {
   const auth = useSpacetimeAuth();
   const [localToken, setLocalToken] = useState<string | undefined>(undefined);
   const [localReady, setLocalReady] = useState(!LOCAL_DEV);
+  // Guest (anonymous) mode on Maincloud — a persisted user choice (M2.9). `guestReady`
+  // gates the first non-local render until the flag is loaded (local skips guest).
+  const [guest, setGuest] = useState(false);
+  const [guestToken, setGuestToken] = useState<string | undefined>(undefined);
+  const [guestReady, setGuestReady] = useState(LOCAL_DEV);
+
   useEffect(() => {
     if (!LOCAL_DEV) return;
     void SecureStore.getItemAsync(LOCAL_TOKEN_KEY).then((t) => {
@@ -245,16 +268,53 @@ export default function App(): React.JSX.Element {
     });
   }, []);
 
-  // Local dev has no OIDC refresh — a reconnect reuses the persisted anonymous token.
+  // Restore a returning guest (non-local only).
+  useEffect(() => {
+    if (LOCAL_DEV) return;
+    void Promise.all([
+      SecureStore.getItemAsync(GUEST_FLAG_KEY),
+      SecureStore.getItemAsync(GUEST_TOKEN_KEY),
+    ]).then(([flag, tok]) => {
+      setGuest(flag === '1');
+      setGuestToken(tok ?? undefined);
+      setGuestReady(true);
+    });
+  }, []);
+
+  // Local dev / guest have no OIDC refresh — a reconnect reuses the persisted anon token.
   const localRefresh = useCallback(async (): Promise<RefreshResult> => {
     const t = await SecureStore.getItemAsync(LOCAL_TOKEN_KEY);
     return { outcome: 'kept', token: t ?? undefined };
   }, []);
+  const guestRefresh = useCallback(async (): Promise<RefreshResult> => {
+    const t = await SecureStore.getItemAsync(GUEST_TOKEN_KEY);
+    return { outcome: 'kept', token: t ?? undefined };
+  }, []);
+
+  // Enter guest: persist the choice + connect anonymously (token undefined → the server
+  // mints one, which makeBuilder caches under GUEST_TOKEN_KEY for a stable identity).
+  const enterGuest = useCallback(() => {
+    void SecureStore.setItemAsync(GUEST_FLAG_KEY, '1');
+    setGuestToken(undefined);
+    setGuest(true);
+  }, []);
+
+  // Sign out clears guest state (or ends the OIDC session) → back to the Login screen.
+  const signOut = useCallback(() => {
+    if (guest) {
+      void SecureStore.deleteItemAsync(GUEST_FLAG_KEY);
+      void SecureStore.deleteItemAsync(GUEST_TOKEN_KEY);
+      setGuestToken(undefined);
+      setGuest(false);
+      return;
+    }
+    auth.logout();
+  }, [guest, auth]);
 
   // The signed-in app, mounted under the ConnectionGate which owns reconnect (M2.5).
   const app = (
     <View style={styles.fill}>
-      <Root onSignOut={auth.logout} />
+      <Root onSignOut={signOut} />
       <StatusBar style="light" />
     </View>
   );
@@ -262,24 +322,32 @@ export default function App(): React.JSX.Element {
   let content: React.JSX.Element;
   if (LOCAL_DEV) {
     content = localReady ? (
-      <ConnectionGate makeBuilder={buildConnection} token={localToken} refresh={localRefresh}>
+      <ConnectionGate makeBuilder={buildLocal} token={localToken} refresh={localRefresh}>
         {app}
       </ConnectionGate>
     ) : (
       <Splash label="Connecting (local dev)…" />
+    );
+  } else if (!guestReady) {
+    content = <Splash label="Restoring session…" />;
+  } else if (guest) {
+    content = (
+      <ConnectionGate makeBuilder={buildGuest} token={guestToken} refresh={guestRefresh}>
+        {app}
+      </ConnectionGate>
     );
   } else if (auth.status === 'loading') {
     content = <Splash label="Restoring session…" />;
   } else if (auth.status === 'signedOut' || !auth.idToken) {
     content = (
       <View style={styles.fill}>
-        <Login onSignIn={auth.login} busy={auth.busy} error={auth.error} />
+        <Login onGoogle={noop} onSignIn={auth.login} onGuest={enterGuest} busy={auth.busy} error={auth.error} />
         <StatusBar style="light" />
       </View>
     );
   } else {
     content = (
-      <ConnectionGate makeBuilder={buildConnection} token={auth.idToken} refresh={auth.refresh}>
+      <ConnectionGate makeBuilder={buildAuthed} token={auth.idToken} refresh={auth.refresh}>
         {app}
       </ConnectionGate>
     );

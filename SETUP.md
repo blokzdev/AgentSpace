@@ -237,19 +237,76 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-8 — Re-publish the module to Maincloud for M2.4 (public agent cards)  ·  added 2026-06-23 · M2.4  ·  [ ]
-> **Same one-liner as S-6, for the M2.4 schema.** M2.4 appends `agent.avatar_emoji` and adds the public
-> `thread_agent_cards` view — additive but **breaking** (a new non-null column needs a default), so Maincloud
-> needs a `--delete-data` republish (wipes the cloud DB's throwaway test data, exactly as S-6 did for M2.1).
+### S-8 — Re-publish the module to Maincloud for M2.4 (public agent cards)  ·  added 2026-06-23 · M2.4  ·  [x] (founder 2026-06-23)
+> **DONE (founder 2026-06-23).** Re-published `agentspace-hpm58` to **Maincloud** (DB identity
+> `c200c0eea8579360068efe51acaffc85ee5e216ecea5226810a91de45387b15d`); the publish reported the expected
+> breaking change (`Adding a column avatar_emoji to table agent requires a default value annotation`) and the
+> `--delete-data=on-conflict` cleared + recreated it. The AI **verified the live schema** via
+> `spacetime describe --server maincloud agentspace-hpm58 --json` — it now contains `thread_agent_cards` +
+> `avatar_emoji` (atop the M2.1 `thread_agent`/`episode`/`reap_stale_runs`). **V-24 unblocked.**
+>
+> **⚠️ Command-doc fix (the flag that was missing 2026-06-23).** The first attempt used
+> `spacetime publish agentspace-hpm58 -p . --delete-data` **without `--server maincloud`** and silently went to
+> the **local** server (`Uploading to local => http://127.0.0.1:3000`), creating a stray local `agentspace-hpm58`
+> and leaving Maincloud stale. **Root cause:** `modules/spacetime/spacetime.json` pins `"server": "local"`, which
+> **overrides the CLI's default server for `publish`** — so **every Maincloud publish MUST pass `--server
+> maincloud` explicitly** (the CLI's `***` default in `spacetime server list` does not apply once the project
+> config sets one). The corrected step 2 below now matches S-6.
 - **Why:** without it the cloud module lacks the column/view, so the app's card-first render falls back to
   the old "Agent"/🤖 label for cross-owner agents and AgentEditor's emoji field has nowhere to write.
-- **Where:** **terminal** on the founder's machine (the `spacetime` CLI logged into Maincloud).
-- **Steps:**
-  1. From the repo: `cd modules/spacetime`.
-  2. `spacetime publish agentspace-hpm58 -p . --delete-data` (confirm the data-wipe prompt). *(Local dev
-     already uses this; the cloud DB is throwaway pre-launch test data.)*
+- **Where:** **terminal** on the founder's machine (the `spacetime` CLI logged into Maincloud as `blokzdev`).
+- **Steps (PowerShell):**
+  1. From the repo: `cd modules\spacetime` (and be logged in — `spacetime login show`).
+  2. Re-publish **to Maincloud** (the `--server maincloud` flag is mandatory — see the root-cause note above):
+     ```powershell
+     spacetime publish agentspace-hpm58 -p . --server maincloud --delete-data=on-conflict --yes
+     ```
+     Cosmetic lines (`tsc not found` / `verbatimModuleSyntax`) are fine — watch for `Build finished
+     successfully` then `Uploading to maincloud => https://maincloud.spacetimedb.com`. *(The cloud DB is
+     throwaway pre-launch test data; the wipe is expected — the orchestrator re-registers on first connect and
+     users re-enter keys in 🔑 Keys.)*
   3. No regenerate needed founder-side — the committed bindings already match.
 - **Give back to the AI:** confirm the republish succeeded → this unblocks **V-24** (on-device card render).
+
+---
+
+### S-9 — Create the Google OAuth client (Google Cloud Console)  ·  added 2026-06-23 · M2.9  ·  [ ]
+> **The single unblock for M2.9 native Google sign-in (DEC-037, Path B).** The app will do a
+> **native** Google Sign-In (no hosted webview) → a Google **id token** → `DbConnection.withToken()`,
+> and SpacetimeDB derives a stable Identity from Google's `iss+sub` (no Maincloud issuer config needed —
+> SpacetimeDB auto-fetches Google's standard JWKS). This chunk shipped the **inert** scaffolding (config
+> flags + an inert "Continue with Google" button); the **next** chunk wires the native SDK once you hand
+> back the **Web client ID** below. The build is inert until you do — nothing breaks meanwhile.
+- **Why:** the **Web** client ID is what makes Google mint an id token, and it is also the token's `aud`
+  that the module will verify (a Google token is only trusted if `aud` == our Web client ID — SpacetimeDB
+  keys Identity on `iss+sub` only, so the module must check `aud` itself). The **Android** client (package +
+  signing SHA-1) is what lets Google issue the token to the app on-device.
+- **Where:** **web dashboard** — [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services
+  → **Credentials** + **OAuth consent screen**.
+- **Steps:**
+  1. **Create/select a project** (top bar project picker → New Project, or reuse one).
+  2. **OAuth consent screen** → User type **External** → fill app name + your support email + developer
+     contact → Save. While it's in **Testing**, add **your own Google account as a Test User** (Audience →
+     Test users → Add) so you can sign in before the app is verified. (Scopes: the defaults
+     `openid`/`email`/`profile` are enough — no extra scopes needed.)
+  3. **Credentials → Create Credentials → OAuth client ID → type "Web application"** → name it (e.g.
+     "AgentSpace Web") → Create. **No redirect URI is required** for native google-signin (unlike the old
+     PKCE flow). Copy its **Client ID** — this is the give-back value (`EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`).
+  4. **Credentials → Create Credentials → OAuth client ID → type "Android"** → **Package name**
+     `com.agentspace.probe` → **SHA-1 certificate fingerprint** = your **debug** keystore's SHA-1 (for the
+     testing builds; the production Play/EAS signing SHA-1 is a separate registration at launch — **LG-9**).
+     Get the debug SHA-1 with **either**:
+     ```powershell
+     keytool -list -v -keystore "$env:USERPROFILE\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
+     ```
+     (look for the **SHA1:** line) **or**, from the app's native dir (if present):
+     ```powershell
+     cd apps\mobile\android; .\gradlew signingReport   # use the `debug` variant's SHA-1
+     ```
+- **Give back to the AI:** (1) the **Web client ID** string (`…apps.googleusercontent.com`) — it's
+  **public** (an `EXPO_PUBLIC_*` value), fine to paste in chat / commit; I'll wire it as
+  `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`. (2) Confirm the **Android** client (package `com.agentspace.probe` +
+  debug SHA-1) is registered. That unblocks the next chunk (native sign-in + the module `aud` guard).
 
 ---
 

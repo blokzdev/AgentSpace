@@ -4,11 +4,17 @@
 // a streaming message + running run) and NEVER finishing it, then watching the
 // reaper terminalize it. No model/key needed. Takes ~2–3 minutes.
 //   pnpm --filter @agentspace/orchestrator exec tsx scripts/verify-reaper.ts
+//
+// PRECONDITION: stop any running orchestrator (`tsx src/main.ts`) against this DB
+// first — both it and this script register the singleton `service`, and a stray one
+// would steal the agent membership and get our begin refused (OT-008). The
+// assertWeOwnService() guard below fails fast with that hint if it happens.
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Identity } from 'spacetimedb';
 import { DbConnection } from '@agentspace/stdb-bindings';
 import { connectOrchestrator } from '../src/spacetime';
+import { assertWeOwnService } from './_harness';
 
 const HOST = process.env.AGENTSPACE_STDB_HOST ?? 'ws://127.0.0.1:3000';
 const DB = process.env.AGENTSPACE_STDB_DB ?? 'agentspace';
@@ -67,8 +73,13 @@ async function run(): Promise<void> {
   const episodeId = [...user.conn.db.my_thread_messages.iter()].find((m) => m.runId === '' && m.text === probe)!.episodeId;
 
   // Simulate a crash mid-stream: begin a reply (streaming message + running run) and NEVER finish it.
+  // Guard: confirm WE still own the service singleton (a stray orchestrator would have stolen the
+  // agent membership and the begin would be refused — OT-008), so a refusal here is real, not a clobber.
+  assertWeOwnService(user.conn, orch.identity, fail);
   const runId = 'reaper-stuck-run';
-  orch.conn.reducers.agentReplyBegin({ threadId: gid, runId, model: 'crash-sim', agentId, episodeId }).catch(() => {});
+  orch.conn.reducers
+    .agentReplyBegin({ threadId: gid, runId, model: 'crash-sim', agentId, episodeId })
+    .catch((e: unknown) => fail(`agent_reply_begin refused: ${e instanceof Error ? e.message : String(e)}`));
   await until('stuck streaming message exists', () => [...user.conn.db.my_thread_messages.iter()].some((m) => m.runId === runId && m.streamState === 'streaming'), 15_000);
   const t0 = Date.now();
   console.info(`  • stuck streaming message created (runId=${runId}); orchestrator now goes silent. Waiting for the reaper…`);

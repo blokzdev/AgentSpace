@@ -246,6 +246,14 @@ Each MUST be satisfied before the v1 tag. Owner ticks with evidence.
       Signing / a managed keystore + secret). The `build-apk` workflow is a **release**
       build but **debug-signed** for testing only — swap in the prod signing config +
       a keystore secret at launch. Source: the manual Build APK workflow.
+- [ ] **LG-10 — Deploy discipline (schema-first; correct publish target).** A Maincloud
+      **module publish MUST pass `--server maincloud`** — `modules/spacetime/spacetime.json`
+      pins `server=local`, which overrides the CLI default, so a bare `spacetime publish`
+      silently goes to the local server (the S-8 incident, 2026-06-23). And a **schema
+      republish must precede an APK build**: the mobile bindings subscribe to views/columns
+      (e.g. `thread_agent_cards`/`avatar_emoji`) that must already exist on the target DB, or
+      the app's subscription/decode fails. Confirm both at release: the live Maincloud schema
+      matches the shipped bindings (`spacetime describe --server maincloud agentspace-hpm58`).
 
 *(Open Human-Verification `[gate]` items at milestone-close flow here with trigger
 "verify before v1 ships.")*
