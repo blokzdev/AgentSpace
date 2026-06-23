@@ -27,6 +27,7 @@ export function ThreadList({
   const [users] = useTable(tables.user);
   const [agents] = useTable(tables.my_agents);
   const [members] = useTable(tables.my_thread_members);
+  const [threadAgents] = useTable(tables.my_thread_agents);
   const [messages] = useTable(tables.my_thread_messages);
   const setDisplayName = useReducer(reducers.setDisplayName);
 
@@ -67,8 +68,10 @@ export function ThreadList({
             avatar = { idKey: `dm-${t.id.toString()}` };
           }
         } else {
-          title = t.title ?? `Group #${t.id.toString()}`;
-          avatar = { idKey: `group-${t.id.toString()}`, name: title };
+          const base = t.title ?? `Group #${t.id.toString()}`;
+          const agentCount = threadAgents.filter((ta) => ta.threadId === t.id).length;
+          title = agentCount > 0 ? `${base}  ·  🤖 ${agentCount}` : base;
+          avatar = { idKey: `group-${t.id.toString()}`, name: base, emoji: agentCount > 0 ? '🤖' : undefined };
         }
 
         const subtitle = last
@@ -77,7 +80,7 @@ export function ThreadList({
         return { id: t.id, title, subtitle, activity, avatar, when: last ? relativeTime(last.sent) : '' };
       })
       .sort((a, b) => (a.activity < b.activity ? 1 : -1));
-  }, [threads, messages, members, agents, users, identity]);
+  }, [threads, messages, members, agents, threadAgents, users, identity]);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -13,14 +13,16 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-22.* **M0 closed; M1 ✓ SHIPPED** — all build phases (M1.1 chat, M1.2 login, M1.3
-contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies, **M1.7 per-user
-BYOK**, **M1.8 full multi-provider**) done, and the **build-an-agent → converse-with-your-own-key**
-loop is **verified on-device** vs Maincloud (V-5/V-7/V-8; DEC-029, PRs #29–#31). **Current chunk =
-`M1.9` Streaming hardening (fixes OT-004; pulls all of M2.3 forward)** — delta-streaming
-(append-only INSERTs replace cumulative-text UPDATEs) + run lifecycle (backpressure, idle/error
-timeout, cancellation-on-supersede). Built + headless-verified; on-device is V-13/V-14 (DEC-030).
-Then **M2** (multi-agent groups, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
+*2026-06-23.* **M0 closed; M1 ✓ SHIPPED; M1.9 ✓ done; M2.1 ✓ built & CI-green** — the
+**build-an-agent → converse-with-your-own-key** loop is **verified on-device** vs Maincloud
+(V-5/V-7/V-8; DEC-029, PRs #29–#31); M1.9 delta-streaming + run lifecycle landed (on-device
+V-13/V-14). **Just shipped = `M2.1` multi-agent group threads (MVP; DEC-031 "Candidate C")** —
+persona-tagged single connection, structured `@mention` addressing, and the full episode/turn/cost
+guard system **enforced in the reducer** (`agent_reply_begin`); all 11 M2 guards met. Built +
+headless-proven (integration A–F pass, incl. a terminating agent↔agent volley + reducer-enforced
+budget; CI 16/16). **On-device V-15…V-19 pending** (founder re-publishes to Maincloud with
+`--delete-data=on-conflict` for the new tables). Then **M2.2** (presence/typing), **M2.3** (context
+isolation), **M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
 (durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder
 setup S-1/S-2/S-3 done (S-2 redirect now reverse-DNS); S-4 optional.
 
@@ -226,13 +228,15 @@ trigger (mention order); **supersede per-`episodeId`** (not per-thread); per-run
 showstopper — pulled into the MVP), `message.id` sort tiebreak. Mobile: `@mention` composer +
 "+ Add agent" picker + **delta render grouped by `runId`** + typing from `streaming` rows.
 
-**Must-have guards (gate any ship — all net-new):** (1) episode+turn budget enforced
-pre-execution in `agent_reply_begin`; (2) `episodeId` threaded trigger→reply→next (so agent→agent
-inherits the budget); (3) once-per-episode-per-agent de-dup; (4) per-run output-token cap;
-(5) concurrency cap in the reducer; (6) tag-based `isAgent` (persona-bleed); (7) `message.id`
-sort tiebreak; (8) episode token ceiling summed across runs; (9) module reaper for stuck
-`streaming`/`running`; (10) mobile delta grouping by `runId`; (11) `my_persona_keys` off
-`thread_agent` + coalesced per-agent error replies.
+**Must-have guards (gate any ship — all net-new) — ✓ ALL MET (M2.1, 2026-06-23):** (1) episode+turn
+budget enforced pre-execution in `agent_reply_begin` ✓; (2) `episodeId` threaded trigger→reply→next
+(so agent→agent inherits the budget) ✓; (3) once-per-episode-per-agent de-dup (`agent_turn`) ✓;
+(4) per-run output-token cap (`MAX_OUTPUT_TOKENS_PER_RUN`→`maxOutputTokens`) ✓; (5) concurrency cap
+in the reducer (`MAX_CONCURRENT`) ✓; (6) tag-based `isAgent` (persona-bleed) ✓; (7) `message.id`
+sort tiebreak ✓; (8) episode token ceiling summed across runs (`agent_reply_finish` decrements,
+closes at ≤0) ✓; (9) module reaper for stuck `streaming`/`running` (`reap_stale_runs`, 60s) ✓;
+(10) mobile delta grouping by `runId` ✓; (11) `my_persona_keys`/`my_active_personas` off
+`thread_agent` + coalesced per-agent error replies ✓.
 
 - **M2.1 — Addressing + arbitration (the MVP; existential core).** Structured `@mention`
   grammar (SPEC §3) + reply-to + a thread **default responder**; addressed-only reply set;
@@ -240,6 +244,19 @@ sort tiebreak; (8) episode token ceiling summed across runs; (9) module reaper f
   ≥2 humans + ≥2 agents converse coherently; `@everyone` + an agent↔agent volley terminate
   within budget. Headless-testable (no key) + orchestrator unit tests + a new `scripts/integration`
   scenario. On-device → new V-items (below).
+  ✓ *M2.1 [done 2026-06-23]: multi-agent MVP shipped & CI-green (16/16); headless integration A–F
+  pass (incl. terminating agent↔agent volley + reducer-enforced budget); on-device V-15…V-19 pending.*
+  New tables `thread_agent`/`episode`/`agent_turn` + `reaper_schedule`; additive cols
+  `message.{mentions,agentId,episodeId}`, `run.{agentId,episodeId}`, `agent.respondsToAgents`;
+  `agent_reply_begin` is the enforcement boundary (refuses a disallowed run — no row created);
+  `agent_turn` structurally bounds any agent↔agent volley to ≤(#agents) replies/episode.
+  Shared `evaluateBegin` + dials (`MAX_TURNS_HARD=8`, `MAX_CONCURRENT=2`,
+  `MAX_OUTPUT_TOKENS_PER_RUN=2000`, `EPISODE_TOKEN_CEILING=50k`, `STREAM_TTL_MS=120s`;
+  `AGENT_COOLDOWN_MS=3s` reserved/unenforced). Orchestrator per-thread serialized fan-out
+  (human→agent + agent→agent, supersede per-`episodeId`); mobile `@mention` typeahead +
+  `+ Add agent` + `AgentPicker` + per-`agentId` delta render. Dials are starting defaults
+  (tune after V-16). 35 orch + 22 gateway + 8 shared tests. Deferred: `@human` mentions,
+  enforced cooldown, other-owners' agent names in UI → M2.3/M2.4/BACKLOG.
 - **M2.2 — Agent presence & typing.** "🤖 {name} is thinking…" derived from `streaming` rows
   (no new table; self-heals via the reaper). The seam where real `user.online` swaps in at M2.4.
 - **M2.3 — Multi-party context isolation.** Full per-agent `buildPrompt` recipe (role-flip +
@@ -252,7 +269,9 @@ sort tiebreak; (8) episode token ceiling summed across runs; (9) module reaper f
   Closes OT-007 + DEC-022. Reversible to the C MVP. *Pulled in only if real avatars/online-dots
   become a launch requirement.*
 
-Human verification (on-device, founder-owned; renumbered to avoid the existing V-1…V-14):
+Human verification (on-device, founder-owned; renumbered to avoid the existing V-1…V-14).
+**V-15…V-19 are now the gating on-device items for M2.1** (built + headless-proven A–F; founder
+re-publishes to Maincloud with `--delete-data=on-conflict` for the new tables, then verifies):
 **V-15** multi-agent coherence (`@a @b` reply in order, no persona-bleed); **V-16** loop/cost
 guard (agent↔agent volley terminates within budget — the existential test); **V-17** `@everyone`
 storm bound; **V-18** typing + crash self-heal (kill the orchestrator mid-stream → indicator

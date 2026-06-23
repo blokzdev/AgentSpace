@@ -9,6 +9,10 @@ import {
   type AlgebraicTypeType as __AlgebraicTypeType,
   type Infer as __Infer,
 } from "spacetimedb";
+import {
+  Mention,
+} from "./types";
+
 
 export default __t.row({
   id: __t.u64().primaryKey(),
@@ -18,4 +22,9 @@ export default __t.row({
   sent: __t.timestamp(),
   streamState: __t.string().name("stream_state"),
   runId: __t.string().name("run_id"),
+  get mentions() {
+    return __t.array(Mention);
+  },
+  agentId: __t.u64().name("agent_id"),
+  episodeId: __t.u64().name("episode_id"),
 });

@@ -384,3 +384,140 @@ Notes: <founder fills: device + OS + result>
   (cursor clears on the interrupted bubble) wasn't tap-through-verified this session (same Metro
   dev-client instability as V-13) — please confirm on-device.
 - **Notes (founder):** _device + result →_
+
+---
+
+> **M2.1 founder run-environment notes (apply to V-15…V-19):**
+> - **Republish the module to Maincloud first** — M2.1 adds new tables (`thread_agent`, `episode`,
+>   `agent_turn`, `reaper_schedule`) + additive columns, so the schema migration needs
+>   `--delete-data=on-conflict` (a fresh test DB loses nothing). This is the new **SETUP S-item** and a
+>   **prerequisite** for all of V-15…V-19:
+>   `spacetime publish agentspace-hpm58 -p modules\spacetime --server maincloud --delete-data=on-conflict --yes`,
+>   then regenerate + sync the bindings (×3). Bindings are committed; only re-run if you edit the module.
+> - **Windows / PowerShell — clear `ANTHROPIC_BASE_URL` before launching the orchestrator** for any
+>   item using a real Anthropic key (**V-16**, **V-19**): `Remove-Item Env:ANTHROPIC_BASE_URL` (a stray
+>   base URL without `/v1` makes Anthropic 404). Then start it (S-5) with your key entered in 🔑 Keys.
+> - **Dial numbers are starting defaults** (`MAX_TURNS_HARD=8`, `MAX_CONCURRENT=2`,
+>   `MAX_OUTPUT_TOKENS_PER_RUN=2000`, `EPISODE_TOKEN_CEILING=50_000`, `STREAM_TTL_MS=120_000`) — note
+>   anything that feels too tight/loose during V-16 and we'll tune.
+
+---
+
+### V-15 — Multi-agent group coherence (no persona-bleed)  ·  added 2026-06-23 · M2.1
+- **Why:** M2.1 lets a thread hold **many agents** (the new `thread_agent` table). Headless
+  integration proves two `@`-mentioned agents each reply, tagged + in mention order (scenario C); this
+  is the on-device proof that, in a real group, **each agent answers as itself** with its own
+  persona/model — no cross-talk where one agent's reply leaks another's voice (the `prompt.ts`
+  `isAgent`-from-the-tag fix). Needs the M2.1 republish (above).
+- **Setup:** orchestrator vs Maincloud (S-5), key in 🔑 Keys. Author **two distinct personas** (V-8) —
+  e.g. **Pirate Pete** ("reply only in pirate speak") and **Professor Quill** ("reply formally, in one
+  precise sentence"). Have **≥2 human identities** in the thread (a second device/emulator, V-4 setup).
+- **Steps:**
+  1. Create a **group** (not a DM) with both humans. Open **Members → + Add agent** and add **both**
+     personas (the `🤖 …with agents` badge shows on the thread).
+  2. From human A, send one message that **@-mentions both agents** — type `@` and pick each from the
+     typeahead: e.g. *"@Pirate Pete @Professor Quill — describe the sea."*
+  3. From human B, send a follow-up that @-mentions just **one** of them.
+- **Pass when:** **both** agents reply to step 2, **each in its own persona** (Pete in pirate speak,
+  Quill in one formal sentence) and rendered with the **right name/avatar** on each bubble — no bleed
+  (Pete doesn't answer formally, Quill doesn't talk like a pirate); replies arrive in **mention order**
+  (Pete before Quill). Step 3's single mention is answered by **only** that agent.
+- **If it fails:** both bubbles look like one persona, or a reply shows the wrong name → persona-bleed
+  (capture both bubbles + the orchestrator logs); only one agent replies to a two-mention → the second
+  `@` didn't resolve to a `thread_agent` (re-pick it from the typeahead, don't type it raw). Tell me.
+- **Notes (founder):** _devices + personas + result →_
+
+---
+
+### V-16 — Loop / cost guard: an agent↔agent volley TERMINATES within budget  ·  added 2026-06-23 · M2.1
+- **Why:** **the existential test for M2.1.** With agents allowed to address each other
+  (`respondsToAgents`), the danger is an infinite (and costly) agent↔agent loop. The reducer guard —
+  `agent_turn` (once-per-episode-per-agent) + `turnsRemaining` + the summed `EPISODE_TOKEN_CEILING` +
+  per-run `MAX_OUTPUT_TOKENS_PER_RUN` + `MAX_CONCURRENT` — **structurally bounds** any volley to
+  **≤ (#agents) replies per human-rooted episode**. Headless scenario D proves a two-agent volley stops
+  at **exactly 2** replies; this confirms it on a **real model** end-to-end and lets you watch real
+  token spend. **Clear `ANTHROPIC_BASE_URL` first** (notes above).
+- **Setup:** orchestrator vs Maincloud (S-5, `ANTHROPIC_BASE_URL` cleared), Anthropic key in 🔑 Keys.
+  Author **two** agents and **toggle `respondsToAgents` ON** on each (AgentEditor) — e.g. **Alice** and
+  **Bob**, each prompted to **address the other by name** (e.g. *"Always end by asking @Bob a question."*
+  / vice-versa) so they would loop if unbounded.
+- **Steps:**
+  1. Create a group, **+ Add agent** for both Alice and Bob.
+  2. Send **one** human message that kicks it off — e.g. *"@Alice, start a chat with @Bob."*
+  3. **Do not** send anything further. Watch the thread settle; watch the orchestrator logs for the run
+     token sums.
+- **Pass when:** the conversation **STOPS on its own** — **at most #agents (=2) agent replies** for that
+  one human message (the episode), **no perpetual back-and-forth**, no runaway. Each run's output stays
+  under the per-run cap and the **summed** tokens stay under the episode ceiling (the episode closes when
+  the budget is spent). Sending a **new** human message starts a **fresh** episode (a new bounded round).
+- **If it fails (it keeps going past #agents replies, or never stops):** capture the full thread + the
+  orchestrator logs (with the per-run token sums) immediately and **stop the orchestrator** — this is the
+  guard failing and is the one result that **blocks**. Tell me the agent count and how many replies fired.
+- **Notes (founder):** _#agents + replies observed + token sums + result →_
+
+---
+
+### V-17 — `@everyone` is bounded — each agent replies exactly once  ·  added 2026-06-23 · M2.1
+- **Why:** `@everyone` (the synthetic all-mention) fans a single human message out to **every** agent in
+  the thread. The same `agent_turn` once-per-episode-per-agent guard must ensure this is a **single
+  bounded round**, not a storm. Headless scenario E proves each of N agents replies **once**; this is the
+  on-device confirmation with several agents. Needs the M2.1 republish (above).
+- **Setup:** orchestrator vs Maincloud (S-5), key in 🔑 Keys. A group with **N ≥ 3 agents** added
+  (reuse personas from V-15/V-16; mixed providers is fine if you have the keys).
+- **Steps:**
+  1. In the group, type `@` and pick **@everyone** from the typeahead (or send *"@everyone, say hi."*).
+  2. Send it **once**.
+- **Pass when:** **each** of the N agents replies **exactly once** (N bubbles, correct names), then the
+  round **ends** — no agent replies twice, no cascading re-triggers from the agents' own replies, no
+  storm. (Concurrency is capped at `MAX_CONCURRENT=2`, so they may stream a couple at a time, not all at
+  once — that's expected.)
+- **If it fails (any agent replies twice, or it cascades):** capture the thread (counting bubbles per
+  agent) + the orchestrator logs. Tell me N and which agent doubled.
+- **Notes (founder):** _#agents + bubbles per agent + result →_
+
+---
+
+### V-18 — Typing indicator + crash self-heal (the reaper)  ·  added 2026-06-23 · M2.1
+- **Why:** M2.1 adds a **scheduled reaper** (`reap_stale_runs`, every 60s) that fails out `streaming`
+  messages / `running` runs older than `STREAM_TTL` (120s), GCs their deltas, and closes their episodes —
+  so a **crashed orchestrator** can't leave a thread stuck "thinking…" forever. This 120s TTL is
+  impractical to time in headless tests, so it's verified here. Also confirms the live **"{name} is
+  thinking…"** indicator. Needs the M2.1 republish (above).
+- **Setup:** orchestrator vs Maincloud (S-5), key in 🔑 Keys, an anthropic persona in a thread (V-8).
+- **Steps:**
+  1. Send a message that triggers a reply; confirm a **"{persona} is thinking…"** row appears and the
+     bubble starts streaming (`▍`).
+  2. **While it is still streaming, KILL the orchestrator** (Ctrl-C / close its terminal) — do **not**
+     restart it.
+  3. Leave the app open on that thread and **wait ~2 minutes**.
+- **Pass when:** within **~2 min** (one or two reaper ticks past the 120s TTL) the stuck row **clears on
+  its own** — the "thinking…"/streaming indicator disappears and the message lands **`failed`** (no
+  dangling `▍`), **without** restarting the orchestrator. Restarting the orchestrator afterward and
+  sending a new message produces a normal reply.
+- **If it fails (the bubble stays "thinking…" indefinitely past ~3 min):** the reaper isn't running or
+  the schedule didn't seed on `init` — confirm the module was **republished** (the `reaper_schedule`
+  table is new) and capture the STDB row state for that message/run. Tell me.
+- **Notes (founder):** _wait time to clear + result →_
+
+---
+
+### V-19 — Per-agent BYOK in a group (right key per agent)  ·  added 2026-06-23 · M2.1
+- **Why:** in a multi-agent group each agent must reply with **its owner's** key for **its** provider —
+  the M2.1 views (`my_persona_keys` rewritten over `thread_agent`) resolve a per-`(owner, provider)` key
+  per agent, so two agents with different owners/providers don't cross-use a key. Confirms BYOK isolation
+  end-to-end in a group. **Clear `ANTHROPIC_BASE_URL` first** if any agent is Anthropic (notes above).
+- **Setup:** orchestrator vs Maincloud (S-5, `ANTHROPIC_BASE_URL` cleared as needed). Two agents whose
+  providers differ (e.g. **anthropic** + **openai**), with the matching keys entered in 🔑 Keys — either
+  both owned by you (two provider cards) or by **two different users** (each enters their own key on their
+  device; M1.7 per-user BYOK).
+- **Steps:**
+  1. Create a group; **+ Add agent** for both agents (each bound to its own provider/model).
+  2. Send a human message that **@-mentions both** (or `@everyone`).
+- **Pass when:** **both** agents reply successfully, **each via its own provider's key** — no
+  `⚠️ add an API key…` on an agent whose key *is* set, and no agent answering with the wrong provider.
+  Removing/clearing **one** agent's key and re-sending makes **only that agent** show the `⚠️` (the other
+  still replies) — proving per-`(owner, provider)` resolution.
+- **If it fails:** an agent whose key is set still shows `⚠️` → its `(owner, provider)` key didn't resolve
+  through `my_persona_keys` (check the owner matches the key's owner + the provider matches the agent's);
+  an agent replies via the wrong provider → capture the orchestrator logs + both agents' provider/model.
+- **Notes (founder):** _agents + providers + owners + result →_

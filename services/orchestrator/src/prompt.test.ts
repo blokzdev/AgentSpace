@@ -3,23 +3,37 @@ import { DEFAULT_MODEL } from '@agentspace/shared';
 import {
   buildPrompt,
   createBatcher,
+  mentionStops,
   newRunId,
+  parseTextMentions,
+  resolveAddressees,
   selectPersona,
+  selectPersonaById,
+  stripLeadingName,
   DEFAULT_SYSTEM_PROMPT,
   MAX_PENDING_CHARS,
   type AgentRef,
   type PromptRow,
+  type ThreadAgentInfo,
   type ThreadRef,
 } from './prompt';
 
-describe('buildPrompt', () => {
-  it('orders by sentMicros, maps roles, and prepends the system prompt', () => {
+// A human row (agentId 0n) and an agent row, for prompt assembly.
+const human = (id: bigint, text: string, sentMicros: bigint, name = 'Alice'): PromptRow => ({
+  id, agentId: 0n, senderName: name, text, sentMicros,
+});
+const agentRow = (id: bigint, agentId: bigint, text: string, sentMicros: bigint, name = 'Agent'): PromptRow => ({
+  id, agentId, senderName: name, text, sentMicros,
+});
+
+describe('buildPrompt — DM mode (empty roster ⇒ pre-M2 behavior)', () => {
+  it('orders by sentMicros, maps roles by TAG, prepends the system prompt', () => {
     const rows: PromptRow[] = [
-      { isAgent: false, text: 'second', sentMicros: 200n },
-      { isAgent: false, text: 'first', sentMicros: 100n },
-      { isAgent: true, text: 'agent reply', sentMicros: 150n },
+      human(2n, 'second', 200n),
+      human(1n, 'first', 100n),
+      agentRow(3n, 42n, 'agent reply', 150n, 'Pete'),
     ];
-    expect(buildPrompt(rows)).toEqual([
+    expect(buildPrompt(rows, { targetAgentId: 42n })).toEqual([
       { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
       { role: 'user', content: 'first' },
       { role: 'assistant', content: 'agent reply' },
@@ -28,11 +42,8 @@ describe('buildPrompt', () => {
   });
 
   it('drops empty (in-flight streaming) rows and honors a custom system prompt', () => {
-    const rows: PromptRow[] = [
-      { isAgent: false, text: 'hi', sentMicros: 1n },
-      { isAgent: true, text: '', sentMicros: 2n },
-    ];
-    expect(buildPrompt(rows, 'be terse')).toEqual([
+    const rows: PromptRow[] = [human(1n, 'hi', 1n), agentRow(2n, 42n, '', 2n)];
+    expect(buildPrompt(rows, { targetAgentId: 42n, system: 'be terse' })).toEqual([
       { role: 'system', content: 'be terse' },
       { role: 'user', content: 'hi' },
     ]);
@@ -40,13 +51,70 @@ describe('buildPrompt', () => {
 
   it('drops trailing assistant turns so the conversation ends with a user message', () => {
     const rows: PromptRow[] = [
-      { isAgent: false, text: 'hello', sentMicros: 1n },
-      { isAgent: true, text: '⚠️ Sorry — I could not generate a reply.', sentMicros: 2n },
+      human(1n, 'hello', 1n),
+      agentRow(2n, 42n, '⚠️ Sorry — I could not generate a reply.', 2n),
     ];
-    expect(buildPrompt(rows)).toEqual([
+    expect(buildPrompt(rows, { targetAgentId: 42n })).toEqual([
       { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
       { role: 'user', content: 'hello' },
     ]);
+  });
+
+  it('breaks a same-microsecond tie deterministically by message id', () => {
+    const rows: PromptRow[] = [human(2n, 'B', 100n), human(1n, 'A', 100n)];
+    // Both human → merged into one user turn, in id order.
+    expect(buildPrompt(rows, { targetAgentId: 42n })).toEqual([
+      { role: 'system', content: DEFAULT_SYSTEM_PROMPT },
+      { role: 'user', content: 'A\n\nB' },
+    ]);
+  });
+});
+
+describe('buildPrompt — GROUP mode (no persona-bleed; DEC-031 showstopper)', () => {
+  const A = 1n;
+  const B = 9n;
+  const rows: PromptRow[] = [
+    human(1n, 'hi all', 1n, 'Alice'),
+    agentRow(2n, A, 'hello, I am A', 2n, 'Aria'),
+    agentRow(3n, B, 'and I am B', 3n, 'Banjo'),
+    human(4n, 'thanks', 4n, 'Alice'),
+  ];
+
+  it('tags non-self turns with the sender name, merges same-role runs, appends a roster footer', () => {
+    const out = buildPrompt(rows, { targetAgentId: A, selfName: 'Aria', roster: ['Banjo', 'Alice'] });
+    expect(out[0].role).toBe('system');
+    expect(out[0].content).toContain('You are "Aria"');
+    expect(out[0].content).toContain('Other participants: Banjo, Alice.');
+    expect(out.slice(1)).toEqual([
+      { role: 'user', content: 'Alice: hi all' },
+      { role: 'assistant', content: 'hello, I am A' },
+      // B's turn + Alice's "thanks" are consecutive user turns → merged.
+      { role: 'user', content: 'Banjo: and I am B\n\nAlice: thanks' },
+    ]);
+  });
+
+  it('computes isAgent FROM THE TAG, not identity — the same rows differ by target agent', () => {
+    const forA = buildPrompt(rows, { targetAgentId: A, roster: ['Banjo', 'Alice'] });
+    const forB = buildPrompt(rows, { targetAgentId: B, roster: ['Aria', 'Alice'] });
+    const assistantText = (m: { role: string; content: string }[]): string[] =>
+      m.filter((t) => t.role === 'assistant').map((t) => t.content);
+    // For A, only A's message is assistant; B's is a user turn (and vice-versa).
+    expect(assistantText(forA)).toEqual(['hello, I am A']);
+    expect(assistantText(forB)).toEqual(['and I am B']);
+    expect(JSON.stringify(forA)).not.toContain('assistant","content":"and I am B');
+  });
+});
+
+describe('mentionStops / stripLeadingName (group output hygiene)', () => {
+  it('builds "\\nName:" stop sequences for the other participants only', () => {
+    expect(mentionStops(['Banjo', '', 'Alice'])).toEqual(['\nBanjo:', '\nAlice:']);
+  });
+
+  it('strips a leading self-name label the model may echo', () => {
+    expect(stripLeadingName('Aria: hello there', 'Aria')).toBe('hello there');
+    expect(stripLeadingName('  Aria:   hi', 'Aria')).toBe('hi');
+    expect(stripLeadingName('hello there', 'Aria')).toBe('hello there');
+    expect(stripLeadingName('anything', '')).toBe('anything');
   });
 });
 
@@ -59,58 +127,79 @@ describe('newRunId', () => {
   });
 });
 
-describe('selectPersona', () => {
-  const threads: ThreadRef[] = [
-    { id: 1n, agentId: 0n },
-    { id: 2n, agentId: 42n },
-    { id: 3n, agentId: 99n },
-  ];
+describe('selectPersonaById / selectPersona', () => {
   const agents: AgentRef[] = [
-    { id: 42n, systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o', owner: 'abc123', baseUrl: '' },
-    { id: 99n, systemPrompt: '', provider: 'not-a-provider', model: 'x', owner: 'def456', baseUrl: '' },
+    { id: 42n, name: 'Pirate Pete', systemPrompt: 'You are Pirate Pete.', provider: 'openai', model: 'gpt-4o', owner: 'abc123', baseUrl: '' },
+    { id: 99n, name: 'Broken', systemPrompt: '', provider: 'not-a-provider', model: 'x', owner: 'def456', baseUrl: '' },
+    { id: 7n, name: 'Local', systemPrompt: 'local', provider: 'openai-compatible', model: 'llama3.2', owner: 'aaa', baseUrl: 'http://localhost:11434/v1' },
   ];
 
-  it('uses the bound persona prompt + model + owner', () => {
-    expect(selectPersona(threads, agents, 2n)).toEqual({
-      systemPrompt: 'You are Pirate Pete.',
-      model: { provider: 'openai', model: 'gpt-4o' },
-      ownerHex: 'abc123',
-      baseUrl: '',
+  it('resolves a persona by agent id (name + prompt + model + owner)', () => {
+    expect(selectPersonaById(agents, 42n)).toEqual({
+      name: 'Pirate Pete', systemPrompt: 'You are Pirate Pete.',
+      model: { provider: 'openai', model: 'gpt-4o' }, ownerHex: 'abc123', baseUrl: '',
     });
   });
 
-  it('carries a local (openai-compatible) persona base URL through', () => {
-    const local: AgentRef[] = [
-      { id: 7n, systemPrompt: 'local', provider: 'openai-compatible', model: 'llama3.2', owner: 'aaa', baseUrl: 'http://localhost:11434/v1' },
-    ];
-    expect(selectPersona([{ id: 5n, agentId: 7n }], local, 5n)).toEqual({
-      systemPrompt: 'local',
-      model: { provider: 'openai-compatible', model: 'llama3.2' },
-      ownerHex: 'aaa',
-      baseUrl: 'http://localhost:11434/v1',
-    });
+  it('carries a local (openai-compatible) base URL through', () => {
+    expect(selectPersonaById(agents, 7n).baseUrl).toBe('http://localhost:11434/v1');
   });
 
-  it('falls back to defaults for a human thread (agentId 0)', () => {
-    expect(selectPersona(threads, agents, 1n)).toEqual({
-      systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      model: DEFAULT_MODEL,
-      ownerHex: '',
-      baseUrl: '',
-    });
+  it('falls back to the default persona for 0n / unknown / unsupported provider', () => {
+    for (const id of [0n, 99n, 777n]) {
+      expect(selectPersonaById(agents, id)).toEqual({
+        name: '', systemPrompt: DEFAULT_SYSTEM_PROMPT, model: DEFAULT_MODEL, ownerHex: '', baseUrl: '',
+      });
+    }
   });
 
-  it('falls back when the persona has an unknown provider', () => {
-    expect(selectPersona(threads, agents, 3n)).toEqual({
-      systemPrompt: DEFAULT_SYSTEM_PROMPT,
-      model: DEFAULT_MODEL,
-      ownerHex: '',
-      baseUrl: '',
-    });
+  it('selectPersona delegates via the singular thread.agentId (DM path)', () => {
+    const threads: ThreadRef[] = [{ id: 1n, agentId: 0n }, { id: 2n, agentId: 42n }];
+    expect(selectPersona(threads, agents, 2n).name).toBe('Pirate Pete');
+    expect(selectPersona(threads, agents, 1n).model).toEqual(DEFAULT_MODEL);
+  });
+});
+
+describe('resolveAddressees (arbitration; DEC-031)', () => {
+  // roster order: Aria, Banjo, Cleo
+  const agents: ThreadAgentInfo[] = [
+    { agentId: 1n, name: 'Aria', respondsToAgents: true, isDefaultResponder: true },
+    { agentId: 9n, name: 'Banjo', respondsToAgents: false, isDefaultResponder: false },
+    { agentId: 5n, name: 'Cleo', respondsToAgents: true, isDefaultResponder: false },
+  ];
+  const human = (mentions: { kind: string; ref: bigint }[]): { agentId: bigint; text: string; mentions: typeof mentions } =>
+    ({ agentId: 0n, text: '', mentions });
+
+  it('human @a @b → those agents, in mention order', () => {
+    expect(resolveAddressees(human([{ kind: 'agent', ref: 9n }, { kind: 'agent', ref: 1n }]), agents)).toEqual([9n, 1n]);
   });
 
-  it('falls back for an unknown thread', () => {
-    expect(selectPersona(threads, agents, 777n).model).toEqual(DEFAULT_MODEL);
+  it('human @everyone → all agents, in roster order', () => {
+    expect(resolveAddressees(human([{ kind: 'all', ref: 0n }]), agents)).toEqual([1n, 9n, 5n]);
+  });
+
+  it('human with no mentions → the default responder (or nobody if none set)', () => {
+    expect(resolveAddressees(human([]), agents, { defaultResponderId: 1n })).toEqual([1n]);
+    expect(resolveAddressees(human([]), agents)).toEqual([]);
+  });
+
+  it('ignores a duplicate / dedupes @everyone + explicit @a', () => {
+    expect(resolveAddressees(human([{ kind: 'all', ref: 0n }, { kind: 'agent', ref: 1n }]), agents)).toEqual([1n, 9n, 5n]);
+  });
+
+  it('agent-authored: parses @Name from text, admits ONLY opted-in agents, never itself', () => {
+    // Aria (agentId 1) thanks Banjo (opted-OUT) and Cleo (opted-IN) and mentions herself.
+    const trigger = { agentId: 1n, text: 'thanks @Banjo and @Cleo — also @Aria', mentions: [] };
+    expect(resolveAddressees(trigger, agents)).toEqual([5n]); // only Cleo; Banjo opted out; self excluded
+  });
+
+  it('agent-authored with no @mention → nobody (no default-responder fallback)', () => {
+    expect(resolveAddressees({ agentId: 1n, text: 'just thinking out loud', mentions: [] }, agents)).toEqual([]);
+  });
+
+  it('parseTextMentions matches @Name on a word boundary, case-insensitive', () => {
+    expect(parseTextMentions('hey @ARIA and @Cleo!', agents)).toEqual([1n, 5n]);
+    expect(parseTextMentions('email ariana@x.com', agents)).toEqual([]); // not an @mention of Aria
   });
 });
 
@@ -127,8 +216,6 @@ describe('createBatcher (M1.9 delta-accumulate)', () => {
     vi.advanceTimersByTime(50);
     expect(flushed).toEqual(['Hello, world']); // the burst's deltas, concatenated — once
 
-    // Each flush emits only the NEW deltas since the last flush (not cumulative),
-    // so concatenating all flushes reconstructs the full reply.
     b.push('!');
     b.stop(); // flushes the tail and clears the timer
     expect(flushed).toEqual(['Hello, world', '!']);

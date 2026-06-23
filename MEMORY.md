@@ -54,22 +54,24 @@ messages, but the **live render tap-through wasn't completed** — Metro dev-cli
 code). **Next:** founder runs **V-13** (long reply settles clean, no dangling `▍`) + **V-14**
 (cancellation) on-device → tick. Then **M2** (multi-agent groups), **M3** (RAG), **BL-016**, **BL-011**.
 
-**M2 multi-agent group threads — PLANNED & ratified (DEC-031, 2026-06-23); no code yet.** An 8-agent
-research+adversarial workflow (`.audit/m2-research-2026-06-22/`) chose **"Candidate C"**: ship
-multi-agent on the **existing single orchestrator connection**, each agent message **tagged by
-`agentId`**, with the cost/loop safety system **enforced in the reducer** (`agent_reply_begin` refuses
-a run past an **episode** budget) — because the existential risk is agent↔agent loops + token cost, not
-presence; per-agent SpacetimeDB identities/real presence defer to a reversible **M2.4 / BL-014**. New
-tables `thread_agent`/`episode`/`agent_turn`; additive cols `message.{mentions[],agentId,episodeId}` +
-`agent.respondsToAgents`; addressed-only `@mention` arbitration; **tag-based `isAgent`** fixes
-persona-bleed (pulled into the MVP). Founder dials: `MAX_TURNS_HARD≈8`/`MAX_CONCURRENT≈2`/`~2k`
-per-run/`~50k` episode ceiling (configurable; metering→BL-020); agent→agent **off by default**, opt-in
-per persona; `@mention`-only MVP (NL address→M2.3); per-agent identity→M2.4. Phases M2.1 (addressing+
-arbitration = MVP/existential core) → M2.2 (presence from `streaming` rows) → M2.3 (context isolation) →
-M2.4 (per-agent identity). **Next chunk: build M2.1** (recommend a fresh session — handoff prepared).
-New V-15…V-20; SPEC §3 refined; ROADMAP M2 expanded.
+**M2 multi-agent group threads — M2.1 (the MVP) BUILT, CI-green + headless-verified (DEC-031 plan →
+DEC-032 build, 2026-06-23); on-device = founder V-15…V-19.** Implements **"Candidate C"**: multi-agent
+on the **existing single orchestrator connection**, each agent message **tagged by `agentId`**, the
+cost/loop safety system **enforced in the reducer** — `agent_reply_begin` refuses a run past the
+**episode** budget (turns + summed token ceiling + per-run cap + concurrency cap), and **`agent_turn`
+(once-per-episode-per-agent) structurally bounds any agent↔agent volley to ≤#agents replies**. New
+tables `thread_agent`/`episode`/`agent_turn` + a scheduled **reaper**; additive cols
+`message.{mentions[],agentId,episodeId}`/`run.{agentId,episodeId}`/`agent.respondsToAgents`. **Tag-based
+`isAgent`** fixes persona-bleed (prompt + mobile render). Addressing = `@mention` + `@everyone` + a
+thread default-responder; agent→agent off by default (opt-in per persona). Mobile gets an `@mention`
+composer, a "+ Add agent" flow, a `respondsToAgents` toggle, and per-persona avatars. Proven
+**headlessly** by `integration.ts` Scenarios A–F (incl. **the agent↔agent volley terminating** + the
+**reducer refusing a duplicate turn**) + 35 orchestrator / 22 gateway / 8 shared unit tests; **CI 16/16**.
+Dials at DEC-031 defaults (tune after V-16). **Next:** PR → merge → founder runs **V-15…V-19** (needs
+the Maincloud `--delete-data` republish, new SETUP S-6) → **M2.2** (presence/typing) → M2.3 (context
+isolation + NL address) → M2.4 (per-agent identity, BL-014).
 
-- **Active branch:** `main` (M1.9 = PR #33 merged 2026-06-23; a docs evidence PR follows).
+- **Active branch:** `m2.1-multi-agent` (M2.1 built locally; PR to follow). M1.9 = PR #33 (merged 2026-06-23).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -535,6 +537,41 @@ core) → M2.2 (presence/typing from `streaming` rows) → M2.3 (full context-is
 → M2.4 (per-agent identity, BL-014). Supersedes the agent-participation half of DEC-022. New V-items
 V-15…V-20; SPEC §3 refined (structured `mentions` + episode budget). Doc/plan only — no code yet.
 
+### DEC-032 — M2.1 built: episode-first opens, await-begin pre-flight, structural agent_turn bound
+*2026-06-23.* M2.1 (the multi-agent MVP) implemented per DEC-031 and shipped CI-green + headless.
+The decisions DEC-031's plan left open, pinned during the build: (1) **Episode-first `send_message`
+ordering** — insert the episode → insert the message with its `episodeId` → back-stamp
+`episode.rootMessageId`; so the message is inserted EXACTLY ONCE with its final `episodeId` and a
+subscriber's `onInsert` sees it set (no reliance on intra-transaction insert+update coalescing). (2)
+The orchestrator reacts to **human triggers on `onInsert`** (human messages are inserted `complete`)
+and **agent-reply completions on `onUpdate`** (`streaming`→`complete`) — the agent→agent trigger. (3)
+**`agent_turn` is the structural termination guarantee**: once-per-episode-per-agent bounds any
+agent↔agent volley to **≤ #agents replies** per human-rooted episode — the turn counter, summed token
+ceiling, per-run cap, and concurrency cap are belt-and-suspenders. (4) **The orchestrator AWAITS
+`agent_reply_begin` and skips cleanly if the reducer refuses** — a real robustness fix: the SDK
+surfaces a refused reducer as a **rejected promise**, so a fire-and-forget budget refusal was an
+unhandled crash; awaiting begin also skips the gateway call entirely on refusal (no wasted tokens).
+An in-memory once-per-(episode,agent) set **pre-flights** the reducer guard (the reducer stays
+authoritative — proven by integration Scenario F calling a duplicate begin directly → REFUSED). (5)
+**Default responder = the first agent added** to a thread (`thread_agent.isDefaultResponder`);
+`create_agent_dm` now also writes a `thread_agent` row so a 1:1 agent DM still auto-answers an
+unaddressed message and DMs+groups resolve through one path (no `thread.agentId` UNION needed). (6)
+**`buildPrompt` is DM/GROUP-gated on a non-empty roster** — a 1:1 DM keeps the exact pre-M2 prompt;
+group mode adds name-tags + same-role merge + a roster footer; `isAgent` is from the `agentId` TAG
+(the showstopper). (7) **MVP `@mention` = agent + `@everyone` only**; `@human` deferred (humans don't
+auto-respond), so the composer never emits it and `Mention.ref` is unambiguously an `agentId`. (8) The
+WASM module **re-declares the dials inline** (coupled twin of `@agentspace/shared` — it can't import
+the package; CLAUDE §8). (9) Terminal-absorbing guards on delta/finish/cancel + a 120s-TTL scheduled
+**reaper** (60s sweep) make every run terminal even if the orchestrator dies. Dials shipped at the
+DEC-031 defaults (`STREAM_TTL_MS=120000`); tune after V-16. Verified **headlessly** end-to-end —
+integration Scenarios A–F (DM stream+GC+BYOK / supersede / @a@b in order / **agent↔agent volley
+terminates** / @everyone bounded / **reducer refuses a duplicate turn**) + 35 orchestrator unit tests
++ the gateway `maxOutputTokens` forwarding test; CI **16/16**. Coupled across `modules/spacetime` ↔
+bindings ×3 ↔ `shared`/`gateway`/orchestrator ↔ mobile. On-device = founder **V-15…V-19** (needs the
+Maincloud `--delete-data` republish — new SETUP S-item). Deferrals: per-(agent,thread) cooldown
+reserved-but-unenforced; other users' agent names fall back to a generic label in the mobile UI
+(BL); reaper timed test = V-18; per-agent identity = M2.4.
+
 ---
 
 ## Session Journal (append-only)
@@ -931,6 +968,26 @@ V-15…V-20; SPEC §3 refined (structured `mentions` + episode budget). Doc/plan
 - **Next:** build **M2.1** (the addressed-only, episode-budgeted MVP — the existential core) in a fresh
   session; tight handoff prepared. Guards 1–11 (the whole safety+correctness system) are all net-new and
   block any multi-agent ship.
+
+### 2026-06-23 — M2.1 built: multi-agent group threads MVP (DEC-032)
+- Built **M2.1** end-to-end across module ↔ bindings ×3 ↔ shared/gateway/orchestrator ↔ mobile, in
+  phases A–F. Led with the two highest-risk pieces: the **tag-based `isAgent`** showstopper (`prompt.ts`,
+  pure unit-tested first) and the **reducer-enforced episode budget** (`agent_reply_begin`). Re-published
+  to local with `--delete-data=on-conflict` (new tables = breaking schema) and synced bindings to all 3
+  surfaces.
+- **My-side verification (all green):** `spacetime build` confirmed the novel schema mechanisms compile in
+  CLI 2.6.0 (the `Mention` `t.object` struct, the `t.array` column, the scheduled reaper — no fallback
+  needed); **CI 16/16**; 35 orchestrator + 22 gateway + 8 shared unit tests; the rewritten
+  **`integration.ts` Scenarios A–F all pass** — incl. **D (agent↔agent volley TERMINATES — exactly 2
+  replies)** and **F (the reducer REFUSES a duplicate agent turn, independent of orchestrator memory)**.
+- **Notable build findings (DEC-032):** the SDK surfaces a refused reducer as a **rejected promise**, so a
+  fire-and-forget budget refusal crashed the loop → now **await `begin` + skip cleanly on refusal** (also
+  saves the gateway call). Episode-first `send_message` ordering so `episodeId` is set on the message's
+  first insert. `agent_turn` gives a **structural** ≤#agents volley bound. `create_agent_dm` writes a
+  `thread_agent` row so DMs+groups share one persona path.
+- **Next:** open the PR, watch CI to green, squash-merge. Then the founder runs **V-15…V-19** on-device
+  (needs the Maincloud `--delete-data` republish — new SETUP S-item) → then **M2.2** (presence/typing).
+  Deferred to backlog: other users' agent names in the mobile UI; per-(agent,thread) cooldown enforcement.
 
 ---
 

@@ -21,8 +21,35 @@ export const Agent = __t.object("Agent", {
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
   baseUrl: __t.string(),
+  respondsToAgents: __t.bool(),
 });
 export type Agent = __Infer<typeof Agent>;
+
+export const AgentTurn = __t.object("AgentTurn", {
+  id: __t.u64(),
+  episodeId: __t.u64(),
+  agentId: __t.u64(),
+});
+export type AgentTurn = __Infer<typeof AgentTurn>;
+
+export const Episode = __t.object("Episode", {
+  id: __t.u64(),
+  threadId: __t.u64(),
+  rootMessageId: __t.u64(),
+  turnsRemaining: __t.u8(),
+  tokenBudgetRemaining: __t.u64(),
+  openedAt: __t.timestamp(),
+  status: __t.string(),
+});
+export type Episode = __Infer<typeof Episode>;
+
+export const Mention = __t.object("Mention", {
+  kind: __t.string(),
+  ref: __t.u64(),
+  start: __t.u32(),
+  len: __t.u32(),
+});
+export type Mention = __Infer<typeof Mention>;
 
 export const Message = __t.object("Message", {
   id: __t.u64(),
@@ -32,6 +59,11 @@ export const Message = __t.object("Message", {
   sent: __t.timestamp(),
   streamState: __t.string(),
   runId: __t.string(),
+  get mentions() {
+    return __t.array(Mention);
+  },
+  agentId: __t.u64(),
+  episodeId: __t.u64(),
 });
 export type Message = __Infer<typeof Message>;
 
@@ -49,6 +81,9 @@ export type MyProviderKeys = __Infer<typeof MyProviderKeys>;
 
 export const MyReplyDeltas = __t.object("MyReplyDeltas", {});
 export type MyReplyDeltas = __Infer<typeof MyReplyDeltas>;
+
+export const MyThreadAgents = __t.object("MyThreadAgents", {});
+export type MyThreadAgents = __Infer<typeof MyThreadAgents>;
 
 export const MyThreadMembers = __t.object("MyThreadMembers", {});
 export type MyThreadMembers = __Infer<typeof MyThreadMembers>;
@@ -68,6 +103,12 @@ export const ProviderKey = __t.object("ProviderKey", {
   updatedAt: __t.timestamp(),
 });
 export type ProviderKey = __Infer<typeof ProviderKey>;
+
+export const ReaperSchedule = __t.object("ReaperSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type ReaperSchedule = __Infer<typeof ReaperSchedule>;
 
 export const ReplyDelta = __t.object("ReplyDelta", {
   id: __t.u64(),
@@ -90,6 +131,8 @@ export const Run = __t.object("Run", {
   outputTokens: __t.u64(),
   startedAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  agentId: __t.u64(),
+  episodeId: __t.u64(),
 });
 export type Run = __Infer<typeof Run>;
 
@@ -112,6 +155,16 @@ export const Thread = __t.object("Thread", {
   agentId: __t.u64(),
 });
 export type Thread = __Infer<typeof Thread>;
+
+export const ThreadAgent = __t.object("ThreadAgent", {
+  id: __t.u64(),
+  threadId: __t.u64(),
+  agentId: __t.u64(),
+  isDefaultResponder: __t.bool(),
+  addedBy: __t.identity(),
+  addedAt: __t.timestamp(),
+});
+export type ThreadAgent = __Infer<typeof ThreadAgent>;
 
 export const ThreadMember = __t.object("ThreadMember", {
   id: __t.u64(),

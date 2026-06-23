@@ -6,8 +6,8 @@
 import { type Infer as __Infer } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddAgentToThreadReducer from "../add_agent_to_thread_reducer";
 import AddMemberReducer from "../add_member_reducer";
-import AgentReplyAppendReducer from "../agent_reply_append_reducer";
 import AgentReplyBeginReducer from "../agent_reply_begin_reducer";
 import AgentReplyCancelReducer from "../agent_reply_cancel_reducer";
 import AgentReplyDeltaReducer from "../agent_reply_delta_reducer";
@@ -20,6 +20,7 @@ import DeleteAgentReducer from "../delete_agent_reducer";
 import DeleteProviderKeyReducer from "../delete_provider_key_reducer";
 import LeaveThreadReducer from "../leave_thread_reducer";
 import RegisterServiceReducer from "../register_service_reducer";
+import RemoveAgentFromThreadReducer from "../remove_agent_from_thread_reducer";
 import RemoveMemberReducer from "../remove_member_reducer";
 import SendMessageReducer from "../send_message_reducer";
 import SetDisplayNameReducer from "../set_display_name_reducer";
@@ -27,8 +28,8 @@ import SetProviderKeyReducer from "../set_provider_key_reducer";
 import SetThreadTitleReducer from "../set_thread_title_reducer";
 import UpdateAgentReducer from "../update_agent_reducer";
 
+export type AddAgentToThreadParams = __Infer<typeof AddAgentToThreadReducer>;
 export type AddMemberParams = __Infer<typeof AddMemberReducer>;
-export type AgentReplyAppendParams = __Infer<typeof AgentReplyAppendReducer>;
 export type AgentReplyBeginParams = __Infer<typeof AgentReplyBeginReducer>;
 export type AgentReplyCancelParams = __Infer<typeof AgentReplyCancelReducer>;
 export type AgentReplyDeltaParams = __Infer<typeof AgentReplyDeltaReducer>;
@@ -41,6 +42,7 @@ export type DeleteAgentParams = __Infer<typeof DeleteAgentReducer>;
 export type DeleteProviderKeyParams = __Infer<typeof DeleteProviderKeyReducer>;
 export type LeaveThreadParams = __Infer<typeof LeaveThreadReducer>;
 export type RegisterServiceParams = __Infer<typeof RegisterServiceReducer>;
+export type RemoveAgentFromThreadParams = __Infer<typeof RemoveAgentFromThreadReducer>;
 export type RemoveMemberParams = __Infer<typeof RemoveMemberReducer>;
 export type SendMessageParams = __Infer<typeof SendMessageReducer>;
 export type SetDisplayNameParams = __Infer<typeof SetDisplayNameReducer>;

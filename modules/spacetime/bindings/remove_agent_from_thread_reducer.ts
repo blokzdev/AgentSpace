@@ -11,10 +11,6 @@ import {
 } from "spacetimedb";
 
 export default {
-  name: __t.string(),
-  systemPrompt: __t.string(),
-  provider: __t.string(),
-  model: __t.string(),
-  baseUrl: __t.string(),
-  respondsToAgents: __t.bool(),
+  threadId: __t.u64(),
+  agentId: __t.u64(),
 };

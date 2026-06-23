@@ -10,11 +10,13 @@ import { colors, radius, shortId, space } from '../chat';
 export function ThreadMembers({
   threadId,
   onAddMember,
+  onAddAgent,
   onBack,
   onLeft,
 }: {
   threadId: bigint;
   onAddMember: () => void;
+  onAddAgent: () => void;
   onBack: () => void;
   onLeft: () => void;
 }): React.JSX.Element {
@@ -72,13 +74,16 @@ export function ThreadMembers({
         </View>
       ) : null}
 
-      <View style={styles.actionsRow}>
-        {isGroup ? (
+      {isGroup ? (
+        <View style={styles.actionsRow}>
           <Pressable style={styles.addBtn} onPress={onAddMember}>
             <Text style={styles.addText}>+ Add member</Text>
           </Pressable>
-        ) : null}
-      </View>
+          <Pressable style={styles.addBtn} onPress={onAddAgent}>
+            <Text style={styles.addText}>+ Add agent 🤖</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       <FlatList
         data={members}
@@ -150,8 +155,8 @@ const styles = StyleSheet.create({
   },
   saveBtn: { backgroundColor: colors.accent, borderRadius: radius.md, paddingHorizontal: space.lg, justifyContent: 'center' },
   saveText: { color: colors.onAccent, fontWeight: '700' },
-  actionsRow: { paddingHorizontal: space.md, paddingBottom: space.sm },
-  addBtn: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
+  actionsRow: { flexDirection: 'row', gap: space.sm, paddingHorizontal: space.md, paddingBottom: space.sm },
+  addBtn: { flex: 1, backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
   addText: { color: colors.accent, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: 10 },
   rowMain: { flex: 1 },

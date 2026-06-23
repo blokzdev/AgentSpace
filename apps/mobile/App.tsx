@@ -16,6 +16,7 @@ import { ThreadList } from './src/screens/ThreadList';
 import { Thread } from './src/screens/Thread';
 import { ThreadMembers } from './src/screens/ThreadMembers';
 import { UserPicker } from './src/screens/UserPicker';
+import { AgentPicker } from './src/screens/AgentPicker';
 import { AgentList } from './src/screens/AgentList';
 import { AgentEditor } from './src/screens/AgentEditor';
 import { ApiKeys } from './src/screens/ApiKeys';
@@ -38,6 +39,7 @@ type Screen =
   | { name: 'thread'; threadId: bigint }
   | { name: 'members'; threadId: bigint }
   | { name: 'addMember'; threadId: bigint }
+  | { name: 'addAgent'; threadId: bigint }
   | { name: 'newChat' }
   | { name: 'agents' }
   | { name: 'agentEditor'; agentId: bigint | null }
@@ -47,8 +49,10 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   const { isActive, identity } = useSpacetimeDB();
   const [threads] = useTable(tables.my_threads);
   const [members] = useTable(tables.my_thread_members);
+  const [threadAgents] = useTable(tables.my_thread_agents);
   const createDm = useReducer(reducers.createDm);
   const addMember = useReducer(reducers.addMember);
+  const addAgentToThread = useReducer(reducers.addAgentToThread);
   const createGroup = useReducer(reducers.createGroup);
   const [screen, setScreen] = useState<Screen>({ name: 'threads' });
   const [pendingDm, setPendingDm] = useState<string | null>(null); // other identity hex
@@ -127,6 +131,7 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
         <ThreadMembers
           threadId={screen.threadId}
           onAddMember={() => setScreen({ name: 'addMember', threadId: screen.threadId })}
+          onAddAgent={() => setScreen({ name: 'addAgent', threadId: screen.threadId })}
           onBack={() => setScreen({ name: 'thread', threadId: screen.threadId })}
           onLeft={() => setScreen({ name: 'threads' })}
         />
@@ -140,6 +145,22 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
           excludeIds={excludeIds}
           onPick={(member) => {
             void addMember({ threadId: tid, member, role: 'human' });
+            setScreen({ name: 'members', threadId: tid });
+          }}
+          onBack={() => setScreen({ name: 'members', threadId: tid })}
+        />
+      );
+    }
+    case 'addAgent': {
+      const tid = screen.threadId;
+      const excludeAgentIds = threadAgents
+        .filter((ta) => ta.threadId === tid)
+        .map((ta) => ta.agentId.toString());
+      return (
+        <AgentPicker
+          excludeAgentIds={excludeAgentIds}
+          onPick={(agentId) => {
+            void addAgentToThread({ threadId: tid, agentId });
             setScreen({ name: 'members', threadId: tid });
           }}
           onBack={() => setScreen({ name: 'members', threadId: tid })}

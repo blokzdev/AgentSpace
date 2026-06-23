@@ -21,4 +21,5 @@ export default __t.row({
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
   baseUrl: __t.string().name("base_url"),
+  respondsToAgents: __t.bool().name("responds_to_agents"),
 });

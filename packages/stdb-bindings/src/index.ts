@@ -34,8 +34,8 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddAgentToThreadReducer from "./add_agent_to_thread_reducer";
 import AddMemberReducer from "./add_member_reducer";
-import AgentReplyAppendReducer from "./agent_reply_append_reducer";
 import AgentReplyBeginReducer from "./agent_reply_begin_reducer";
 import AgentReplyCancelReducer from "./agent_reply_cancel_reducer";
 import AgentReplyDeltaReducer from "./agent_reply_delta_reducer";
@@ -48,6 +48,7 @@ import DeleteAgentReducer from "./delete_agent_reducer";
 import DeleteProviderKeyReducer from "./delete_provider_key_reducer";
 import LeaveThreadReducer from "./leave_thread_reducer";
 import RegisterServiceReducer from "./register_service_reducer";
+import RemoveAgentFromThreadReducer from "./remove_agent_from_thread_reducer";
 import RemoveMemberReducer from "./remove_member_reducer";
 import SendMessageReducer from "./send_message_reducer";
 import SetDisplayNameReducer from "./set_display_name_reducer";
@@ -63,6 +64,7 @@ import MyAgentsRow from "./my_agents_table";
 import MyPersonaKeysRow from "./my_persona_keys_table";
 import MyProviderKeysRow from "./my_provider_keys_table";
 import MyReplyDeltasRow from "./my_reply_deltas_table";
+import MyThreadAgentsRow from "./my_thread_agents_table";
 import MyThreadMembersRow from "./my_thread_members_table";
 import MyThreadMessagesRow from "./my_thread_messages_table";
 import MyThreadsRow from "./my_threads_table";
@@ -119,6 +121,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, MyReplyDeltasRow),
+  my_thread_agents: __table({
+    name: 'my_thread_agents',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, MyThreadAgentsRow),
   my_thread_members: __table({
     name: 'my_thread_members',
     indexes: [
@@ -151,8 +160,8 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("add_agent_to_thread", AddAgentToThreadReducer),
   __reducerSchema("add_member", AddMemberReducer),
-  __reducerSchema("agent_reply_append", AgentReplyAppendReducer),
   __reducerSchema("agent_reply_begin", AgentReplyBeginReducer),
   __reducerSchema("agent_reply_cancel", AgentReplyCancelReducer),
   __reducerSchema("agent_reply_delta", AgentReplyDeltaReducer),
@@ -165,6 +174,7 @@ const reducersSchema = __reducers(
   __reducerSchema("delete_provider_key", DeleteProviderKeyReducer),
   __reducerSchema("leave_thread", LeaveThreadReducer),
   __reducerSchema("register_service", RegisterServiceReducer),
+  __reducerSchema("remove_agent_from_thread", RemoveAgentFromThreadReducer),
   __reducerSchema("remove_member", RemoveMemberReducer),
   __reducerSchema("send_message", SendMessageReducer),
   __reducerSchema("set_display_name", SetDisplayNameReducer),

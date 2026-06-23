@@ -10,7 +10,14 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
+import {
+  Mention,
+} from "./types";
+
 export default {
   threadId: __t.u64(),
   text: __t.string(),
+  get mentions() {
+    return __t.array(Mention);
+  },
 };

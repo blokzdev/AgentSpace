@@ -16,4 +16,5 @@ export default {
   provider: __t.string(),
   model: __t.string(),
   baseUrl: __t.string(),
+  respondsToAgents: __t.bool(),
 };

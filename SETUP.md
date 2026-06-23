@@ -173,6 +173,46 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
+### S-6 — Re-publish the module to Maincloud for M2.1 (multi-agent group threads)  ·  added 2026-06-23 · M2.1  ·  [ ] (required before V-15…V-19)
+> **Heads-up: this DESTROYS existing Maincloud data.** M2.1 adds new tables
+> (`thread_agent`, `episode`, `agent_turn`, `reaper_schedule`) and appends columns to
+> existing ones — a **non-additive** schema change, so the publish needs
+> `--delete-data=on-conflict` (the prior `agentspace-hpm58` DB is wiped and recreated;
+> a test DB has nothing to lose). The AI **verified M2.1 against a LOCAL server first**
+> (CI 16/16 + all 6 headless integration scenarios A–F green); this step pushes the same
+> module to Maincloud so the **on-device** checks can run.
+- **Why:** the M2.1 reducers/views (multi-agent threads, the per-episode budget guard, the
+  scheduled reaper) only exist on Maincloud after a re-publish. Without it the device still
+  talks to the M1.9 schema and **V-15…V-19** can't run.
+- **Where:** **any PowerShell terminal** with the repo checked out + the SpacetimeDB CLI,
+  logged in as your `blokzdev`/Maincloud account (same prerequisites as **S-3**:
+  `pnpm install` done so the module compiles).
+- **Steps (PowerShell, from the repo root `E:\Cloud\AgentSpace`):**
+  1. Make sure you're logged into Maincloud as `blokzdev` (`spacetime login show`) — see
+     **S-3** steps 1–3 if not.
+  2. **Re-publish with a data wipe** (the new tables make this a breaking change):
+     ```powershell
+     spacetime publish agentspace-hpm58 -p modules\spacetime --server maincloud --delete-data=on-conflict --yes
+     ```
+     The same two **cosmetic** messages from S-3 (`tsc not found` / `verbatimModuleSyntax`)
+     are fine — watch for `Build finished successfully`.
+  3. **Regenerate + sync the bindings to all 3 surfaces** (the new tables/cols change the
+     generated client SDK). From the repo root:
+     `pnpm --filter @agentspace/spacetime-module spacetime:generate`, then make sure the
+     regenerated bindings are synced to the **3 consumers** —
+     `apps/mobile/module_bindings`, `packages/stdb-bindings`, and the orchestrator's
+     copy — and rebuild (`pnpm run build`). *(The AI can run the regenerate + sync during a
+     local session and commit it; you only need to do the Maincloud re-publish above.)*
+  4. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
+     Maincloud console shows the new tables (`thread_agent`, `episode`, `agent_turn`, …).
+- **Give back to the AI:** confirm it **re-published** (data-wipe accepted) **and** that the
+  bindings were **regenerated**. Then **V-15…V-19** (coherence/no-bleed, loop+cost guard,
+  `@everyone` bound, typing + crash self-heal, per-agent BYOK in a group) are ready to run.
+  V-16/V-19 use a real Anthropic key — launch the orchestrator (**S-5**) with
+  `ANTHROPIC_BASE_URL` cleared first (`Remove-Item Env:ANTHROPIC_BASE_URL`) or Anthropic 404s.
+
+---
+
 ### S-4 — (Optional) provider API key for the gateway *smoke test*  ·  added 2026-06-13 · M1.4  ·  [ ] optional
 - **Scope note:** **per-user BYOK shipped (M1.7)** — for the app, you add your key
   **in-app** (🔑 Keys), *not* `.env`, and the orchestrator no longer reads `.env`. This
@@ -222,7 +262,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
    (fresh test DB; nothing lost). Unblocks **V-13** (long reply settles clean) + **V-14**
    (cancellation). *(The AI can run this re-publish during a local session; bindings are already
    regenerated + committed.)*
+5. **M2.1 (multi-agent group threads) needs a Maincloud re-publish — `S-6`** — the new
+   `thread_agent` / `episode` / `agent_turn` / `reaper_schedule` tables make this a breaking
+   change, so the same `--delete-data=on-conflict` publish + binding regen applies. Required
+   before **V-15…V-19** (verified locally first).
 
-*Done: S-1, S-2, **S-3** (module published to Maincloud 2026-06-22). Remaining: **S-5**
-(run the orchestrator) + on-device V-checklist (V-5 / V-7 / V-8) → I tag `M1 [shipped]`.
-S-4 optional (gateway smoke / V-6 only).*
+*Done: S-1, S-2, **S-3** (module published to Maincloud 2026-06-22). Remaining: **S-6**
+(M2.1 Maincloud re-publish — required before V-15…V-19) + **S-5** (run the orchestrator,
+for any live agent reply) + the on-device V-checklist. S-4 optional (gateway smoke / V-6 only).*
