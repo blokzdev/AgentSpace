@@ -47,6 +47,9 @@ export type MyPersonaKeys = __Infer<typeof MyPersonaKeys>;
 export const MyProviderKeys = __t.object("MyProviderKeys", {});
 export type MyProviderKeys = __Infer<typeof MyProviderKeys>;
 
+export const MyReplyDeltas = __t.object("MyReplyDeltas", {});
+export type MyReplyDeltas = __Infer<typeof MyReplyDeltas>;
+
 export const MyThreadMembers = __t.object("MyThreadMembers", {});
 export type MyThreadMembers = __Infer<typeof MyThreadMembers>;
 
@@ -65,6 +68,16 @@ export const ProviderKey = __t.object("ProviderKey", {
   updatedAt: __t.timestamp(),
 });
 export type ProviderKey = __Infer<typeof ProviderKey>;
+
+export const ReplyDelta = __t.object("ReplyDelta", {
+  id: __t.u64(),
+  runId: __t.string(),
+  threadId: __t.u64(),
+  seq: __t.u64(),
+  text: __t.string(),
+  sent: __t.timestamp(),
+});
+export type ReplyDelta = __Infer<typeof ReplyDelta>;
 
 export const Run = __t.object("Run", {
   id: __t.u64(),
