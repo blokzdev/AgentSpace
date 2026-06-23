@@ -236,6 +236,11 @@ Each MUST be satisfied before the v1 tag. Owner ticks with evidence.
 - [ ] **LG-7 — Observability.** Error capture + usage dashboards in place.
 - [ ] **LG-8 — Pre-launch drift sweep** run; `[critical]`/`[important]` findings
       routed (CLAUDE.md §7).
+- [ ] **LG-9 — Production app signing.** Build the release APK/AAB with a real
+      **production keystore** (not the debug key) and sign for distribution (Play App
+      Signing / a managed keystore + secret). The `build-apk` workflow is a **release**
+      build but **debug-signed** for testing only — swap in the prod signing config +
+      a keystore secret at launch. Source: the manual Build APK workflow.
 
 *(Open Human-Verification `[gate]` items at milestone-close flow here with trigger
 "verify before v1 ships.")*
