@@ -1,10 +1,13 @@
 name: Build APK
 
-# Manually-triggered, standalone, **debug-signed release** APK for on-device testing
-# (e.g. a Galaxy S20). It's a release build (JS bundled via Hermes — runs without a
-# Metro dev server) signed with the debug keystore, so it installs with no
-# release-keystore management. Get it from the run's **Artifacts**, or from the rolling
-# **`apk-debug` pre-release** (this repo is public → a direct URL you can open on the phone).
+# Manually-triggered **release** APK for on-device testing (e.g. a Galaxy S20).
+# This is a RELEASE build (`assembleRelease`): JS bundled via Hermes, optimized, NO
+# dev menu / NO Metro / no debug overlays — it looks and feels like the production app.
+# It is signed with the **debug keystore** for now (so it installs without keystore
+# management); a real production keystore + a Play-signed release is a launch-phase item
+# (BACKLOG LG-9 — "debug" here refers ONLY to the signing key, not the build type).
+# Get it from the run's **Artifacts**, or the rolling **`apk-release` pre-release**
+# (this repo is public → a direct URL you can open on the phone).
 on:
   workflow_dispatch:
     inputs:
@@ -16,14 +19,14 @@ on:
         default: 'agentspace-hpm58'
 
 permissions:
-  contents: write # to publish the rolling apk-debug pre-release
+  contents: write # to publish the rolling apk-release pre-release
 
 env:
   EXPO_NO_TELEMETRY: '1'
 
 jobs:
   build:
-    name: Build debug-signed release APK
+    name: Build release APK (debug-signed)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +70,7 @@ jobs:
         working-directory: apps/mobile
         run: pnpm exec expo prebuild -p android --no-install
 
-      - name: Ensure the release build is debug-signed
+      - name: Ensure the release build is debug-signed (no prod keystore yet — LG-9)
         working-directory: apps/mobile/android
         run: |
           if ! grep -q 'signingConfig signingConfigs.debug' app/build.gradle; then
@@ -76,36 +79,40 @@ jobs:
           fi
           echo "--- signingConfig references ---"; grep -n 'signingConfig' app/build.gradle || true
 
-      - name: Build release APK (arm64-v8a only — the Galaxy S20 arch; faster)
+      - name: Build the release APK (arm64-v8a only — the Galaxy S20 arch; faster)
         working-directory: apps/mobile/android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
 
       - name: Stage the APK
         run: |
           mkdir -p dist
-          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk dist/agentspace-debug.apk
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk dist/agentspace-release.apk
           ls -lh dist
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentspace-debug-apk
-          path: dist/agentspace-debug.apk
+          name: agentspace-release-apk
+          path: dist/agentspace-release.apk
           if-no-files-found: error
 
       - name: Publish rolling pre-release (public repo → direct phone download)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: apk-debug
-          name: 'Debug APK (latest)'
+          tag_name: apk-release
+          name: 'AgentSpace — Release APK (debug-signed)'
           prerelease: true
           make_latest: false
-          files: dist/agentspace-debug.apk
+          files: dist/agentspace-release.apk
           body: |
-            Standalone **debug-signed release** APK for on-device testing — built from `${{ github.sha }}`.
+            Standalone **release** APK (optimized, JS-bundled via Hermes, no dev menu — looks &
+            feels like the production app), **debug-signed** for now — built from `${{ github.sha }}`.
 
             - Target: `${{ inputs.spacetimedb_host }}` / `${{ inputs.spacetimedb_db }}`
             - arch: `arm64-v8a` (Galaxy S20 and most modern Androids)
-            - Install: download `agentspace-debug.apk` on the phone → allow "install unknown apps" for your browser → open it.
+            - Install: download `agentspace-release.apk` on the phone → allow "install unknown apps"
+              for your browser → open it.
 
-            For live agent replies, run the orchestrator against the same target (SETUP.md S-5).
+            Signed with the **debug keystore** (no production keystore yet → not Play-Store-installable;
+            that's a launch-phase item, BACKLOG **LG-9**). For live agent replies, run the orchestrator
+            against the same target (SETUP.md S-5).
