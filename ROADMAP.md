@@ -29,10 +29,11 @@ now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). **M2.3
 "Hey {name}," soft-address + the per-agent isolation guarantee (pure orchestrator, no schema change). **V-2 /
 V-6 / V-22 AI-completed** (local-stack Views isolation + live gateway round-trip + orchestrator self-heal); a
 manual **`build-apk`** workflow now ships a debug-signed **release** APK (running on-device on a Galaxy S20).
-**Next: M2.4** (per-agent identity, BL-014) → **M2.9** (production auth + login UX — native Google sign-in;
-DEC-037) → **M3** (RAG) → **BL-016** (chat polish, at M6) / **BL-011** (durable key backing). Optional:
-**V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6 done; S-4 optional,
-S-7 (key rotation) open.
+**M2.4 lean shipped** (public agent cards → cross-owner names/avatars, BL-021; DEC-038). **Next: M2.9**
+(production auth + login UX — native Google sign-in; DEC-037) → **M3** (RAG) → **BL-016** (chat polish, at
+M6) / **BL-011** (durable key backing); **M2.4-full** (per-agent identity + presence dots) committed for
+after M2.9. Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6
+done; S-4 optional, S-7 (key rotation) + S-8 (M2.4 republish) open.
 
 ---
 
@@ -284,11 +285,19 @@ closes at ≤0) ✓; (9) module reaper for stuck `streaming`/`running` (`reap_st
   unchanged) + a `buildPrompt` isolation regression test + a documented guarantee. Stricter than the audited
   `addressing.md` rule by design (DEC-036). No schema/mobile change; CI 16/16 (49 orch tests). Out: selective
   per-agent VISIBILITY (BL-020), agent-side NL, @human, multi-agent NL.*
-- **M2.4 — Per-agent identity & real presence (BL-014).** Mint per-agent STDB identities
-  (service-managed/OIDC), each agent a first-class member with `user.online` presence + distinct
-  avatar; orchestrator drives N identities (connection pool); `agentId` tag demotes to provenance.
-  Closes OT-007 + DEC-022. Reversible to the C MVP. *Pulled in only if real avatars/online-dots
-  become a launch requirement.*
+- **M2.4 — Public agent face (lean; BL-021). ✓ [done 2026-06-23]** A 9-agent planning workflow
+  (critic-verified the SDK mechanics) + founder ratification chose the **lean cut**: a PUBLIC
+  `thread_agent_cards` view (projected `t.row` `{threadId, agentId, name, avatarEmoji}`, `by_member`
+  predicate — no secret columns) + an appended `agent.avatarEmoji` column + an AgentEditor emoji field +
+  a **card-first** mobile render. Now EVERY member sees a cross-owner agent's real name + avatar (closes
+  **BL-021**) instead of a generic "Agent". **`message.sender` STAYS the service identity** (zero ripple to
+  M1.7/M2.1/M2.5); trivially reversible. Proven headless (`verify-cards`; integration A–G regress clean);
+  CI 16/16. On-device = **V-24**; needs the Maincloud `--delete-data` republish (**S-8**). (DEC-038.)
+- **M2.4-full — Full per-agent identity & real presence (BL-014) — COMMITTED, scheduled AFTER M2.9.**
+  Mint per-agent STDB identities + a connection pool, each agent a first-class member with real
+  `user.online` presence dots + `message.sender` = the agent identity; `agentId` tag demotes to provenance.
+  Closes OT-007 + supersedes DEC-022. **Sequenced after M2.9** so the Google-auth issuer re-key (DEC-037)
+  doesn't make the identities throwaway. Reversible to the lean MVP.
 - **M2.5 — On-device connection resilience (auto-reconnect; BL-022, DEC-034).** *Built **next**,
   pulled forward ahead of M2.2–M2.4 — a verified on-device defect gating V-15…V-19.* The SpacetimeDB
   SDK has no auto-reconnect, so a dropped Maincloud socket left the app stuck on "Connecting…" and

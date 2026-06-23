@@ -92,8 +92,8 @@ the episode budget untouched) + a `buildPrompt` isolation regression test. Stric
 `addressing.md` by design. CI 16/16 (49 orch tests). *(M2.2 presence/typing shipped just prior — #41; S-6
 Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 
-- **Active branch:** `docs/m2.9-auth-and-currency` (DEC-037 auth milestone + doc currency). Recent merges:
-  M2.3 NL (#42, DEC-036); V-6 (#43); V-2/V-22 + verify-views (#44); `build-apk` workflow (#45–47). Repo
+- **Active branch:** `feat/m2.4-public-agent-cards` (M2.4 lean — public agent cards, BL-021; DEC-038). Recent
+  merges: M2.3 NL (#42); V-6 (#43); V-2/V-22 (#44); `build-apk` (#45–47); M2.9 auth docs (#48). Repo
   **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
@@ -105,9 +105,9 @@ Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 - **Verification status:** **V-2 / V-6 / V-22 ✅ AI-completed** (server-side, no UI). **Founder device-render
   ticks owed:** **V-13/V-14** (M1.9), **V-15/16/17/19** (M2.1 — S-6 done, headless real-model evidence
   captured), **V-21** (M2.5 app reconnect), **V-23** (M2.2 presence). *(OT-004 resolved by M1.9.)*
-- **Next build:** **M2.4** (per-agent identity, BL-014 — schema/identity change) → **M2.9** (production auth +
-  login UX — native Google sign-in; DEC-037) → **M3** (RAG); **BL-016** chat polish at **M6**; **BL-011**
-  durable key backing. *(M2.1/2.2/2.3/2.5 shipped.)*
+- **Next build:** **M2.9** (production auth + login UX — native Google sign-in; DEC-037) → **M3** (RAG);
+  **M2.4-full** (per-agent identity + presence dots, BL-014) committed for **after M2.9**; **BL-016** chat
+  polish at **M6**; **BL-011** durable key backing. *(M2.1/2.2/2.3/2.5 shipped; M2.4 lean shipped — BL-021.)*
 
 ---
 
@@ -685,6 +685,26 @@ the login surface ONLY; broad app/chat polish stays **BL-016 / M6** (don't over-
 **Path A (SpacetimeAuth + Google) is the guaranteed fallback** so we're never blocked. Pairs with **LG-9**
 (production app signing). Anonymous login works **now** for testing meanwhile. Docs-only this PR.
 
+### DEC-038 — M2.4 lean: public agent cards (closes BL-021); full per-agent identity committed post-M2.9
+*2026-06-23.* M2.4 was scoped as "per-agent identity & real presence." A 9-agent planning workflow (4
+readers → 3 designs → synthesis → an adversarial critic that **verified the mechanics against the
+SpacetimeDB SDK source**) found the `agentId` tag ALREADY renders distinct per-agent avatars/names for the
+caller's OWN agents; the only real gap was **BL-021** (agents owned by OTHER members render as a generic
+"Agent" because names resolve via the caller's private `my_agents`) — a **read-visibility** problem.
+**Decision (founder-ratified, Option 2): ship the lean cut now + commit the full version post-M2.9.** Lean
+= a new PUBLIC `thread_agent_cards` view (projected `t.row` `{threadId, agentId, name, avatarEmoji}`,
+`by_member` predicate — NOT the `role==='agent'` predicate; no secret columns) + an appended
+`agent.avatarEmoji` column + an AgentEditor emoji field + a **card-first** mobile render. EVERY member now
+sees a cross-owner agent's real name+avatar. **`message.sender` STAYS the service identity** (the `agentId`
+tag stays the canonical render/isAgent key) → zero ripple to the M1.7 BYOK / M2.1 budget / M2.5 reconnect
+surfaces; trivially reversible (additive column + additive view + a render swap; no data migration). **Why
+not full now:** minting per-agent identities the milestone BEFORE **M2.9 re-keys the identity issuer
+(DEC-037)** would be throwaway, and real online-dots aren't launch-gating — so the **full** per-agent
+identity (N identities + connection pool + presence dots + sender=agent) is a **committed milestone
+scheduled AFTER M2.9** (BL-014). DEC-022 + DEC-031 remain in force; OT-007 stays a clean deferral. Verified
+headless (`verify-cards`: A sees B's cross-owner card, no secret leak; integration A–G regress clean); CI
+16/16. On-device = a new V-item; the appended column needs a Maincloud `--delete-data` republish (S-item).
+
 ---
 
 ## Session Journal (append-only)
@@ -1221,6 +1241,21 @@ the login surface ONLY; broad app/chat polish stays **BL-016 / M6** (don't over-
   before M3 (scope = auth/login only; broad polish stays M6/BL-016). PRs this stretch: #42 (M2.3), #43 (V-6),
   #44 (V-2/V-22 + verify-views), #45–47 (build-apk + naming).
 - **Next:** **M2.4** (per-agent identity) → **M2.9** (production auth) → M3.
+
+### 2026-06-23 — M2.4 lean: public agent cards (closes BL-021) (DEC-038)
+- Planned via a 9-agent workflow (the critic verified the SDK `t.row` projected-view mechanic + flagged
+  the `by_member`-vs-`role==='agent'` predicate trap). Founder ratified **Option 2** — lean now + full
+  per-agent identity committed for **after M2.9**.
+- Shipped on `feat/m2.4-public-agent-cards`: module `agent.avatarEmoji` (appended) + `create/update_agent`
+  (default 🤖, clamp 16) + a PUBLIC **`thread_agent_cards`** view (projected `t.row`, `by_member`, name +
+  avatar only). Bindings regen + synced ×3 — the **first projected view**; it binds cleanly (no TS2742, the
+  fallback wasn't needed). Mobile **card-first** render in Thread/ThreadList + an AgentEditor emoji field;
+  new `verify-cards.ts` (+ every `createAgent` caller updated for the new arg).
+- **No sender change → zero M1.7/M2.1/M2.5 ripple.** Headless green: `verify-cards` (A sees B's cross-owner
+  card "Lyric" 🎵; no secret-prompt leak) + integration **A–G** regress clean; `pnpm run ci` 16/16.
+- **Next:** **M2.9** (production auth + login UX) → **M3**; **M2.4-full** (per-agent identity + presence
+  dots, BL-014) committed for after M2.9. On-device = a new V-item (needs the Maincloud `--delete-data`
+  republish, new S-item).
 
 ---
 

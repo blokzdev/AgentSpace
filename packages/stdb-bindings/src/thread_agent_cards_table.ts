@@ -10,13 +10,9 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  agentId: __t.u64(),
+export default __t.row({
+  threadId: __t.u64().name("thread_id"),
+  agentId: __t.u64().name("agent_id"),
   name: __t.string(),
-  systemPrompt: __t.string(),
-  provider: __t.string(),
-  model: __t.string(),
-  baseUrl: __t.string(),
-  respondsToAgents: __t.bool(),
-  avatarEmoji: __t.string(),
-};
+  avatarEmoji: __t.string().name("avatar_emoji"),
+});

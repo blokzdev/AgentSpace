@@ -653,3 +653,34 @@ Notes: <founder fills: device + OS + result>
   pure-client off existing `streaming`+`agentId` rows; Android bundle clean. The RN **animation render** is
   the founder's tick.
 - **Notes (founder):** _device + result →_
+
+---
+
+### V-24 — A cross-owner agent shows its real name + avatar to everyone  ·  added 2026-06-23 · M2.4
+- **Why:** M2.4 (lean) closes **BL-021** — before it, an agent owned by *another* member rendered as a
+  generic "Agent" (names resolved via the caller's private `my_agents`). Now a PUBLIC `thread_agent_cards`
+  view (name + avatar only) feeds a **card-first** render, so every member sees the real persona name +
+  emoji. `message.sender` is unchanged (still the service identity), so agents still get **no green online
+  dot** — that's **expected** for the lean cut (real presence dots = the committed post-M2.9 full-identity
+  milestone). **Needs the Maincloud republish (S-8).**
+- **Setup:** the app on the S20/dev build vs Maincloud, orchestrator running (S-5). You need **two user
+  accounts** — **owner A** and **owner B** (e.g. anonymous login on a second device/emulator, or a friend).
+- **Steps:**
+  1. As **owner B**, open 🤖 Agents → create an agent with a distinctive **name + avatar emoji** (e.g.
+     "Lyric" 🎵) via the new AgentEditor **Avatar** field.
+  2. As **owner A**, create a **group** and add **owner B** as a member.
+  3. As **owner B** (now a member), open the group → **+ Add agent** → pick your own "Lyric".
+  4. Both A and B look at the group — the thread-list row, the open-thread bubbles, and the @mention
+     typeahead.
+- **Pass when:**
+  - For **both** owners, B's agent shows as **"Lyric" with the 🎵 avatar** everywhere (bubbles, header,
+    @mention list, thread-list badge) — **never** a generic "Agent" / 🤖.
+  - Editing the emoji in AgentEditor updates the avatar for everyone after a moment.
+  - Existing 1:1 DM / `@mention` / "thinking…" behavior is unchanged.
+- **If it fails:** B's agent still shows "Agent"/🤖 to owner A → the public view didn't apply (confirm the
+  S-8 republish ran); the emoji never renders → an AgentEditor write issue. Capture the thread + tell me which.
+- **🤖 AI evidence (2026-06-23):** headless `verify-cards` proves owner A (who owns neither) sees owner B's
+  cross-owner agent card ("Lyric" 🎵) via `thread_agent_cards` with **no secret-prompt leak**; integration
+  A–G regress clean; mobile typecheck confirms the projected view binds. The **on-device multi-account
+  render** is the founder's tick.
+- **Notes (founder):** _device + result →_

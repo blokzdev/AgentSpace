@@ -168,6 +168,7 @@ const agent = table(
     updatedAt: t.timestamp(),
     baseUrl: t.string(), // '' except for provider 'openai-compatible' (local endpoint) — M1.8.2; appended for clean migration
     respondsToAgents: t.bool(), // M2.1 (appended): opt-in to agent→agent addressing (DEC-031; default off)
+    avatarEmoji: t.string(), // M2.4 (appended): the agent's public avatar (emoji/short text; '🤖' default)
   }
 );
 
@@ -338,8 +339,8 @@ export const create_group = spacetimedb.reducer(
 // ── Agent Studio (M1.5) ──────────────────────────────────────────────────────
 
 export const create_agent = spacetimedb.reducer(
-  { name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string(), respondsToAgents: t.bool() },
-  (ctx, { name, systemPrompt, provider, model, baseUrl, respondsToAgents }) => {
+  { name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string(), respondsToAgents: t.bool(), avatarEmoji: t.string() },
+  (ctx, { name, systemPrompt, provider, model, baseUrl, respondsToAgents, avatarEmoji }) => {
     if (!name) throw new SenderError('Agent name must not be empty');
     if (!model) throw new SenderError('Agent model must not be empty');
     ctx.db.agent.insert({
@@ -354,13 +355,14 @@ export const create_agent = spacetimedb.reducer(
       createdAt: ctx.timestamp,
       updatedAt: ctx.timestamp,
       respondsToAgents,
+      avatarEmoji: (avatarEmoji || '🤖').slice(0, 16), // public; default + bounded (sanitize untrusted input)
     });
   }
 );
 
 export const update_agent = spacetimedb.reducer(
-  { agentId: t.u64(), name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string(), respondsToAgents: t.bool() },
-  (ctx, { agentId, name, systemPrompt, provider, model, baseUrl, respondsToAgents }) => {
+  { agentId: t.u64(), name: t.string(), systemPrompt: t.string(), provider: t.string(), model: t.string(), baseUrl: t.string(), respondsToAgents: t.bool(), avatarEmoji: t.string() },
+  (ctx, { agentId, name, systemPrompt, provider, model, baseUrl, respondsToAgents, avatarEmoji }) => {
     const a = ctx.db.agent.id.find(agentId);
     if (!a || !a.owner.isEqual(ctx.sender)) throw new SenderError('Not your agent');
     if (!name) throw new SenderError('Agent name must not be empty');
@@ -375,6 +377,7 @@ export const update_agent = spacetimedb.reducer(
       version: a.version + 1n,
       updatedAt: ctx.timestamp,
       respondsToAgents,
+      avatarEmoji: (avatarEmoji || '🤖').slice(0, 16),
     });
   }
 );
@@ -854,6 +857,32 @@ export const my_thread_agents = spacetimedb.view(
     [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => [
       ...ctx.db.threadAgent.by_thread.filter(m.threadId),
     ])
+);
+
+// M2.4 (lean): the PUBLIC agent face. For every thread the caller is a member of (ANY
+// role — same `by_member` predicate as my_thread_agents, NOT the agent-only predicate
+// below), expose each thread agent's name + avatar so EVERY member sees a cross-owner
+// agent's real persona name/avatar instead of a generic "Agent" (fixes BL-021). Name +
+// emoji ONLY — never the persona's systemPrompt/provider/model/owner. A projected `t.row`
+// (not a table rowType) keeps the secret columns off the wire; no primaryKey ((threadId,
+// agentId) isn't single-column unique, and a view row allows ≤1 PK).
+export const thread_agent_cards = spacetimedb.view(
+  { name: 'thread_agent_cards', public: true },
+  t.array(
+    t.row('AgentCard', {
+      threadId: t.u64(),
+      agentId: t.u64(),
+      name: t.string(),
+      avatarEmoji: t.string(),
+    })
+  ),
+  (ctx) =>
+    [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) =>
+      [...ctx.db.threadAgent.by_thread.filter(m.threadId)].flatMap((ta) => {
+        const a = ctx.db.agent.id.find(ta.agentId);
+        return a ? [{ threadId: m.threadId, agentId: ta.agentId, name: a.name, avatarEmoji: a.avatarEmoji }] : [];
+      })
+    )
 );
 
 // Personas active in threads the caller is an `agent` member of — the orchestrator's

@@ -22,4 +22,5 @@ export default __t.row({
   updatedAt: __t.timestamp().name("updated_at"),
   baseUrl: __t.string().name("base_url"),
   respondsToAgents: __t.bool().name("responds_to_agents"),
+  avatarEmoji: __t.string().name("avatar_emoji"),
 });

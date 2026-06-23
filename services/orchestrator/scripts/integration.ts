@@ -177,9 +177,9 @@ async function run(): Promise<void> {
     if (!svc || svc.encPubKey.length === 0) return;
     seeded = true;
     user.conn.reducers.setProviderKey({ provider: PROVIDER, sealed: seal(USER_KEY, svc.encPubKey) });
-    user.conn.reducers.createAgent({ name: 'Pirate Pete', systemPrompt: 'You are Pirate Pete.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: false });
-    user.conn.reducers.createAgent({ name: 'Aria', systemPrompt: 'You are Aria.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: true });
-    user.conn.reducers.createAgent({ name: 'Banjo', systemPrompt: 'You are Banjo.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: true });
+    user.conn.reducers.createAgent({ name: 'Pirate Pete', systemPrompt: 'You are Pirate Pete.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: false, avatarEmoji: '🏴‍☠️' });
+    user.conn.reducers.createAgent({ name: 'Aria', systemPrompt: 'You are Aria.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: true, avatarEmoji: '🎤' });
+    user.conn.reducers.createAgent({ name: 'Banjo', systemPrompt: 'You are Banjo.', provider: PROVIDER, model: MODEL, baseUrl: '', respondsToAgents: true, avatarEmoji: '🪕' });
   };
   user.conn.db.service_info.onInsert(() => seed());
   user.conn.db.service_info.onUpdate(() => seed());

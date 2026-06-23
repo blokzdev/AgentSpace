@@ -45,7 +45,7 @@ async function run(): Promise<void> {
   const seed = (): void => {
     if (seeded || ![...user.conn.db.service_info.iter()][0]) return;
     seeded = true;
-    user.conn.reducers.createAgent({ name: 'Stuckbot', systemPrompt: 'x', provider: 'anthropic', model: 'claude-haiku-4-5-20251001', baseUrl: '', respondsToAgents: false });
+    user.conn.reducers.createAgent({ name: 'Stuckbot', systemPrompt: 'x', provider: 'anthropic', model: 'claude-haiku-4-5-20251001', baseUrl: '', respondsToAgents: false, avatarEmoji: '🤖' });
   };
   user.conn.db.service_info.onInsert(() => seed());
   user.conn.db.service_info.onUpdate(() => seed());

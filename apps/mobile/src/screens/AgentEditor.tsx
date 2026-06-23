@@ -38,6 +38,7 @@ export function AgentEditor({
   const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL.model);
   const [baseUrl, setBaseUrl] = useState(existing?.baseUrl ?? '');
   const [respondsToAgents, setRespondsToAgents] = useState(existing?.respondsToAgents ?? false);
+  const [avatarEmoji, setAvatarEmoji] = useState(existing?.avatarEmoji ?? '🤖');
 
   const info = providerInfo(provider);
   const isLocal = info?.kind === 'baseUrl';
@@ -62,6 +63,7 @@ export function AgentEditor({
       model: model.trim(),
       baseUrl: isLocal ? baseUrl.trim() : '',
       respondsToAgents,
+      avatarEmoji: avatarEmoji.trim() || '🤖',
     };
     if (agentId === null) {
       void createAgent(fields);
@@ -89,6 +91,22 @@ export function AgentEditor({
           value={name}
           onChangeText={setName}
         />
+
+        <Text style={styles.label}>Avatar</Text>
+        <View style={styles.avatarRow}>
+          <View style={styles.avatarPreview}>
+            <Text style={styles.avatarPreviewText}>{avatarEmoji || '🤖'}</Text>
+          </View>
+          <TextInput
+            style={[styles.input, styles.avatarInput]}
+            placeholder="🤖"
+            placeholderTextColor={colors.faint}
+            value={avatarEmoji}
+            onChangeText={setAvatarEmoji}
+            maxLength={8}
+          />
+        </View>
+        <Text style={styles.hint}>An emoji shown to everyone in the thread (default 🤖).</Text>
 
         <Text style={styles.label}>System prompt</Text>
         <TextInput
@@ -199,6 +217,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   multiline: { minHeight: 110, textAlignVertical: 'top' },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 },
+  avatarPreview: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.panel2, borderColor: colors.border, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatarPreviewText: { fontSize: 22 },
+  avatarInput: { flex: 1 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   chip: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
   chipOn: { backgroundColor: colors.accent, borderColor: colors.accent },

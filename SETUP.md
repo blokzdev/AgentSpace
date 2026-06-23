@@ -237,6 +237,22 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
+### S-8 — Re-publish the module to Maincloud for M2.4 (public agent cards)  ·  added 2026-06-23 · M2.4  ·  [ ]
+> **Same one-liner as S-6, for the M2.4 schema.** M2.4 appends `agent.avatar_emoji` and adds the public
+> `thread_agent_cards` view — additive but **breaking** (a new non-null column needs a default), so Maincloud
+> needs a `--delete-data` republish (wipes the cloud DB's throwaway test data, exactly as S-6 did for M2.1).
+- **Why:** without it the cloud module lacks the column/view, so the app's card-first render falls back to
+  the old "Agent"/🤖 label for cross-owner agents and AgentEditor's emoji field has nowhere to write.
+- **Where:** **terminal** on the founder's machine (the `spacetime` CLI logged into Maincloud).
+- **Steps:**
+  1. From the repo: `cd modules/spacetime`.
+  2. `spacetime publish agentspace-hpm58 -p . --delete-data` (confirm the data-wipe prompt). *(Local dev
+     already uses this; the cloud DB is throwaway pre-launch test data.)*
+  3. No regenerate needed founder-side — the committed bindings already match.
+- **Give back to the AI:** confirm the republish succeeded → this unblocks **V-24** (on-device card render).
+
+---
+
 ### S-4 — (Optional) provider API key for the gateway *smoke test*  ·  added 2026-06-13 · M1.4  ·  [ ] optional
 - **Scope note:** **per-user BYOK shipped (M1.7)** — for the app, you add your key
   **in-app** (🔑 Keys), *not* `.env`, and the orchestrator no longer reads `.env`. This

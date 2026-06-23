@@ -100,9 +100,12 @@
 - **Promotion:** mint a per-agent STDB identity (service-managed token), make each agent
   a first-class member with presence/avatar; the orchestrator drives N agent identities.
   Ties to OT-007 (orchestrator service-account auth) + hardening `register_service`.
-- **Now scheduled as M2.4 (DEC-031):** M2's MVP ships agents as persona-*tagged* messages on the
-  single connection (Candidate C); this item is the fast-follow that swaps the `agentId` tag for a
-  real per-agent `Identity` + `user.online` presence + distinct avatars. Additive/reversible.
+- **Re-scheduled (DEC-038, 2026-06-23):** M2.4 shipped the **lean cut** (a public `thread_agent_cards`
+  projection → cross-owner names/avatars, closing BL-021) and **kept `message.sender` = the service
+  identity**. The **full** per-agent identity (mint N STDB identities + a connection pool + `user.online`
+  presence dots + sender = the agent identity) is now a **committed milestone scheduled AFTER M2.9** (the
+  Google-auth re-key settles the issuer first, so it isn't throwaway). Additive/reversible; the
+  card-derived render is a forward-bridge to it.
 
 ### BL-015 — Contacts / visibility / blocking model (non-global directory)
 - **Source:** DEC-023 (M1.3 user search reads the *public* `user` table — every user
@@ -166,13 +169,13 @@
   server-side fuzzy resolver for agent→agent text mentions — deferred until agent↔agent volleys need it.
 
 ### BL-021 — M2.1 implementation deferrals (cross-owner agent names · cooldown enforcement)
+- **Status (2026-06-23):** **(a) RESOLVED by M2.4 lean (DEC-038)** — the new public `thread_agent_cards`
+  projection (name + avatar, `by_member` predicate, no secret columns) + a card-first mobile render let
+  every member see a cross-owner agent's real name+avatar. **(b) cooldown still deferred** (below).
 - **Source:** DEC-032 (M2.1 build).
-- **Trigger:** a group holds agents owned by *different* users, or per-agent rate-shaping is needed.
-- **Promotion:** (a) **resolve other users' agent names in the mobile UI** — the M2.1 `@mention`
-  typeahead + message render resolve agent names via the caller's own `my_agents`, so an agent owned by
-  another member renders a generic "Agent" label (`@everyone` still reaches it). Fix with a
-  `my_active_personas`-style view for *any* thread member, or a public agent-name projection. (b)
-  **Enforce the per-(agent,thread) cooldown** — `AGENT_COOLDOWN_MS` is reserved in `@agentspace/shared`
+- **Trigger:** ~~cross-owner names (done)~~; per-agent rate-shaping is needed.
+- **Promotion:** ~~(a) resolve other users' agent names — DONE via the public `thread_agent_cards`
+  projection (M2.4 lean).~~ (b) **Enforce the per-(agent,thread) cooldown** — `AGENT_COOLDOWN_MS` is reserved in `@agentspace/shared`
   + the module dials but not yet checked in `agent_reply_begin`; add it to the enforcement boundary if
   rapid-fire agent turns need throttling beyond the episode budget.
 

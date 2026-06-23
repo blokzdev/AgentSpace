@@ -22,8 +22,17 @@ export const Agent = __t.object("Agent", {
   updatedAt: __t.timestamp(),
   baseUrl: __t.string(),
   respondsToAgents: __t.bool(),
+  avatarEmoji: __t.string(),
 });
 export type Agent = __Infer<typeof Agent>;
+
+export const AgentCard = __t.object("AgentCard", {
+  threadId: __t.u64(),
+  agentId: __t.u64(),
+  name: __t.string(),
+  avatarEmoji: __t.string(),
+});
+export type AgentCard = __Infer<typeof AgentCard>;
 
 export const AgentTurn = __t.object("AgentTurn", {
   id: __t.u64(),
@@ -165,6 +174,9 @@ export const ThreadAgent = __t.object("ThreadAgent", {
   addedAt: __t.timestamp(),
 });
 export type ThreadAgent = __Infer<typeof ThreadAgent>;
+
+export const ThreadAgentCards = __t.object("ThreadAgentCards", {});
+export type ThreadAgentCards = __Infer<typeof ThreadAgentCards>;
 
 export const ThreadMember = __t.object("ThreadMember", {
   id: __t.u64(),
