@@ -1,0 +1,108 @@
+name: Build APK
+
+# Manually-triggered, standalone, **debug-signed release** APK for on-device testing
+# (e.g. a Galaxy S20). It's a release build (JS bundled via Hermes — runs without a
+# Metro dev server) signed with the debug keystore, so it installs with no
+# release-keystore management. Get it from the run's **Artifacts**, or from the rolling
+# **`apk-debug` pre-release** (this repo is public → a direct URL you can open on the phone).
+on:
+  workflow_dispatch:
+    inputs:
+      spacetimedb_host:
+        description: 'SpacetimeDB host (wss://… for Maincloud, ws://<your-LAN-IP>:3000 for a local server)'
+        default: 'wss://maincloud.spacetimedb.com'
+      spacetimedb_db:
+        description: 'SpacetimeDB database name'
+        default: 'agentspace-hpm58'
+
+permissions:
+  contents: write # to publish the rolling apk-debug pre-release
+
+env:
+  EXPO_NO_TELEMETRY: '1'
+
+jobs:
+  build:
+    name: Build debug-signed release APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Write mobile env (EXPO_PUBLIC_* are inlined into the bundle — non-secret)
+        working-directory: apps/mobile
+        env:
+          HOST: ${{ inputs.spacetimedb_host }}
+          DB: ${{ inputs.spacetimedb_db }}
+        run: |
+          cp .env.example .env.local
+          sed -i "s|^EXPO_PUBLIC_SPACETIMEDB_HOST=.*|EXPO_PUBLIC_SPACETIMEDB_HOST=${HOST}|" .env.local
+          sed -i "s|^EXPO_PUBLIC_SPACETIMEDB_DB_NAME=.*|EXPO_PUBLIC_SPACETIMEDB_DB_NAME=${DB}|" .env.local
+          echo "--- apps/mobile/.env.local ---"; cat .env.local
+
+      - name: Expo prebuild (generate the native android/ project)
+        working-directory: apps/mobile
+        run: pnpm exec expo prebuild -p android --no-install
+
+      - name: Ensure the release build is debug-signed
+        working-directory: apps/mobile/android
+        run: |
+          if ! grep -q 'signingConfig signingConfigs.debug' app/build.gradle; then
+            echo "Patching release buildType to use the debug signing config…"
+            perl -0pi -e 's/(buildTypes\s*\{[\s\S]*?\brelease\s*\{)/$1\n            signingConfig signingConfigs.debug/' app/build.gradle
+          fi
+          echo "--- signingConfig references ---"; grep -n 'signingConfig' app/build.gradle || true
+
+      - name: Build release APK (arm64-v8a only — the Galaxy S20 arch; faster)
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+
+      - name: Stage the APK
+        run: |
+          mkdir -p dist
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk dist/agentspace-debug.apk
+          ls -lh dist
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentspace-debug-apk
+          path: dist/agentspace-debug.apk
+          if-no-files-found: error
+
+      - name: Publish rolling pre-release (public repo → direct phone download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-debug
+          name: 'Debug APK (latest)'
+          prerelease: true
+          make_latest: false
+          files: dist/agentspace-debug.apk
+          body: |
+            Standalone **debug-signed release** APK for on-device testing — built from `${{ github.sha }}`.
+
+            - Target: `${{ inputs.spacetimedb_host }}` / `${{ inputs.spacetimedb_db }}`
+            - arch: `arm64-v8a` (Galaxy S20 and most modern Androids)
+            - Install: download `agentspace-debug.apk` on the phone → allow "install unknown apps" for your browser → open it.
+
+            For live agent replies, run the orchestrator against the same target (SETUP.md S-5).
