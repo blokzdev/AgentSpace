@@ -534,9 +534,12 @@ Notes: <founder fills: device + OS + result>
   the schedule didn't seed on `init` — confirm the module was **republished** (the `reaper_schedule`
   table is new) and capture the STDB row state for that message/run. Tell me.
 - **🤖 AI headless evidence (2026-06-23):** verified headlessly (`scripts/verify-reaper.ts`): a stuck
-  `streaming` message (orchestrator silent mid-stream) was driven to **`failed` by the reaper after 165s**
-  (STREAM_TTL=120s + the next 60s sweep) — crash self-heal works. The on-device "thinking…"-clears render
-  is the founder's tick.
+  `streaming` message (orchestrator silent mid-stream) was driven to **`failed` by the reaper** (~158–165s:
+  STREAM_TTL=120s + the next 60s sweep) — crash self-heal works. The on-device "thinking…"-clears render
+  is the founder's tick. *(Precondition for the headless run: **stop any running orchestrator** — `tsx
+  src/main.ts` — against the same DB first; it and the script both register the singleton `service`, so a
+  stray one steals the agent membership and the script's begin is refused. The script now `assertWeOwnService`
+  fails fast with that hint instead of an opaque 15s timeout — OT-008.)*
 - **Notes (founder):** _wait time to clear + result →_
 
 ---
@@ -662,7 +665,8 @@ Notes: <founder fills: device + OS + result>
   view (name + avatar only) feeds a **card-first** render, so every member sees the real persona name +
   emoji. `message.sender` is unchanged (still the service identity), so agents still get **no green online
   dot** — that's **expected** for the lean cut (real presence dots = the committed post-M2.9 full-identity
-  milestone). **Needs the Maincloud republish (S-8).**
+  milestone). **S-8 done (founder 2026-06-23) — Maincloud is current (AI-verified the live schema has
+  `thread_agent_cards` + `avatar_emoji`), so this is ready to run.**
 - **Setup:** the app on the S20/dev build vs Maincloud, orchestrator running (S-5). You need **two user
   accounts** — **owner A** and **owner B** (e.g. anonymous login on a second device/emulator, or a friend).
 - **Steps:**
@@ -683,4 +687,32 @@ Notes: <founder fills: device + OS + result>
   cross-owner agent card ("Lyric" 🎵) via `thread_agent_cards` with **no secret-prompt leak**; integration
   A–G regress clean; mobile typecheck confirms the projected view binds. The **on-device multi-account
   render** is the founder's tick.
+- **Notes (founder):** _device + result →_
+
+---
+
+### V-25 — Branded login + "Continue as guest" on Maincloud  ·  added 2026-06-23 · M2.9
+- **Why:** M2.9 (down-payment) replaces the single "Sign in with SpacetimeAuth" button with **our own**
+  login/onboarding screen — the first step toward native Google sign-in (DEC-037). This verifies the new
+  screen + the **guest** anonymous path (which generalizes the LOCAL_DEV anon mechanism to an explicit
+  user choice on Maincloud) before native Google lands. The "Continue with Google" button is **inert** in
+  this build (no native SDK yet) — it shows a "coming online" note until **S-9** + the next chunk wire it.
+- **Setup:** the app on the S20 / a dev build pointed at **Maincloud** (`agentspace-hpm58`). No orchestrator
+  needed (this is login only).
+- **Steps:**
+  1. Launch the app signed out → the **AgentSpace** login screen shows three actions: **Continue with
+     Google** (greyed, with "coming online — see SETUP.md S-9"), **Sign in with SpacetimeAuth**, and
+     **Continue as guest (testing)**.
+  2. Tap **Continue as guest** → the app should connect and land on the inbox (an anonymous Identity).
+  3. Note the identity (create a thread / agent), then **fully close and reopen** the app.
+  4. (Regression) **Sign out** from the inbox → you're back on the login screen → **Sign in with
+     SpacetimeAuth** still completes the OIDC login as before.
+- **Pass when:** guest connects and reaches the app; the **same identity persists across the cold restart**
+  (your thread/agent is still there as the same user — not a fresh anonymous identity each launch); the
+  SpacetimeAuth path is unchanged; the Google button is visibly inert (not crashing).
+- **If it fails:** guest never connects (capture the connect error — Maincloud may reject anonymous if the
+  module/login config changed); a new identity each restart → the guest token isn't persisting (SecureStore
+  `agentspace.guest.token`); SpacetimeAuth regressed → capture the error. Tell me which.
+- **🤖 AI evidence (2026-06-23):** CI 16/16 + Android bundle clean (652 modules, 2.19 MB) — the screen +
+  guest wiring typecheck and bundle. The on-device connect + cold-restart persistence is the founder's tick.
 - **Notes (founder):** _device + result →_

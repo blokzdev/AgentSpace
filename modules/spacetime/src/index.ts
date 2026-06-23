@@ -388,8 +388,12 @@ export const delete_agent = spacetimedb.reducer({ agentId: t.u64() }, (ctx, { ag
   ctx.db.agent.id.delete(agentId);
 });
 
-// The orchestrator registers its identity once so agent DMs can add it as the
-// `agent` member. First-wins in v1 (harden with OT-007).
+// The orchestrator registers its identity so agent DMs can add it as the `agent`
+// member. LAST-write-wins today: a later caller overwrites `service.identity` — fine
+// for the single central orchestrator (DEC-027), but it means two concurrent service
+// identities (e.g. a stray orchestrator vs a verify script) clobber each other. The
+// guarded fix (reject a competing identity) is OT-007; the test scripts preflight it
+// via assertWeOwnService (services/orchestrator/scripts/_harness.ts).
 export const register_service = spacetimedb.reducer(
   { encPubKey: t.string() },
   (ctx, { encPubKey }) => {

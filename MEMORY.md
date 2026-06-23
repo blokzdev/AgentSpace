@@ -92,22 +92,26 @@ the episode budget untouched) + a `buildPrompt` isolation regression test. Stric
 `addressing.md` by design. CI 16/16 (49 orch tests). *(M2.2 presence/typing shipped just prior — #41; S-6
 Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 
-- **Active branch:** `feat/m2.4-public-agent-cards` (M2.4 lean — public agent cards, BL-021; DEC-038). Recent
-  merges: M2.3 NL (#42); V-6 (#43); V-2/V-22 (#44); `build-apk` (#45–47); M2.9 auth docs (#48). Repo
-  **public**, **Apache-2.0**.
+- **Active branch:** `feat/m2.9-downpayment-ot008` (M2.9 down-payment + OT-008; DEC-039). Recent merges:
+  M2.3 NL (#42); V-6 (#43); V-2/V-22 (#44); `build-apk` (#45–47); M2.9 auth docs (#48); M2.4 lean (#49).
+  Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** **S-6 ✓ done** (M2.1 Maincloud republish; AI-verified). **S-5** (run orchestrator vs
-  Maincloud) works. **S-7** open — rotate the shared Anthropic key (AI uses it for local test loops meanwhile).
-  **Coming for M2.9:** a Google OAuth client + SpacetimeAuth/Maincloud config. S-1/S-2/S-3 done; S-4 optional.
+- **Open founder work:** **S-6 / S-8 ✓ done** (M2.1 + M2.4 Maincloud republishes; AI-verified). **S-5** (run
+  orchestrator vs Maincloud) works. **S-9 open** — the **Google OAuth client** (the single M2.9 unblock;
+  authored this chunk). **S-7** open — rotate the shared Anthropic key (AI uses it for local test loops
+  meanwhile). S-1/S-2/S-3 done; S-4 optional.
 - **Verification status:** **V-2 / V-6 / V-22 ✅ AI-completed** (server-side, no UI). **Founder device-render
-  ticks owed:** **V-13/V-14** (M1.9), **V-15/16/17/19** (M2.1 — S-6 done, headless real-model evidence
-  captured), **V-21** (M2.5 app reconnect), **V-23** (M2.2 presence). *(OT-004 resolved by M1.9.)*
-- **Next build:** **M2.9** (production auth + login UX — native Google sign-in; DEC-037) → **M3** (RAG);
-  **M2.4-full** (per-agent identity + presence dots, BL-014) committed for **after M2.9**; **BL-016** chat
-  polish at **M6**; **BL-011** durable key backing. *(M2.1/2.2/2.3/2.5 shipped; M2.4 lean shipped — BL-021.)*
+  ticks owed:** **V-13/V-14** (M1.9), **V-15/16/17/19** (M2.1), **V-21** (M2.5), **V-23** (M2.2), **V-24**
+  (M2.4 — now ready, Maincloud current), **V-25** (M2.9 branded login + guest — new). *(OT-004 resolved by
+  M1.9; OT-008 resolved this chunk.)*
+- **Next build:** **M2.9 STARTED** — down-payment shipped (branded login UX + guest path + S-9); **next chunk
+  = native Google sign-in + the module `aud`/`iss` guard** (M2.9.2, gated on the founder's Web client ID from
+  S-9) → **M3** (RAG); **M2.4-full** (per-agent identity + presence dots, BL-014) committed for **after
+  M2.9**; **BL-016** chat polish at **M6**; **BL-011** durable key backing. *(M2.1/2.2/2.3/2.5 + M2.4 lean
+  shipped.)*
 
 ---
 
@@ -707,6 +711,43 @@ headless (`verify-cards`: A sees B's cross-owner card, no secret leak; integrati
 
 ---
 
+### DEC-039 — M2.9 down-payment (login UX + guest) + OT-008 resolved; Google-auth de-risked
+*2026-06-23.* After M2.4-lean shipped and Maincloud was brought current (the S-8 republish — see the
+deploy gotcha below), a critic-vetted multi-agent investigation chose the next chunk. **M2.9 (production
+auth) is the next milestone**, but its first phase **M2.9.1 (issuer-trust spike) is founder-gated** on a
+Google OAuth client that **did not yet exist as an S-item**. Founder ratified the **"down-payment + rider"**:
+build the founder-independent slice of M2.9 now, author the unblock, and clear OT-008 — no schema/bindings
+change, no republish, CI 16/16. **Choices:** (1) **Mobile login down-payment** — replaced the single
+SpacetimeAuth button with **our own branded `Login` screen** (Google-first inert button behind
+`GOOGLE_CONFIGURED` + the working SpacetimeAuth button as the **Path-A fallback, kept intact** + a working
+**"Continue as guest"**), and generalized the existing **LOCAL_DEV anonymous-connect** mechanism
+(`makeBuilder(persistKey)` + a persisted `guest` flag/token in `App.tsx`) into an explicit guest choice on
+Maincloud (stable identity across restart; reuses `ConnectionGate` + a kept-token refresh). Native
+`@react-native-google-signin` wiring + `app.json` plugin are **deferred to the next chunk** (they force a
+native rebuild / risk the `expo export` CI bundle). (2) **Authored SETUP `S-9`** — the founder's Google
+Cloud Console steps (consent screen + **Web** client = `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`/the module `aud`
++ **Android** client for `com.agentspace.probe` with the debug SHA-1; no redirect URIs for native
+google-signin; prod SHA-1 = LG-9). **The single unblock for M2.9.2.** (3) **OT-008 resolved** (test-harness
+only): a stray orchestrator re-registers the singleton `service` (last-write-wins) and clobbers a script's
+registration, so its `agent_reply_begin` is refused; `verify-reaper.ts`'s `.catch(()=>{})` hid it. Fix =
+a shared `assertWeOwnService` preflight (`scripts/_harness.ts`, reads `service_info`) wired into
+verify-reaper + integration, the unmasked verify-reaper catch, a `service`-comment drift fix (the
+"First-wins" comment was wrong — code is last-wins), and a V-18 precondition note. **NOT** changing the
+reducer behavior (that's OT-007, founder-routed). **Key de-risk findings (carried for M2.9.2):** SpacetimeDB
+derives Identity = `blake3(iss+"|"+sub)` and **auto-fetches the issuer's JWKS**, so **Google issuer-trust
+needs no Maincloud config** (the finicky edge, SpacetimeDB issue #2600, is specific to non-standard issuers
+like Supabase — Google's discovery doc is standard). **But SpacetimeDB does NOT validate `aud`** — since
+`iss` is identical for every Google app, the module **must** check `aud == our Web client ID` via
+`ctx.senderAuth.jwt` (1.12+ API) or any Google token from any app could connect — this is the security
+task of M2.9.2. Path A (SpacetimeAuth dashboard + Google) stays the zero-code fallback. **Deploy gotcha
+(→ LG-10):** the S-8 republish first went to the **local** server because `modules/spacetime/spacetime.json`
+pins `server=local`, which overrides the CLI default — **every Maincloud publish MUST pass `--server
+maincloud`**; corrected, Maincloud verified current (`thread_agent_cards` + `avatar_emoji`), **V-24
+unblocked**. Resolves **OT-008**. On-device = **V-25** (branded login + guest). Supersedes nothing; advances
+DEC-037.
+
+---
+
 ## Session Journal (append-only)
 
 ### 2026-06-13 — Project bootstrap
@@ -1257,6 +1298,27 @@ headless (`verify-cards`: A sees B's cross-owner card, no secret leak; integrati
   dots, BL-014) committed for after M2.9. On-device = a new V-item (needs the Maincloud `--delete-data`
   republish, new S-item).
 
+### 2026-06-23 — Maincloud fix, OT-008, M2.9 down-payment (DEC-039)
+- **Orient + Maincloud:** founder's S-8 republish had gone to the **local** server (the `spacetime.json`
+  `server=local` pin overrides the CLI default → bare `publish` goes local). Diagnosed + verified: local
+  `agentspace` + a stray local `agentspace-hpm58` both had M2.4 schema; **Maincloud was stale (M2.1)**.
+  Founder re-ran with **`--server maincloud --delete-data=on-conflict --yes`** → AI verified the live
+  schema now has `thread_agent_cards` + `avatar_emoji`. **S-8 done; V-24 unblocked.** Fixed the misleading
+  S-8 command in SETUP + added **LG-10** (deploy discipline).
+- **OT-008:** reproduced — with no stray orchestrator, `verify-reaper` passes clean (reaper self-heal in
+  **158s**). Root cause = stray-orchestrator service-singleton clobber. Resolved.
+- **Planning (ultracode):** a 6-agent workflow (4 investigators → synth → adversarial critic) chose the
+  **"M2.9 down-payment + OT-008 rider"** chunk; founder ratified Option 1. De-risked M2.9: Google issuer-
+  trust "just works" (no Maincloud config); the real task is a module `aud` check (M2.9.2).
+- **Shipped on `feat/m2.9-downpayment-ot008`:** (A) mobile — branded `Login` (inert Google + SpacetimeAuth
+  fallback + working **guest** path on Maincloud; `App.tsx` `makeBuilder(persistKey)` + persisted guest
+  flag), `GOOGLE_*` config scaffolding; (B) OT-008 — `scripts/_harness.ts` `assertWeOwnService` + unmasked
+  catch + `index.ts` comment-drift fix; (C) **SETUP S-9** (Google OAuth client), V-25, LG-10, ROADMAP/MEMORY.
+  **CI 16/16; Android bundle clean (652 modules, 2.19 MB); no schema/bindings change → no republish.**
+- **Next:** founder does **S-9** (Google OAuth client) → next chunk wires **native Google sign-in + the
+  module `aud`/`iss` guard** (M2.9.2). Founder on-device: **V-24** (now ready), **V-25** (new), + the M2.1
+  batch. Still owed: **S-7** (rotate Anthropic key).
+
 ---
 
 ## Open Threads
@@ -1297,11 +1359,13 @@ headless (`verify-cards`: A sees B's cross-owner card, no secret leak; integrati
   doesn't fit a headless service. Decide the real grant (SpacetimeAuth
   client-credentials / a long-lived service token) and wire it. Unblocks: trusted
   agent identity in production. Likely alongside M1.6 (orchestrator reply loop).
-- **OT-008** — *`verify-reaper.ts` (V-18) setup regression.* The script's synthetic `agent_reply_begin` is
-  silently refused (a `.catch(()=>{})` hides the reason), so it can't create the stuck stream — most likely a
-  **leftover orchestrator re-registering the `service` singleton**. Fix: unmask the catch + make it robust to
-  a shared service registration (run vs a clean orchestrator). Test-harness only — the reaper mechanism has
-  prior passing evidence + is structurally present. A spawn_task chip exists; owner = a fix pass.
+- **OT-008** — *`verify-reaper.ts` (V-18) setup regression.* ✅ **Resolved by DEC-039 (2026-06-23).** Root
+  cause confirmed: a leftover orchestrator re-registers the singleton `service` (last-write-wins), stealing
+  the thread's `agent` membership, so the script's `agent_reply_begin` is refused — and the `.catch(()=>{})`
+  hid it. With no stray orchestrator, V-18 passes clean (reaper self-healed a stuck stream in 158s). Fix:
+  a shared `assertWeOwnService` preflight (`services/orchestrator/scripts/_harness.ts`) wired into
+  verify-reaper + integration + the unmasked verify-reaper catch + a `service`-comment drift fix. The
+  *behavioral* hardening (reject a competing registration) stays **OT-007**, founder-routed.
 
 ---
 

@@ -23,3 +23,17 @@ export const SPACETIMEAUTH_CLIENT_ID: string =
 export const SPACETIMEAUTH_SCOPES: readonly string[] = ['openid', 'profile', 'email', 'offline_access'];
 
 export const SPACETIMEAUTH_CONFIGURED: boolean = SPACETIMEAUTH_CLIENT_ID.length > 0;
+
+// Google sign-in (M2.9, DEC-037) — production auth via NATIVE Google Sign-In. The
+// WEB client ID is what makes Google mint an id token (and becomes the token's `aud`,
+// which the module verifies). No default → the login screen's "Continue with Google"
+// stays inert until the founder wires it (SETUP.md S-9). Native SDK wiring is the
+// next chunk; this build only scaffolds the config + an inert button.
+export const GOOGLE_WEB_CLIENT_ID: string =
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+
+// Android OAuth client ID (used by the native SDK in the next chunk). Placeholder now.
+export const GOOGLE_ANDROID_CLIENT_ID: string =
+  process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? '';
+
+export const GOOGLE_CONFIGURED: boolean = GOOGLE_WEB_CLIENT_ID.length > 0;

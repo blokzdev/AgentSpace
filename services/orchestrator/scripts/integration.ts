@@ -26,6 +26,7 @@ import { connectOrchestrator } from '../src/spacetime';
 import { runOrchestrator } from '../src/supervise';
 import { startReplyLoop } from '../src/replyLoop';
 import { createByokResolver, loadOrCreateKeypair, pubKeyB64, seal } from '../src/byok';
+import { assertWeOwnService } from './_harness';
 
 const HOST = process.env.AGENTSPACE_STDB_HOST ?? 'ws://127.0.0.1:3000';
 const DB = process.env.AGENTSPACE_STDB_DB ?? 'agentspace';
@@ -186,6 +187,11 @@ async function run(): Promise<void> {
   seed();
 
   await until('3 personas authored', () => [...user.conn.db.my_agents.iter()].length >= 3);
+  // Guard the whole run: confirm WE own the service singleton. If a stray orchestrator
+  // (`tsx src/main.ts`) is connected to this DB it would have clobbered the registration
+  // (last-write-wins) and every reply-loop begin would be refused — fail fast with the
+  // actionable hint instead of mid-scenario timeouts (OT-008).
+  assertWeOwnService(user.conn, orch.identity, fail);
   const agentId = (name: string): bigint => {
     const a = [...user.conn.db.my_agents.iter()].find((x) => x.name === name);
     if (!a) fail(`agent ${name} not found`);

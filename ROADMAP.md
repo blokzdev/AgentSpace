@@ -32,8 +32,13 @@ manual **`build-apk`** workflow now ships a debug-signed **release** APK (runnin
 **M2.4 lean shipped** (public agent cards → cross-owner names/avatars, BL-021; DEC-038). **Next: M2.9**
 (production auth + login UX — native Google sign-in; DEC-037) → **M3** (RAG) → **BL-016** (chat polish, at
 M6) / **BL-011** (durable key backing); **M2.4-full** (per-agent identity + presence dots) committed for
-after M2.9. Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6
-done; S-4 optional, S-7 (key rotation) + S-8 (M2.4 republish) open.
+after M2.9. **M2.9 STARTED (down-payment, 2026-06-23):** the founder-independent slice landed — our own
+branded **login/onboarding UX** + a working **"Continue as guest"** anonymous path on Maincloud + Google
+config scaffolding (inert button) — and **S-9** (the Google OAuth client) is authored; native Google sign-in
++ the module `aud` guard are the next chunk (gated on the founder's Web client ID). **OT-008 closed**
+(verify-reaper hardened). **S-8 done + Maincloud current → V-24 unblocked.** Optional: **V-9/V-10/V-11**.
+Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6/**S-8** done; S-4 optional, **S-7** (key
+rotation) open; **S-9** (Google OAuth client) is the open M2.9 unblock.
 
 ---
 
@@ -348,15 +353,29 @@ Path B; Path A is the guaranteed fallback.**
   end-to-end (the JWKS path — a known finicky edge for custom issuers). Decide Path B vs the Path A
   fallback. Founder S-item: a **Google OAuth client** (Cloud Console) + the SpacetimeAuth/Maincloud
   config (reusable across both paths).
-- **M2.9.2 — Native Google sign-in.** RN native Google auth (Expo) → id token → `withToken`; identity
-  wiring + token refresh/persist (replaces the hosted flow on the happy path). Removes the "can't get
-  back to the method list" UX — there is no hosted method list anymore.
+  - *De-risked (2026-06-23, research): for Google, issuer trust should "just work" — SpacetimeDB derives
+    Identity from `iss+sub` and auto-fetches the issuer's standard JWKS, so no Maincloud allow-list is
+    needed (the known finicky edge, issue #2600, is specific to non-standard issuers like Supabase). The
+    real security task moves to M2.9.2: the module must verify `aud` == our Web client ID, since SpacetimeDB
+    does NOT check `aud`. Founder unblock authored as **SETUP S-9**.*
+- **M2.9.2 — Native Google sign-in.** RN native Google auth (`@react-native-google-signin/google-signin`,
+  dev build) → id token → `withToken`; identity wiring + token refresh/persist (replaces the hosted flow on
+  the happy path); **module `aud`/`iss` guard** via `ctx.senderAuth.jwt`. Removes the "can't get back to the
+  method list" UX — there is no hosted method list anymore. *Gated on S-9 (the founder's Web client ID).*
 - **M2.9.3 — Login & onboarding UX + cleanup.** Our own sign-in screen (Google + "continue as guest"
   for testing) + a minimal first-run; **remove email/password**; keep anonymous behind a clear
   guest/testing affordance (retire at launch).
+  - ✓ *[down-payment 2026-06-23]: our own branded **Login** screen (`apps/mobile/src/screens/Login.tsx`)
+    with an inert "Continue with Google" (behind `GOOGLE_CONFIGURED`), the working SpacetimeAuth button
+    (Path-A fallback), and a working **"Continue as guest"** anonymous path on Maincloud
+    (`App.tsx` — generalizes the LOCAL_DEV anon mechanism; stable identity across restart). Config
+    scaffolding (`GOOGLE_*` env + flags) added. CI 16/16; bundle 2.19 MB. The hosted method-list / email-
+    password removal completes when native Google replaces the SpacetimeAuth flow (M2.9.2). On-device = **V-25**.*
 
-Human verification (founder-owned, a new V-item): native Google sign-in on-device — stable identity
-that **persists across a cold restart**; the anonymous "guest" path still works for testing.
+Human verification (founder-owned): **V-25** (this chunk) — the branded login screen renders, "Continue as
+guest" connects on Maincloud and yields a **stable identity across a cold restart**, and the inert Google
+button shows its "coming online" state. A later V-item covers native Google sign-in once M2.9.2 wires it
+(stable identity persists across a cold restart; the guest path still works for testing).
 
 ---
 
