@@ -92,21 +92,22 @@ the episode budget untouched) + a `buildPrompt` isolation regression test. Stric
 `addressing.md` by design. CI 16/16 (49 orch tests). *(M2.2 presence/typing shipped just prior — #41; S-6
 Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 
-- **Active branch:** `feat/m2.3-nl-address` (M2.3 NL soft-address — DEC-036). Prior: M2.2 presence (#41,
-  DEC-035); M2.5 reconnect (#40, DEC-034); M2.1 (#36). Repo **public**, **Apache-2.0**.
+- **Active branch:** `docs/m2.9-auth-and-currency` (DEC-037 auth milestone + doc currency). Recent merges:
+  M2.3 NL (#42, DEC-036); V-6 (#43); V-2/V-22 + verify-views (#44); `build-apk` workflow (#45–47). Repo
+  **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** **S-6** (Maincloud `--delete-data` republish for M2.1's new tables) — required
-  before **V-15…V-19**. **S-5** (run orchestrator vs Maincloud) works. **S-7** new — rotate the shared
-  Anthropic key (security hygiene; AI keeps using it for local test loops meanwhile). S-1/S-2/S-3 done;
-  S-4 optional (gateway smoke / V-6).
-- **On-device verification owed (founder):** **V-13/V-14** (M1.9 long-reply + cancel render); **V-15…V-19**
-  (M2.1 multi-agent — needs S-6); **V-21/V-22** (M2.5 reconnect — *no* republish). AI has headless evidence
-  for all; the founder ticks the device render. *(OT-004 long-reply cursor is RESOLVED by M1.9 delta-streaming.)*
-- **Next build:** **M2.4** (per-agent identity & real presence, BL-014 — first M2 phase needing a schema/identity
-  change) → **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable key backing). *(M2.2/M2.3 shipped.)*
+- **Open founder work:** **S-6 ✓ done** (M2.1 Maincloud republish; AI-verified). **S-5** (run orchestrator vs
+  Maincloud) works. **S-7** open — rotate the shared Anthropic key (AI uses it for local test loops meanwhile).
+  **Coming for M2.9:** a Google OAuth client + SpacetimeAuth/Maincloud config. S-1/S-2/S-3 done; S-4 optional.
+- **Verification status:** **V-2 / V-6 / V-22 ✅ AI-completed** (server-side, no UI). **Founder device-render
+  ticks owed:** **V-13/V-14** (M1.9), **V-15/16/17/19** (M2.1 — S-6 done, headless real-model evidence
+  captured), **V-21** (M2.5 app reconnect), **V-23** (M2.2 presence). *(OT-004 resolved by M1.9.)*
+- **Next build:** **M2.4** (per-agent identity, BL-014 — schema/identity change) → **M2.9** (production auth +
+  login UX — native Google sign-in; DEC-037) → **M3** (RAG); **BL-016** chat polish at **M6**; **BL-011**
+  durable key backing. *(M2.1/2.2/2.3/2.5 shipped.)*
 
 ---
 
@@ -668,6 +669,22 @@ and the shipped code don't silently diverge. **No schema/mobile/bindings/shared 
 16/16 (49 orch tests). Deferred (BL-020): selective per-agent message VISIBILITY, agent-side NL, @human,
 multi-agent NL.
 
+### DEC-037 — Pull production auth (native Google sign-in) + login UX forward to M2.9, before M3
+*2026-06-23.* On-device APK testing surfaced that the login is **SpacetimeAuth's hosted OIDC UI** (a
+method-list with no back-nav; feels primitive) and prompted the founder's Q: Google sign-in? avoid
+email/password? **Verified (SpacetimeDB docs):** SpacetimeAuth supports Google as a configurable social
+provider (**Path A**, dashboard config), AND SpacetimeDB derives identity from **any OIDC issuer's
+`iss+sub`**, so a **native** Google Sign-In (Google id token → `withToken`) is possible (**Path B**).
+**Decision (founder-ratified):** a dedicated **M2.9 "Production auth & onboarding"** milestone — **native
+Google sign-in (Path B) + a login/onboarding UX we control + anonymous-for-testing + remove
+email/password** — done **right after M2 (post-M2.4), before M3**, because auth is identity-defining
+(Path B re-keys identities on Google's `iss+sub`) and settling it before RAG/workflows/per-user data
+avoids a later migration; it also transforms the on-device test loop. **Scope guardrail:** M2.9 = auth +
+the login surface ONLY; broad app/chat polish stays **BL-016 / M6** (don't over-polish pre-validation).
+**De-risk:** an M2.9.1 spike confirms Maincloud trusts `accounts.google.com` (a known finicky JWKS edge);
+**Path A (SpacetimeAuth + Google) is the guaranteed fallback** so we're never blocked. Pairs with **LG-9**
+(production app signing). Anonymous login works **now** for testing meanwhile. Docs-only this PR.
+
 ---
 
 ## Session Journal (append-only)
@@ -1187,6 +1204,24 @@ multi-agent NL.
 - **Next:** **M2.4** (per-agent identity & real presence, BL-014) — the first M2 phase needing a schema/identity
   change — or the on-device V-batch (V-15…V-23, all now unblocked).
 
+### 2026-06-23 — On-device APK, verification sweep, build tooling, auth decision (DEC-037)
+- **On-device:** founder installed the **release** APK (debug-signed) on a **Galaxy S20** → reached the
+  Maincloud SpacetimeAuth login. Clarified those login screens are SpacetimeAuth's **hosted** UI.
+- **Verification (local stack):** stood up local spacetime + published; **V-2** (Views isolation, new
+  `verify-views.ts`), **V-6** (gateway live round-trip — Haiku; Opus overloaded), **V-22** (orchestrator
+  self-heal via integration **Scenario G** run live) **AI-completed + ticked**; integration **A–G** +
+  `verify-realmodel` (V-15/16/17/19) re-confirmed live. **V-18 reaper** re-run regressed at setup (leftover
+  orchestrator clobbered the `service` singleton) → **OT-008**; prior evidence stands. Stopped **24**
+  leftover dev processes; kept the local server.
+- **Build tooling:** new **`build-apk`** workflow (manual `workflow_dispatch`) — a standalone debug-signed
+  **release** APK (arm64), uploaded as an artifact + a rolling **`apk-release`** pre-release (public repo →
+  a direct phone-download URL). Verified it builds (needed `pnpm run build` so Metro resolves
+  `@agentspace/shared/dist`). Real prod signing = **LG-9** (launch).
+- **Decision — DEC-037:** production auth (native Google) + login UX → a new **M2.9** milestone, after M2,
+  before M3 (scope = auth/login only; broad polish stays M6/BL-016). PRs this stretch: #42 (M2.3), #43 (V-6),
+  #44 (V-2/V-22 + verify-views), #45–47 (build-apk + naming).
+- **Next:** **M2.4** (per-agent identity) → **M2.9** (production auth) → M3.
+
 ---
 
 ## Open Threads
@@ -1227,6 +1262,11 @@ multi-agent NL.
   doesn't fit a headless service. Decide the real grant (SpacetimeAuth
   client-credentials / a long-lived service token) and wire it. Unblocks: trusted
   agent identity in production. Likely alongside M1.6 (orchestrator reply loop).
+- **OT-008** — *`verify-reaper.ts` (V-18) setup regression.* The script's synthetic `agent_reply_begin` is
+  silently refused (a `.catch(()=>{})` hides the reason), so it can't create the stuck stream — most likely a
+  **leftover orchestrator re-registering the `service` singleton**. Fix: unmask the catch + make it robust to
+  a shared service registration (run vs a clean orchestrator). Test-harness only — the reaper mechanism has
+  prior passing evidence + is structurally present. A spawn_task chip exists; owner = a fix pass.
 
 ---
 

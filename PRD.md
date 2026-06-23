@@ -35,7 +35,7 @@ Android-first (DEC-005); iOS later.
 
 ## 3. The experience (what it feels like)
 
-1. **Sign in** → you have a contact list and threads, like a messenger.
+1. **Sign in with Google** (no passwords) → you have a contact list and threads, like a messenger.
 2. **Build an agent** in Agent Studio: give it a name and résumé/identity, a
    system prompt, a model (Claude/Gemini/OpenAI/local), a knowledge base, a
    toolkit, and optional workflows. It joins your contacts.

@@ -26,10 +26,13 @@ stranded the app / killed the orchestrator during V-15…V-19 setup. **M2.2 ✓ 
 inbox + open thread (pure mobile, no schema change). **S-6 DONE** (founder re-published M2.1 to Maincloud
 2026-06-23; AI-verified the live schema has the new tables). **On-device pending:** **V-15…V-19** (M2.1 —
 now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). **M2.3 ✓ built & CI-green** — the NL
-"Hey {name}," soft-address + the per-agent isolation guarantee (pure orchestrator, no schema change). Then
-**M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
-(durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup
-S-1/S-2/S-3/S-6 done; S-4 optional, S-7 (key rotation) open.
+"Hey {name}," soft-address + the per-agent isolation guarantee (pure orchestrator, no schema change). **V-2 /
+V-6 / V-22 AI-completed** (local-stack Views isolation + live gateway round-trip + orchestrator self-heal); a
+manual **`build-apk`** workflow now ships a debug-signed **release** APK (running on-device on a Galaxy S20).
+**Next: M2.4** (per-agent identity, BL-014) → **M2.9** (production auth + login UX — native Google sign-in;
+DEC-037) → **M3** (RAG) → **BL-016** (chat polish, at M6) / **BL-011** (durable key backing). Optional:
+**V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6 done; S-4 optional,
+S-7 (key rotation) open.
 
 ---
 
@@ -309,6 +312,42 @@ storm bound; **V-18** typing + crash self-heal (kill the orchestrator mid-stream
 clears via the reaper); **V-19** per-agent BYOK in a group (two agents, two owners' keys); and
 (at M2.4) **V-20** per-agent presence/avatars. **M2.5** adds **V-21** (app auto-reconnect after a
 dropped socket) + **V-22** (orchestrator self-heals a drop, no process exit) — **no republish needed**.
+
+---
+
+## M2.9 — Production auth & onboarding  (a foundation beat between M2 and M3; DEC-037)
+
+**Acceptance bar:** a user signs in with their **Google account** via a **native, in-app** flow (no
+hosted method-list to get stuck in) and gets a stable per-user `Identity`; the **login & onboarding
+UX is ours** (not SpacetimeAuth's hosted pages); **anonymous login stays** for testing; **email/
+password is removed**. Verified on-device.
+
+**Why here (DEC-037).** Auth is identity-defining — Path B re-keys identities on Google's `iss+sub`,
+so settling it **before M3+ (RAG / workflows / per-user data)** avoids a later migration, and a real
+login transforms every on-device test. Pulled forward to right after M2 (founder's call). **Scope
+guardrail:** this milestone is **auth + the login/onboarding surface only** — broad app/chat polish
+stays **BL-016 / M6** (don't over-polish before the product is validated). Pairs with **LG-9**
+(production app signing).
+
+**Approach.** Today's login is **SpacetimeAuth's hosted OIDC** (issuer `auth.spacetimedb.com`). Two
+ways to Google: **Path A** = add Google as a provider in the SpacetimeAuth dashboard (config-only,
+guaranteed); **Path B** = **native** Google Sign-In → Google **id token** → `DbConnection.withToken()`
+→ SpacetimeDB derives identity from Google's `iss+sub` (a UI we fully control, no webview). **Target
+Path B; Path A is the guaranteed fallback.**
+
+- **M2.9.1 — Issuer-trust spike (½ day).** Confirm Maincloud can **trust `accounts.google.com`**
+  end-to-end (the JWKS path — a known finicky edge for custom issuers). Decide Path B vs the Path A
+  fallback. Founder S-item: a **Google OAuth client** (Cloud Console) + the SpacetimeAuth/Maincloud
+  config (reusable across both paths).
+- **M2.9.2 — Native Google sign-in.** RN native Google auth (Expo) → id token → `withToken`; identity
+  wiring + token refresh/persist (replaces the hosted flow on the happy path). Removes the "can't get
+  back to the method list" UX — there is no hosted method list anymore.
+- **M2.9.3 — Login & onboarding UX + cleanup.** Our own sign-in screen (Google + "continue as guest"
+  for testing) + a minimal first-run; **remove email/password**; keep anonymous behind a clear
+  guest/testing affordance (retire at launch).
+
+Human verification (founder-owned, a new V-item): native Google sign-in on-device — stable identity
+that **persists across a cold restart**; the anonymous "guest" path still works for testing.
 
 ---
 
