@@ -13,7 +13,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Identity } from 'spacetimedb';
 import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { reducers, tables } from '../../module_bindings';
+import { thinkingLabel } from '@agentspace/shared';
 import { Avatar } from '../components/Avatar';
+import { TypingDots } from '../components/TypingDots';
 import { colors, fmtTime, radius, shortId, space } from '../chat';
 
 interface MentionInput {
@@ -107,6 +109,23 @@ export function Thread({
   const displayText = (m: { streamState: string; runId: string; text: string }): string =>
     m.streamState === 'streaming' ? (deltaTextByRun.get(m.runId) ?? m.text) : m.text;
 
+  // M2.2: which agents are mid-reply in THIS thread (deduped by agentId) → a presence
+  // label for the header. Derived purely from `streaming` rows; clears on complete/failed
+  // (incl. the reaper). Cross-owner agents fall back to "Agent" (BL-021).
+  const streamingAgentNames = useMemo(() => {
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const m of messages) {
+      if (m.streamState !== 'streaming' || m.agentId === 0n) continue;
+      const key = m.agentId.toString();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      names.push(agentNameById.get(m.agentId) ?? 'Agent');
+    }
+    return names;
+  }, [messages, agentNameById]);
+  const thinkingHeader = thinkingLabel(streamingAgentNames);
+
   useEffect(() => {
     if (messages.length > 0) listRef.current?.scrollToEnd({ animated: true });
   }, [messages.length]);
@@ -156,7 +175,15 @@ export function Thread({
         <Pressable onPress={onBack} hitSlop={12}>
           <Text style={styles.back}>‹ Chats</Text>
         </Pressable>
-        <Text numberOfLines={1} style={styles.title}>{headerTitle}</Text>
+        <View style={styles.headerCenter}>
+          <Text numberOfLines={1} style={styles.title}>{headerTitle}</Text>
+          {thinkingHeader ? (
+            <View style={styles.headerThinking}>
+              <Text numberOfLines={1} style={styles.headerThinkingText}>{thinkingHeader}</Text>
+              <TypingDots size={4} />
+            </View>
+          ) : null}
+        </View>
         <Pressable onPress={onMembers} hitSlop={8}>
           <Text style={styles.membersLink}>{members.length} members ›</Text>
         </Pressable>
@@ -192,7 +219,10 @@ export function Thread({
               <View style={[styles.bubble, styles.theirs]}>
                 <Text style={styles.sender}>{label}</Text>
                 {streaming && body.length === 0 ? (
-                  <Text style={[styles.body, styles.thinking]}>{label} is thinking…</Text>
+                  <View style={styles.thinkingRow}>
+                    <Text style={[styles.body, styles.thinking]}>{label} is thinking</Text>
+                    <TypingDots size={4} />
+                  </View>
                 ) : (
                   <Text style={styles.body}>
                     {body}
@@ -248,7 +278,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   back: { color: colors.accent, fontSize: 14 },
-  title: { color: colors.text, fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerCenter: { flex: 1, alignItems: 'center' },
+  title: { color: colors.text, fontSize: 17, fontWeight: '700', textAlign: 'center', alignSelf: 'stretch' },
+  headerThinking: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 },
+  headerThinkingText: { color: colors.accent, fontSize: 11 },
   membersLink: { color: colors.dim, fontSize: 12 },
   list: { flex: 1, paddingHorizontal: space.md },
   empty: { color: colors.faint, textAlign: 'center', marginTop: space.xl },
@@ -259,6 +292,7 @@ const styles = StyleSheet.create({
   sender: { color: colors.accent, fontSize: 12, fontWeight: '600', marginBottom: 2 },
   body: { color: colors.text, fontSize: 15 },
   thinking: { color: colors.dim, fontStyle: 'italic' },
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   cursor: { color: colors.accent },
   time: { color: colors.faint, fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   suggestions: {

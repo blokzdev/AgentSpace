@@ -252,8 +252,8 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5
-│       · App.tsx · src/auth.ts · src/byok.ts · src/reconnect.tsx · src/components/Avatar.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5; presence/typing M2.2
+│       · App.tsx · src/auth.ts · src/byok.ts · src/reconnect.tsx · src/components/{Avatar,TypingDots}.tsx
 │       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,AgentPicker,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
@@ -271,7 +271,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -448,6 +448,15 @@ reconnect, **never exiting**; `index.ts` `main()` drives it (the stable persiste
 reconnects). **No module/schema/bindings change.** Proven by shared + 3 `supervise.test.ts` unit tests +
 integration **Scenario G** (`conn.disconnect()` → reconnect → a new message answered over the fresh
 connection); on-device = `V-21/V-22`.
+
+**M2.2 (agent presence & typing):** the minimal M2.1 "{name} is thinking…" became an **animated** presence
+affordance — pure mobile, **no schema change** (agent activity is derived client-side from `streaming`
+`my_thread_messages` rows tagged `agentId`, and self-heals via the reaper). `@agentspace/shared` adds a pure
+`thinkingLabel(names)` (0→null / 1 / 2 / ≥3 arms, unit-tested); `apps/mobile/src/components/TypingDots.tsx`
+is a dependency-free RN-`Animated` three-dot indicator; `Avatar` gains a pulsing `thinking` halo. Surfaced in
+the **inbox** (`ThreadList.tsx` — "🤖 {who} is thinking…", multi-agent-aware, replacing the bare `▍`), the
+**open thread** (`Thread.tsx` — a header subtitle + the per-row indicator), and the agent avatar. On-device =
+`V-23`. Human typing + per-agent *online* presence are deferred (need a `presence` table) → BL-024 / M2.4.
 
 See `BLUEPRINT.md` §2 for the module graph.
 

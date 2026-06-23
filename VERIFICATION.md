@@ -601,3 +601,32 @@ Notes: <founder fills: device + OS + result>
   backoff growth + reset, and never-exit (injected connector + fake sleep). The founder's tick adds the real
   Maincloud network-drop run.
 - **Notes (founder):** _how the drop was induced + result →_
+
+---
+
+### V-23 — Agent presence & typing render (animated "thinking…")  ·  added 2026-06-23 · M2.2
+- **Why:** M2.2 turned the minimal M2.1 "{name} is thinking…" into an **animated** presence affordance,
+  derived purely from `streaming` message rows (no schema change) and surfaced in the **inbox**, the open
+  thread, and the agent avatar. The pure label logic (`thinkingLabel`) is unit-tested; this confirms the RN
+  animation + multi-agent + self-heal behavior on-device. **No republish needed** (no schema change).
+- **Setup:** the app on the Pixel_8 dev build vs Maincloud (V-7 setup), orchestrator running (S-5), with a
+  **group holding two agents** (reuse personas from V-15).
+- **Steps:**
+  1. In the group, send `@everyone` (or `@A @B`) so both agents reply; watch the **inbox** row for that
+     thread, then open the thread and watch the **header** + bubbles.
+  2. Open a **1:1 agent DM** and send a message; watch the header.
+  3. (Self-heal) Send a message and **kill the orchestrator** mid-stream; wait ~2 min.
+- **Pass when:**
+  - **Inbox:** the thread row shows an **animated** "🤖 2 agents are thinking…" (dots moving) replacing the
+    last-message preview, with a subtle avatar pulse; it **clears** to the normal preview once replies complete.
+  - **Open thread:** a header subtitle shows the animated thinking label while agents are active, and each
+    streaming bubble shows an animated indicator (dots before tokens, then live text); all clear on complete.
+  - **DM:** the header shows "{name} is thinking…" while the single agent replies.
+  - **Self-heal:** after killing the orchestrator, the indicators **clear within ~2 min** (the reaper flips
+    the stale `streaming` row to `failed`) — no perpetual "thinking…".
+- **If it fails:** indicators never appear → the streaming rows aren't derived (capture the thread + logs);
+  indicators never clear (past ~3 min with the orchestrator dead) → reaper issue (overlaps V-18). Tell me which.
+- **🤖 AI evidence (2026-06-23):** `thinkingLabel` (0/1/2/≥3 arms) is unit-tested in CI; the derivation is
+  pure-client off existing `streaming`+`agentId` rows; Android bundle clean. The RN **animation render** is
+  the founder's tick.
+- **Notes (founder):** _device + result →_

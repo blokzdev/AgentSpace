@@ -340,3 +340,27 @@ export function reconnectReducer(state: ReconnectState, event: ReconnectEvent): 
       return state;
   }
 }
+
+// ── Agent presence / typing (M2.2) ───────────────────────────────────────────
+// A human-readable "who is currently replying" label, derived client-side from the
+// streaming agent message rows (no presence table — agents have no `user.online`;
+// per-agent identity/presence is M2.4). Pure so CI covers the pluralization.
+
+/**
+ * Format the set of agent names currently streaming a reply into a status label.
+ * 0 → null (show nothing); 1 → "Aria is thinking…"; 2 → "Aria & Banjo are thinking…";
+ * ≥3 → "3 agents are thinking…". Names are used as-is — the caller maps an unresolved
+ * / cross-owner agent to "Agent" (BL-021).
+ */
+export function thinkingLabel(names: readonly string[]): string | null {
+  switch (names.length) {
+    case 0:
+      return null;
+    case 1:
+      return `${names[0]} is thinking…`;
+    case 2:
+      return `${names[0]} & ${names[1]} are thinking…`;
+    default:
+      return `${names.length} agents are thinking…`;
+  }
+}

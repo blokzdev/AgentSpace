@@ -17,6 +17,7 @@ import {
   reconnectReducer,
   INITIAL_RECONNECT,
   type ReconnectState,
+  thinkingLabel,
 } from './index';
 
 describe('shared contracts', () => {
@@ -138,5 +139,15 @@ describe('reconnect backoff (BL-022 / M2.5)', () => {
     // duplicate drop while authLost is ignored; foreground while up is a no-op
     expect(reconnectReducer({ phase: 'authLost', attempt: 2, nonce: 1 }, 'dropped').phase).toBe('authLost');
     expect(reconnectReducer({ phase: 'up', attempt: 0, nonce: 0 }, 'appForegrounded').phase).toBe('up');
+  });
+});
+
+describe('agent presence label (M2.2)', () => {
+  it('formats the thinking label by agent count, preserving order', () => {
+    expect(thinkingLabel([])).toBeNull();
+    expect(thinkingLabel(['Aria'])).toBe('Aria is thinking…');
+    expect(thinkingLabel(['Banjo', 'Aria'])).toBe('Banjo & Aria are thinking…'); // order kept
+    expect(thinkingLabel(['Aria', 'Banjo', 'Cy'])).toBe('3 agents are thinking…');
+    expect(thinkingLabel(['A', 'B', 'C', 'D'])).toBe('4 agents are thinking…');
   });
 });

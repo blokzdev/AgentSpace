@@ -203,6 +203,16 @@
   conflict) and/or sell a commercial dual-license. As sole copyright holder this stays open without going
   private.
 
+### BL-024 — Human typing indicators + per-agent online presence (needs a `presence` table)
+- **Source:** M2.2 (DEC-035) — M2.2 shipped *agent* presence/typing derived from `streaming` message rows
+  with **no new table**. Two adjacent presence features are deferred because they need state the message
+  stream can't provide.
+- **Trigger:** a richer presence UX is wanted (humans see each other typing; agents show online/idle).
+- **Promotion:** add the BLUEPRINT-sketched `presence` table (`identity`/`agent_id`, `state`,
+  `typing_in_thread`) + a transient, debounced typing signal for **human typing**; **per-agent online
+  presence** rides on per-agent identities (**M2.4 / BL-014**). Keep the M2.2 client derivation as the
+  agent-thinking path; presence rows augment it.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)
