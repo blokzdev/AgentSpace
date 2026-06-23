@@ -33,11 +33,12 @@ end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M
 done**; **M1.8 complete** (DEC-028) — the gateway now spans **16 providers** from one shared
 `PROVIDER_CATALOG`: 13 single-API-key cloud (M1.8.1) + local/openai-compatible via a per-agent
 `agent.baseUrl` (M1.8.2, the one additive STDB column) + multi-credential Bedrock/Azure/Vertex
-(M1.8.3, sealed-JSON). `PROVIDERS.md` documents getting every key. **`M1 [shipped]` tag now
-unblocked** — V-5/V-7/V-8 verified on-device (founder to tick + tag); V-9/V-10/V-11 remain
-optional/next.
+(M1.8.3, sealed-JSON). `PROVIDERS.md` documents getting every key. **M1 ✓ SHIPPED (2026-06-22)** —
+V-5/V-7/V-8 verified on-device (founder-authorized) and tagged in ROADMAP. **Next chunk =
+streaming hardening (OT-004) as `M1.9`** (delta-streaming; pull M2.3 forward); V-9/V-10/V-11
+optional.
 
-- **Active branch:** `main` (PRs #29, #30 merged 2026-06-22).
+- **Active branch:** `main` (PRs #29, #30, #31 merged 2026-06-22; M1 ship-tag in flight).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -755,6 +756,24 @@ Maincloud (founder ticks the V-items). Streaming caveat → updated **OT-004**.
   cumulative-text UPDATEs); short/medium settle clean; mitigated + scoped full fix to M2.3.
 - **Next:** founder ticks V-5/V-7/V-8 → tag `M1 [shipped]`. Optional remaining: **V-10** (free-tier
   cloud key), **V-11** (Ollama). Then M2 / M3 / BL-016 / BL-011.
+
+### 2026-06-22 — M1 ✓ SHIPPED (milestone close) + next = streaming hardening
+- Founder-authorized **ticking V-5/V-7/V-8** (evidence captured this session) and **tagged M1
+  `✓ SHIPPED (2026-06-22)`** in ROADMAP + Snapshot. Focused close — code-reality was reconciled
+  per-PR all session, so no separate drift sweep; the one carried item is **OT-004**.
+- **M1 retro.** From a fresh container with everything green-but-headless, this local session
+  put the whole **build-an-agent → BYOK-converse** loop on a real device for the first time. What
+  worked: methodical on-device driving (adb + `uiautomator` bounds + downscaled screenshots) and
+  treating each failure as a real bug — six fell in sequence (entrypoint, Kotlin pin, reverse-DNS
+  OIDC, `Promise.withResolvers` polyfill, safe-area, prompt user-last), each only visible on-device.
+  Friction: PowerShell heredoc/quoting (use `-F` message files), the image-size cap (downscale), the
+  hardware-BACK-exits-app trap (scroll, don't BACK), and the `ANTHROPIC_BASE_URL` harness env. The
+  one substantive unknown that surfaced is **OT-004** (streaming delivery), now the next chunk.
+- **Founder decision (sequencing):** do **streaming hardening (OT-004) next as `M1.9`** — before
+  M2's multi-agent groups, which would multiply streaming load on an unhardened substrate. Fix =
+  delta-streaming (append-only INSERTs vs growing-row UPDATEs) + backpressure/cancellation/lifecycle.
+- **Next session (local):** re-sequence ROADMAP (insert M1.9 / pull M2.3 forward) in Plan Mode, then
+  build + on-device-verify the delta-streaming fix vs Maincloud. Handoff prompt delivered in chat.
 
 ---
 

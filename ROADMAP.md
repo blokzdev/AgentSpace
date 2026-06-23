@@ -13,14 +13,15 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-14.* **M0 closed; all seven M1 build phases done** (M1.1 chat, M1.2 login, M1.3
-contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies, **M1.7
-per-user BYOK**). Drift sweep done (findings applied). The full **build-an-agent →
-converse with your own key** loop works on real infra (verified headlessly end-to-end).
-**`M1 [shipped]` tag HELD** only on the founder on-device V-checklist (esp. V-7/V-8 on
-the real BYOK path) + S-3 (Maincloud publish). Then **M2** (multi-agent groups, BL-014),
-**M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Autonomous
-build loop (CLAUDE.md §4); founder setup S-1/S-2 done; S-4 now optional (keys go in-app).
+*2026-06-22.* **M0 closed; M1 ✓ SHIPPED** — all build phases (M1.1 chat, M1.2 login, M1.3
+contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies, **M1.7 per-user
+BYOK**, **M1.8 full multi-provider**) done, and the **build-an-agent → converse-with-your-own-key**
+loop is **verified on-device** vs Maincloud (V-5/V-7/V-8; DEC-029, PRs #29–#31). **Next chunk =
+streaming hardening (OT-004): `M1.9` / pull M2.3 forward** — the one carried defect (long replies
+dangle the streaming cursor; the fix is delta-streaming). Then **M2** (multi-agent groups,
+BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Optional:
+**V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3 done (S-2
+redirect now reverse-DNS); S-4 optional.
 
 ---
 
@@ -67,12 +68,21 @@ Human verification: V-1 (Expo connect on a real Android device).
 
 ---
 
-## M1 — Realtime core (A) + Agent MVP (B)
+## M1 — Realtime core (A) + Agent MVP (B)  ✓ SHIPPED (2026-06-22)
 
 **Acceptance bar:** a user signs in, **enters their own provider key (BYOK)**, builds
 an agent persona, and holds a live, streamed 1:1 conversation with it on-device — the
 agent reply uses *their* key; the same app supports human↔human 1:1 and group threads
 with presence.
+
+*Outcome: **met on-device** (2026-06-22, local session, DEC-029) — Android dev build on the
+Pixel_8 emulator vs Maincloud: SpacetimeAuth login → "Pirate Pete" streams pirate-speak
+replies via the user's BYOK Anthropic key (V-5/V-7/V-8 verified). Getting there fixed six
+device-only bugs (PRs #29–#31). Carried: **OT-004** — long replies dangle the streaming
+cursor (cumulative-text UPDATE tail-drop over Maincloud); short/medium settle cleanly; the
+full delta-streaming fix is the next chunk (**M1.9 / M2.3 streaming hardening**). V-9/V-10/V-11
+remain optional. Focused milestone-close (docs were reconciled per-PR this session; no separate
+drift sweep run).*
 
 - **M1.0 (A)** Realtime data model + reducers + membership Views. ✓ *Delivered in
   M0.3 (`modules/spacetime`).*
