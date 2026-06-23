@@ -60,8 +60,12 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 ---
 
 ### S-2 — Register the mobile redirect URI on that Client  ·  added 2026-06-13 · M1.2  ·  [x] (founder 2026-06-14)
-> **DONE.** Redirect URI `agentspace://redirect` registered (matches
-> `makeRedirectUri({ scheme: 'agentspace', path: 'redirect' })` in `src/auth.ts` ✔).
+> **DONE — but UPDATED 2026-06-22 (DEC-029).** The redirect URI is now the **reverse-DNS**
+> `com.agentspace.probe://redirect` (matches `makeRedirectUri({ scheme: 'com.agentspace.probe',
+> path: 'redirect' })` in `src/auth.ts` + app.json `scheme`). SpacetimeAuth (node-oidc-provider)
+> **rejects** the old plain `agentspace://redirect` with `invalid_redirect_uri` — a native client's
+> redirect set must be reverse-DNS, and the **whole set** is validated, so the old URI must be
+> **removed** (founder did this live: only `com.agentspace.probe://redirect` remains).
 - **Why:** OIDC only returns to a **pre-registered** redirect URI. The mobile app
   uses the custom scheme `agentspace://redirect`; it must be on the client's
   allow-list or the provider rejects the login.

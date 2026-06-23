@@ -17,9 +17,15 @@
 PRs #2–#13. AgentSpace is a working app: sign in (SpacetimeAuth/OIDC, M1.2) → find
 people by name + DM/group chat (M1.1/M1.3) → author AI agents (Agent Studio, M1.5) →
 the orchestrator streams real LLM replies into chat as the bound persona (Model
-Gateway M1.4 + reply loop M1.6). Every layer is verified **headlessly** (CI 16/16 +
-real-local-STDB integrations + `spacetime call` reducer checks); **nothing has run
-on a device yet**. **M1.7 per-user BYOK shipped (this branch, DEC-025):** users enter
+Gateway M1.4 + reply loop M1.6). **Now verified on a real device (2026-06-22, local
+session, DEC-029):** an Android dev build on the Pixel_8 emulator signs in via
+SpacetimeAuth, the founder enters their Anthropic key in 🔑 Keys, and "Pirate Pete"
+streams pirate-speak replies via the **real BYOK path** against Maincloud — i.e.
+**V-5/V-7/V-8 pass** (founder ticks). Getting there took **6 on-device bug fixes** none of
+which CI/`expo export` could hit (PRs #29/#30): orchestrator `main()` never called; Kotlin
+1.9.25↔1.9.24 build break; SpacetimeAuth needs a **reverse-DNS** redirect scheme; Hermes
+lacks `Promise.withResolvers` (broke **every** reducer write on-device); status-bar safe-area;
+prompt must end on a user turn. **M1.7 per-user BYOK shipped (DEC-025):** users enter
 their own provider key in a 🔑 Keys screen; it's **box-sealed client-side** to the
 orchestrator's pubkey and stored as **ciphertext only** in `provider_key` (raw key never
 in STDB); the orchestrator decrypts per-(owner,provider) in-memory. Proven headlessly
@@ -27,24 +33,27 @@ end-to-end + 14 orchestrator tests; CI 16/16. So **all M1 build phases (M1.1–M
 done**; **M1.8 complete** (DEC-028) — the gateway now spans **16 providers** from one shared
 `PROVIDER_CATALOG`: 13 single-API-key cloud (M1.8.1) + local/openai-compatible via a per-agent
 `agent.baseUrl` (M1.8.2, the one additive STDB column) + multi-credential Bedrock/Azure/Vertex
-(M1.8.3, sealed-JSON). `PROVIDERS.md` documents getting every key. **`M1 [shipped]` tag HELD**
-only on the on-device V-checklist (esp. V-7/V-8 on the real BYOK path).
+(M1.8.3, sealed-JSON). `PROVIDERS.md` documents getting every key. **`M1 [shipped]` tag now
+unblocked** — V-5/V-7/V-8 verified on-device (founder to tick + tag); V-9/V-10/V-11 remain
+optional/next.
 
-- **Active branch:** `claude/agentspace-initial-setup-w8rx3n`.
+- **Active branch:** `main` (PRs #29, #30 merged 2026-06-22).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** S-1/S-2/**S-3 done** — module **published to Maincloud
-  `agentspace-hpm58`** (2026-06-22; db identity `c200c0ee…`; all 8 tables + 8 views;
-  founder CLI 2.6.0). Remaining: **S-5** (run the orchestrator vs Maincloud) + the
-  on-device V-batch (V-5 login, V-7/V-8 agent reply on the real BYOK path). **S-4**
-  optional (gateway smoke / V-6 only).
-- **Next:** all M1 build phases done; **S-3 published**. Founder runs **S-5** (orchestrator
-  vs Maincloud) + enters a key in 🔑 Keys → on-device **V-5/V-7/V-8** → tag `M1 [shipped]`.
-  Build-wise: **M1.8.2/.3** (local/openai-compatible + multi-cred providers) / **M2**
-  (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable
-  key backing).
+- **Open founder work:** S-1/S-2/S-3 done; **S-2 updated** — register
+  `com.agentspace.probe://redirect` (reverse-DNS) on the SpacetimeAuth client (founder did this
+  live; the old `agentspace://redirect` must be removed). **S-5** (run orchestrator vs Maincloud)
+  was driven this session and works. Android: a dev build runs on the Pixel_8 emulator (JDK =
+  Android Studio JBR 21). **S-4** optional (gateway smoke / V-6 only).
+- **Next:** founder ticks **V-5/V-7/V-8** (evidence captured) → **tag `M1 [shipped]`**. Remaining
+  V-tests (optional/founder-driven): **V-10** (a free-tier cloud provider — needs a key) and
+  **V-11** (local Ollama — `ollama pull llama3.2`). Known issue **OT-004**: long replies dangle
+  the streaming cursor on-device (delivery drops the tail of cumulative-text UPDATEs over
+  Maincloud; mitigated 50→200ms + settle-delay; full delta-streaming fix = **M2.3**). Build-wise:
+  **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish) / **BL-011**
+  (durable key backing).
 
 ---
 
@@ -409,6 +418,29 @@ free-text model field (catalogs drift — never hardcode an allowlist). Supersed
 catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live round-trips =
 `V-10/11/12`.
 
+### DEC-029 — On-device enablement: six fixes the device exposed; V-5/V-7/V-8 proven
+*2026-06-22 (local session).* First real Android-dev-build run vs Maincloud surfaced a chain of
+bugs invisible to headless CI and `expo export` (which never compiles native nor calls a live
+provider). Fixed across PRs **#29** (orchestrator entrypoint) and **#30** (the rest): (1)
+`services/orchestrator/src/index.ts` defined `main()` but never **called** it → added
+`src/main.ts` so `start` actually runs the service. (2) **Android build**: RN 0.76.5's Kotlin
+compiler is 1.9.24 but Expo SDK 52's template defaults the `kotlinVersion` ext to 1.9.25, so
+`expo-modules-core` picked a mismatched Compose-compiler extension and `compileDebugKotlin`
+failed → pin `android.kotlinVersion=1.9.24` via **`expo-build-properties`** (+ gitignore the
+CNG-generated `android/`). (3) **OIDC redirect**: SpacetimeAuth (node-oidc-provider) rejects a
+plain custom scheme `agentspace://redirect` with `invalid_redirect_uri` — native clients need a
+**reverse-DNS** scheme → `com.agentspace.probe://redirect` (`auth.ts` + app.json `scheme`;
+founder re-registers on the client, removing the old URI). (4) **`Promise.withResolvers`**: Hermes
+(RN 0.76) lacks this ES2024 API, which the SpacetimeDB SDK uses for **every reducer call** — so
+on-device key-save / agent-create / send-message all *silently* threw → polyfill in
+`polyfills.ts` (also surfaced the silently-swallowed seal error in `ApiKeys`). (5) **Safe-area**:
+RN's `SafeAreaView` doesn't pad the Android status bar → headers rendered under it and were
+untappable → switch all screens to **`react-native-safe-area-context`**. (6) **Prompt**:
+`buildPrompt` could end on an assistant turn (a re-seen failed reply) → drop trailing assistant
+turns + feed only `complete` messages. **Outcome:** V-5 login, V-7/V-8 "Pirate Pete" streamed
+pirate-speak replies via the user's BYOK Anthropic key — working on the Pixel_8 emulator vs
+Maincloud (founder ticks the V-items). Streaming caveat → updated **OT-004**.
+
 ---
 
 ## Session Journal (append-only)
@@ -704,6 +736,26 @@ catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live r
   (optional). **M1.8 COMPLETE** (all 3 phases). **Next:** update + output the handoff prompt →
   founder switches to the local session.
 
+### 2026-06-22 — Local session: on-device V-5/V-7/V-8 (6 fixes) + PRs #29/#30
+- Ran the local-session handoff on Windows: synced + CI green; **re-published the module to
+  Maincloud** (`agentspace-hpm58`, `--delete-data` for the new `agent.base_url` column); headless
+  BYOK integration passed on a local server; stood up the orchestrator vs **Maincloud**; built and
+  ran an **Android dev build** on the Pixel_8 emulator (toolchain already present — adb v36, AVDs,
+  Android Studio **JBR 21**; no large installs).
+- Drove the app via adb (taps + `uiautomator` for exact bounds; downscaled screenshots to fit the
+  image limit) and found+fixed **6 on-device bugs** (DEC-029) — entrypoint `main()`, Kotlin
+  1.9.24 pin, reverse-DNS OIDC scheme, **`Promise.withResolvers` polyfill** (silently broke every
+  reducer write), safe-area, prompt user-last/complete-filter — plus the `ANTHROPIC_BASE_URL`
+  env-var gotcha (the Claude-Code harness sets it to `…/` without `/v1`, 404'ing Anthropic;
+  cleared it when launching the orchestrator). Merged **#29** (entrypoint) and **#30** (the rest);
+  CI green (orch 17 tests).
+- **Result:** "Pirate Pete" streams pirate-speak replies via the founder's BYOK Anthropic key on
+  Maincloud — **V-5/V-7/V-8 proven on-device** (evidence: logs + screenshots; founder ticks). Found
+  **OT-004** is real on-device: long replies dangle the cursor (delivery drops the tail of rapid
+  cumulative-text UPDATEs); short/medium settle clean; mitigated + scoped full fix to M2.3.
+- **Next:** founder ticks V-5/V-7/V-8 → tag `M1 [shipped]`. Optional remaining: **V-10** (free-tier
+  cloud key), **V-11** (Ollama). Then M2 / M3 / BL-016 / BL-011.
+
 ---
 
 ## Open Threads
@@ -719,9 +771,15 @@ catalog-integrity tests via `MockLanguageModelV3`; Android bundle clean); live r
   M0.2b) cleared the build/resolution risk. Sole remaining item: the live
   on-device connect — tracked as **`VERIFICATION.md` V-1** (founder-owned). Not
   blocking forward work.
-- **OT-004** — *Streaming write cadence & cost.* Confirm batched row UPDATEs
-  (~50ms) for partial agent tokens don't strain SpacetimeDB/energy budget at
-  realistic concurrency. Unblocks: M2 streaming work.
+- **OT-004** — *Streaming write cadence & cost.* **Concrete on-device finding (2026-06-22,
+  DEC-029):** each `agent_reply_append` re-sends the **full cumulative text**, so a long reply is
+  ~150+ rapidly-growing row UPDATEs; over Maincloud's latency the **client subscription drops the
+  tail of that burst**, freezing the bubble mid-text with a dangling cursor (the reply is always
+  correct in STDB; a fresh subscription shows it complete). Short/medium replies (few updates)
+  settle cleanly. **Mitigated** (flush 50→200ms + a settle-delay before the authoritative finish +
+  feed only `complete` rows). **Full fix = M2.3 streaming hardening:** send **deltas** instead of
+  cumulative text (SpacetimeDB row updates carry the whole row, so cumulative text is O(n²)
+  bandwidth), and/or a reliable final-state delivery + backpressure/cancellation. Unblocks: M2.3.
 - **OT-005** — *Hosting & data stores.* The orchestrator **hosting model is now decided —
   central always-on (DEC-027)**; OT-005 narrows to the **specific** choices: SpacetimeDB host
   (Maincloud Pro vs self-host), the **specific** orchestrator host (Fly/Railway/Render/
