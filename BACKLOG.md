@@ -160,6 +160,17 @@
   (c) **selective per-agent message visibility** (an agent sees only messages it was mentioned in) —
   distinct from M2.3's *instruction* isolation (all agents share the transcript in M2).
 
+### BL-021 — M2.1 implementation deferrals (cross-owner agent names · cooldown enforcement)
+- **Source:** DEC-032 (M2.1 build).
+- **Trigger:** a group holds agents owned by *different* users, or per-agent rate-shaping is needed.
+- **Promotion:** (a) **resolve other users' agent names in the mobile UI** — the M2.1 `@mention`
+  typeahead + message render resolve agent names via the caller's own `my_agents`, so an agent owned by
+  another member renders a generic "Agent" label (`@everyone` still reaches it). Fix with a
+  `my_active_personas`-style view for *any* thread member, or a public agent-name projection. (b)
+  **Enforce the per-(agent,thread) cooldown** — `AGENT_COOLDOWN_MS` is reserved in `@agentspace/shared`
+  + the module dials but not yet checked in `agent_reply_begin`; add it to the enforcement boundary if
+  rapid-fire agent turns need throttling beyond the episode budget.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)
