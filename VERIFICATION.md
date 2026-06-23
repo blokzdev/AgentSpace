@@ -425,6 +425,11 @@ Notes: <founder fills: device + OS + result>
 - **If it fails:** both bubbles look like one persona, or a reply shows the wrong name → persona-bleed
   (capture both bubbles + the orchestrator logs); only one agent replies to a two-mention → the second
   `@` didn't resolve to a `thread_agent` (re-pick it from the typeahead, don't type it raw). Tell me.
+- **🤖 AI headless evidence (2026-06-23):** verified against a local STDB with the **real Anthropic model**
+  (`scripts/verify-realmodel.ts`, Haiku): `@Marina @Lyric — what lives in the deep sea?` → Marina answered
+  in one factual sentence, Lyric in a rhyming couplet — two distinct voices, correctly **tagged + in mention
+  order, no bleed**. Confirms the behavior; the on-device **UI render** (avatar/name from `message.agentId`)
+  + the 2-human setup remain the founder's tick.
 - **Notes (founder):** _devices + personas + result →_
 
 ---
@@ -453,6 +458,11 @@ Notes: <founder fills: device + OS + result>
 - **If it fails (it keeps going past #agents replies, or never stops):** capture the full thread + the
   orchestrator logs (with the per-run token sums) immediately and **stop the orchestrator** — this is the
   guard failing and is the one result that **blocks**. Tell me the agent count and how many replies fired.
+- **🤖 AI headless evidence (2026-06-23):** the existential test, **real model** (`verify-realmodel.ts`):
+  Pingu addressed `@Pongo`, Pongo replied and asked Pingu a follow-up, and the reducer **refused Pingu a 2nd
+  turn (`agent_turn`)** → the volley **terminated at exactly 2 replies (319 real tokens)** even though the
+  model was actively trying to keep going. The reducer-side guard is also proven by integration Scenario F.
+  The founder's tick adds the real-key Maincloud run.
 - **Notes (founder):** _#agents + replies observed + token sums + result →_
 
 ---
@@ -473,6 +483,9 @@ Notes: <founder fills: device + OS + result>
   once — that's expected.)
 - **If it fails (any agent replies twice, or it cascades):** capture the thread (counting bubbles per
   agent) + the orchestrator logs. Tell me N and which agent doubled.
+- **🤖 AI headless evidence (2026-06-23):** **real model** (`verify-realmodel.ts`): `@everyone` → Marina
+  and Lyric each replied **exactly once** — no storm, no re-trigger cascade. On-device UI render is the
+  founder's tick.
 - **Notes (founder):** _#agents + bubbles per agent + result →_
 
 ---
@@ -497,6 +510,10 @@ Notes: <founder fills: device + OS + result>
 - **If it fails (the bubble stays "thinking…" indefinitely past ~3 min):** the reaper isn't running or
   the schedule didn't seed on `init` — confirm the module was **republished** (the `reaper_schedule`
   table is new) and capture the STDB row state for that message/run. Tell me.
+- **🤖 AI headless evidence (2026-06-23):** verified headlessly (`scripts/verify-reaper.ts`): a stuck
+  `streaming` message (orchestrator silent mid-stream) was driven to **`failed` by the reaper after 165s**
+  (STREAM_TTL=120s + the next 60s sweep) — crash self-heal works. The on-device "thinking…"-clears render
+  is the founder's tick.
 - **Notes (founder):** _wait time to clear + result →_
 
 ---
@@ -520,4 +537,9 @@ Notes: <founder fills: device + OS + result>
 - **If it fails:** an agent whose key is set still shows `⚠️` → its `(owner, provider)` key didn't resolve
   through `my_persona_keys` (check the owner matches the key's owner + the provider matches the agent's);
   an agent replies via the wrong provider → capture the orchestrator logs + both agents' provider/model.
+- **🤖 AI headless evidence (2026-06-23):** **real key** (`verify-realmodel.ts`): the founder's Anthropic
+  key was sealed client-side → stored as **ciphertext** → **decrypted in-memory** by the orchestrator →
+  produced real replies (the per-`(owner, provider)` `my_persona_keys` path, end-to-end). Distinct
+  keys-per-agent across **two owners** needs the founder's 2-provider on-device run; the single-owner path
+  is verified.
 - **Notes (founder):** _agents + providers + owners + result →_

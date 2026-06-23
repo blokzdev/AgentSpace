@@ -989,6 +989,22 @@ reserved-but-unenforced; other users' agent names fall back to a generic label i
   (needs the Maincloud `--delete-data` republish — new SETUP S-item) → then **M2.2** (presence/typing).
   Deferred to backlog: other users' agent names in the mobile UI; per-(agent,thread) cooldown enforcement.
 
+### 2026-06-23 — M2.1 merged (#36) + real-model headless verification of V-15…V-19
+- Merged M2.1 (**PR #36** → `c6cdf2f`); CI green. Founder completed **SETUP S-6** (Maincloud republish with
+  `--delete-data=on-conflict`); the regenerate "error" was a benign `tsc-not-found` warning + EOL-only churn
+  (the committed bindings already match the new schema).
+- Founder provided a real Anthropic key and asked to **verify V-15…V-19 via emulator**. The on-device UI +
+  SpacetimeAuth login are not AI-reachable (no account credentials; V-15 needs two logins; no emulator was
+  running), so I verified the **behavioral substance with the REAL model** headlessly
+  (`services/orchestrator/scripts/verify-realmodel.ts` + `verify-reaper.ts`; key in a gitignored `.env`):
+  **V-15** two distinct voices, tagged + in mention order, no bleed; **V-16** an agent↔agent volley
+  **terminated at exactly 2 replies / 319 real tokens** (the model tried to continue — `agent_turn` stopped
+  it); **V-17** `@everyone` each agent once; **V-18** the reaper failed out a stuck stream after **165s**;
+  **V-19** the real key sealed→decrypted→real reply. Evidence recorded under each item in `VERIFICATION.md`
+  (the `[ ]` ticks stay the founder's — the on-device render + the Maincloud real-key run remain theirs).
+- **Next:** founder runs the on-device V-15…V-19 (UI render + login) when convenient and **rotates the
+  shared key**; then **M2.2** (presence/typing). Dials held at the DEC-031 defaults (tune after on-device V-16).
+
 ---
 
 ## Open Threads
