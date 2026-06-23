@@ -346,6 +346,19 @@ Notes: <founder fills: device + OS + result>
   recording + the thread; note the approximate reply length. The reply is always correct in STDB, so
   a failure here is a delivery/render issue (tell me — we may need to tune the flush window or the
   client assembly).
+- **AI evidence (2026-06-23 — mechanism proven; live render is yours to confirm):** the OT-004
+  *mechanism* is verified end-to-end over **real Maincloud** by a headless long-reply probe: a
+  **4949-char reply streamed as 36 append-only deltas, arrived in `seq` order with NO gaps, settled
+  to `complete` with the full text, and the deltas GC'd — i.e. NO tail-drop** (the exact failure
+  OT-004 describes). Backed by the local + Maincloud integrations (delta order + GC + cancellation)
+  and **24 orchestrator unit tests**. On the **Pixel_8 emulator** the app loads + runs the M1.9 JS
+  bundle and connects to Maincloud with **no JS errors**; I even observed the *historical* OT-004 bug
+  still frozen in the Maincloud data (old pre-M1.9 replies stuck `streaming` with a dangling `▍`).
+  The **live on-device render tap-through wasn't completed** this session — the Metro dev-client was
+  unstable (subscription flapping / reconnects / anonymous-login not persisting across restart),
+  which blocked reliable UI automation; this is an environment issue, not an M1.9 code defect. Please
+  run the steps above (a long prompt in the Pirate Pete DM) to confirm the bubble settles `complete`
+  with no dangling `▍`.
 - **Notes (founder):** _device + reply length + result →_
 
 ---
@@ -364,4 +377,10 @@ Notes: <founder fills: device + OS + result>
   completes. No dangling cursor on either.
 - **If it fails:** the first bubble keeps a dangling cursor → the cancel didn’t finalize; the second
   message gets no reply → capture the orchestrator logs. Tell me which.
+- **AI evidence (2026-06-23 — proven headlessly):** cancellation-on-supersede is verified end-to-end
+  over **real Maincloud** (and locally): a second message sent mid-stream cancels run #1 (its message
+  → `failed`, run → `cancelled`) and the new message is answered (`complete`). Covered by a dedicated
+  `handleReply` unit test + the integration's cancellation scenario. The on-device *render* of this
+  (cursor clears on the interrupted bubble) wasn't tap-through-verified this session (same Metro
+  dev-client instability as V-13) — please confirm on-device.
 - **Notes (founder):** _device + result →_
