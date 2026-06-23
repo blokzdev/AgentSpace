@@ -38,8 +38,8 @@ state (it carries the authoritative final text; the deltas are GC'd on finish). 
 orchestrator MUST end every stream it starts in `complete` or `failed` (no dangling
 `streaming`) — guaranteed by an idle/error timeout. Producers: `modules/spacetime`
 reducers `send_message`, `agent_reply_begin`, `agent_reply_delta`, `agent_reply_finish`,
-`agent_reply_cancel` (`agent_reply_append` is dormant — back-compat, deleted next
-milestone). Consumer: `apps/mobile` thread view (`Thread.tsx` — concatenates
+`agent_reply_cancel` (the old cumulative-text `agent_reply_append` was removed in M2.1).
+Consumer: `apps/mobile` thread view (`Thread.tsx` — concatenates
 `my_reply_deltas` by `runId`, renders a streaming cursor on `streaming` rows). Cite both sides.
 
 **M2.1 mechanics (DEC-031).** An agent message now carries a provenance + budget tag —
