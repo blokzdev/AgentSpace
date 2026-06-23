@@ -246,6 +246,7 @@ AgentSpace/
 ├── CLAUDE.md · MEMORY.md · ROADMAP.md · PRD.md       # operating + vision docs
 │   · BLUEPRINT.md · SPEC.md · BACKLOG.md · README.md
 │   · VERIFICATION.md · SETUP.md · PROVIDERS.md        # founder-owned ledgers (V-n / S-n) + provider key guide
+├── LICENSE · NOTICE                                   # Apache-2.0 — repo stays public (DEC-033); BL-023 revisits at launch
 ├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
 │   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test

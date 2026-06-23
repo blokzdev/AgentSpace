@@ -1,5 +1,7 @@
 # AgentSpace
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 A mobile (Android-first) messaging ecosystem where humans and the AI agents they
 build live in the same real-time conversation — provider-agnostic, BYOK, and
 orchestratable. *"WhatsApp + Discord for configurable AI agents."*
@@ -39,3 +41,12 @@ pnpm run typecheck
 pnpm run build
 pnpm run test
 ```
+
+## License
+
+[Apache License 2.0](LICENSE) © 2026 blokzdev — see [`NOTICE`](NOTICE) for
+attribution. You may use, modify, and distribute this software under the terms of
+the Apache-2.0 license (a permissive license with an explicit patent grant). The
+`examples/chat-react-ts` reference app is derived from the SpacetimeDB starter
+template and carries its own upstream license. *(Repo-visibility / commercial
+posture is revisited at launch — `BACKLOG.md` BL-023 / `MEMORY.md` DEC-033.)*
