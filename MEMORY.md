@@ -38,17 +38,23 @@ V-5/V-7/V-8 verified on-device (founder-authorized) and tagged in ROADMAP. **Nex
 streaming hardening (OT-004) as `M1.9`** (delta-streaming; pull M2.3 forward); V-9/V-10/V-11
 optional.
 
-**M1.9 streaming hardening built (DEC-030), headless-verified, on-device pending.** Now on branch
-`feat/m1.9-streaming-hardening`: replaced cumulative-text `message` UPDATEs with **append-only
+**M1.9 streaming hardening SHIPPED (DEC-030), headless + Maincloud verified; on-device render =
+founder V-13/V-14.** Merged **PR #33**: replaced cumulative-text `message` UPDATEs with **append-only
 `reply_delta` INSERTs** (fixes OT-004 — the long-reply dangling cursor) + pulled all of old M2.3
 forward (backpressure, idle/error timeout → terminal `failed`, cancellation-on-supersede via an
 `AbortController` threaded into the gateway). Coupled across module ↔ bindings ×3 ↔ orchestrator ↔
-mobile. CI 16/16; 24 orchestrator tests; the rewritten local-STDB integration proves delta order +
-GC + cancellation (no key); Android bundle clean (645 modules). **Next:** open the PR (watch CI to
-green, merge), then on-device V-13 (long reply settles clean) / V-14 (cancellation) vs Maincloud
-(needs a `--delete-data` re-publish for the new table).
+mobile. CI 16/16; **24 orchestrator tests**; the rewritten integration proves delta order + GC +
+cancellation against **both local STDB and Maincloud** (no key); a Maincloud **long-reply probe**
+streamed a 4949-char reply as 36 deltas in `seq` order with **no gaps / no tail-drop**, settled
+`complete`, GC'd — the definitive OT-004 mechanism proof. **Maincloud re-published** with the new
+schema (additive → `--delete-data` was a no-op; existing data survived). The Pixel_8 emulator runs
+the M1.9 JS cleanly (no JS errors) and the *historical* OT-004 bug is visible in old stuck `▍`
+messages, but the **live render tap-through wasn't completed** — Metro dev-client instability
+(subscription flapping / reconnects / anonymous-login not persisting) blocked UI automation (env, not
+code). **Next:** founder runs **V-13** (long reply settles clean, no dangling `▍`) + **V-14**
+(cancellation) on-device → tick. Then **M2** (multi-agent groups), **M3** (RAG), **BL-016**, **BL-011**.
 
-- **Active branch:** `feat/m1.9-streaming-hardening` (M1 shipped as PR #32; M1.9 PR in flight).
+- **Active branch:** `main` (M1.9 = PR #33 merged 2026-06-23; a docs evidence PR follows).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -834,6 +840,28 @@ bundle clean (645 modules). On-device vs Maincloud = **V-13** (long reply settle
   (V-13/V-14) / SETUP.
 - **Next:** open the M1.9 PR → CI green → merge; then on-device V-13 (long reply settles clean, no
   dangling cursor) + V-14 (cancellation) vs Maincloud (re-publish with `--delete-data`).
+
+### 2026-06-23 — M1.9 merged (#33) + Maincloud verification; on-device render handed to founder
+- Merged **PR #33** (M1.9 streaming hardening) on green CI (16/16). Synced `main`.
+- **Maincloud re-published** with the new `reply_delta` schema — additive migration, so
+  `--delete-data=on-conflict` was a **no-op** (existing data, incl. Pirate Pete + the founder's
+  sealed key, survived — good).
+- **Maincloud verification (headless, no key):** the rewritten integration passed vs Maincloud
+  (delta order + GC + cancellation). A throwaway **long-reply probe** then streamed a **4949-char
+  reply as 36 deltas in `seq` order with NO gaps**, settled `complete` with the full text, and GC'd
+  — **no tail-drop** over real Maincloud latency. This is the definitive OT-004-fix proof.
+- **Emulator drive (Pixel_8):** installed dev-client loads the M1.9 JS (pure-JS change, served via
+  Metro — no native rebuild) and connects to Maincloud with **no JS errors**. Saw the *historical*
+  OT-004 bug frozen in the data (old pre-M1.9 long replies stuck `streaming` with dangling `▍`).
+  **Could not complete the live render tap-through** — Metro dev-client instability (subscription
+  flapping, "Cannot connect to Metro" reconnects resetting navigation, anonymous-login not
+  persisting across force-stop) + adb friction (Git-Bash mangling `/sdcard/...`, screencap↔
+  uiautomator desync) made UI automation unreliable. **Not an M1.9 defect** (app runs clean). Left
+  the emulator running; V-13/V-14 render confirmation is the founder's quick tap-through.
+- **Memory/docs:** Snapshot refreshed; VERIFICATION V-13/V-14 got AI-evidence annotations (mechanism
+  proven; live render = founder). Cleaned up throwaway scripts + background processes.
+- **Next:** founder ticks V-13/V-14 after the on-device render check. Then **M2** (multi-agent
+  groups, BL-014) — the hardened streaming substrate is ready for it. Also **M3** (RAG) / BL-016 / BL-011.
 
 ---
 
