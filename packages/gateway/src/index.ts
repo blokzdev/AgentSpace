@@ -30,6 +30,8 @@ export interface GatewayRequest {
   credentialRef: string;
   /** Endpoint for local/self-hosted providers (kind 'baseUrl', e.g. Ollama). */
   baseUrl?: string;
+  /** Abort the in-flight provider request (cancellation / idle-timeout — M1.9.2). */
+  signal?: AbortSignal;
 }
 
 export interface GatewayUsage {
@@ -120,7 +122,7 @@ export function createModelGateway(options: ModelGatewayOptions = {}): ModelGate
       const model = factory(apiKey, req.model.model, { baseUrl: req.baseUrl });
       const { system, messages } = toModelMessages(req.messages);
 
-      const result = streamText({ model, system, messages, tools: toToolSet(req.tools) });
+      const result = streamText({ model, system, messages, tools: toToolSet(req.tools), abortSignal: req.signal });
       for await (const part of result.fullStream) {
         if (part.type === 'error') {
           throw part.error instanceof Error ? part.error : new Error(String(part.error));

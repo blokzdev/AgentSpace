@@ -6,6 +6,7 @@ import {
   newRunId,
   selectPersona,
   DEFAULT_SYSTEM_PROMPT,
+  MAX_PENDING_CHARS,
   type AgentRef,
   type PromptRow,
   type ThreadRef,
@@ -113,22 +114,66 @@ describe('selectPersona', () => {
   });
 });
 
-describe('createBatcher', () => {
-  it('coalesces bursts and flushes the latest text on the interval', () => {
+describe('createBatcher (M1.9 delta-accumulate)', () => {
+  it('coalesces a burst of deltas into one concatenated flush per interval', () => {
+    vi.useFakeTimers();
+    const flushed: string[] = [];
+    const b = createBatcher({ intervalMs: 50, onFlush: (t) => flushed.push(t) });
+
+    b.push('Hello');
+    b.push(', ');
+    b.push('world');
+    expect(flushed).toEqual([]); // nothing until the interval fires
+    vi.advanceTimersByTime(50);
+    expect(flushed).toEqual(['Hello, world']); // the burst's deltas, concatenated — once
+
+    // Each flush emits only the NEW deltas since the last flush (not cumulative),
+    // so concatenating all flushes reconstructs the full reply.
+    b.push('!');
+    b.stop(); // flushes the tail and clears the timer
+    expect(flushed).toEqual(['Hello, world', '!']);
+    expect(flushed.join('')).toBe('Hello, world!');
+    vi.useRealTimers();
+  });
+
+  it('emits one flush per interval window (so the caller can assign a monotonic seq)', () => {
     vi.useFakeTimers();
     const flushed: string[] = [];
     const b = createBatcher({ intervalMs: 50, onFlush: (t) => flushed.push(t) });
 
     b.push('a');
-    b.push('ab');
-    b.push('abc');
-    expect(flushed).toEqual([]); // nothing until the interval fires
     vi.advanceTimersByTime(50);
-    expect(flushed).toEqual(['abc']); // only the latest cumulative text
+    b.push('b');
+    b.push('c');
+    vi.advanceTimersByTime(50);
+    expect(flushed).toEqual(['a', 'bc']); // two windows → two flushes (→ seq 0, 1)
+    vi.advanceTimersByTime(500); // idle: no pending, no spurious flush
+    expect(flushed).toEqual(['a', 'bc']);
+    b.stop();
+    vi.useRealTimers();
+  });
 
-    b.push('abcd');
-    b.stop(); // flushes the tail and clears the timer
-    expect(flushed).toEqual(['abc', 'abcd']);
+  it('flushes immediately when pending exceeds the soft cap (backpressure)', () => {
+    vi.useFakeTimers();
+    const flushed: string[] = [];
+    const b = createBatcher({ intervalMs: 50, maxPendingChars: 8, onFlush: (t) => flushed.push(t) });
+
+    b.push('1234'); // under the cap → buffered, waits for the interval
+    expect(flushed).toEqual([]);
+    b.push('5678'); // reaches the cap → flush now, no timer wait
+    expect(flushed).toEqual(['12345678']);
+    b.stop();
+    vi.useRealTimers();
+  });
+
+  it('ignores empty chunks and the default cap is generous', () => {
+    vi.useFakeTimers();
+    const flushed: string[] = [];
+    const b = createBatcher({ intervalMs: 50, onFlush: (t) => flushed.push(t) });
+    expect(MAX_PENDING_CHARS).toBeGreaterThan(1000);
+    b.push('');
+    b.stop(); // nothing pending → no flush
+    expect(flushed).toEqual([]);
     vi.useRealTimers();
   });
 });
