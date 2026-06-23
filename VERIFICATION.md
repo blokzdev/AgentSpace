@@ -116,7 +116,10 @@ Notes: <founder fills: device + OS + result>
   the founder re-registered exactly that on the SpacetimeAuth client (removing `agentspace://`).
   **Caveat:** *anonymous* login does not persist across a cold app restart (no usable refresh
   token) — the cross-restart "still signed in" check (a real email login) is still founder-owned.
-- **Notes (founder):** _device + OS + result →_
+- **Notes (founder):** ✅ **VERIFIED 2026-06-22** (founder-authorized on the captured evidence) —
+  Pixel_8 emulator (Android dev build) vs Maincloud `agentspace-hpm58`; SpacetimeAuth login →
+  stable per-user Identity → chat UI. *(Cross-restart persistence via a real email login is a
+  nice-to-have; anonymous login doesn't persist — non-blocking.)*
 
 ---
 
@@ -183,7 +186,9 @@ Notes: <founder fills: device + OS + result>
   saved) + clearing a stray `ANTHROPIC_BASE_URL` env var that 404'd the API. **Caveat (OT-004):**
   *long* replies can freeze mid-text with a dangling cursor (delivery drops the UPDATE-burst tail;
   the reply is complete in STDB) — short/medium replies settle cleanly; full fix is M2.3.
-- **Notes (founder):** _host (local/Maincloud) + provider + result →_
+- **Notes (founder):** ✅ **VERIFIED 2026-06-22** (founder-authorized) — Maincloud + Anthropic
+  (BYOK key entered in 🔑 Keys, sealed); a streamed agent reply rendered live token-by-token.
+  *(OT-004 long-reply dangling-cursor caveat carried to M1.9/M2.3 — non-blocking.)*
 
 ---
 
@@ -221,7 +226,9 @@ Notes: <founder fills: device + OS + result>
   matey! … a chest brimmin' with golden pieces of eight would make me peg leg dance a merry jig!
   … Arrr! 🏴‍☠️"* — i.e. the persona's system prompt + model took effect, decrypting the founder's
   BYOK key. Same caveat as V-7 (OT-004 long-reply cursor). Screenshots + STDB rows captured.
-- **Notes (founder):** _persona + provider + result →_
+- **Notes (founder):** ✅ **VERIFIED 2026-06-22** (founder-authorized) — "Pirate Pete"
+  (anthropic / `claude-opus-4-8`) replied **in persona** (pirate speak) via the user's BYOK key.
+  *(Same OT-004 caveat.)*
 
 ---
 
