@@ -16,12 +16,13 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 *2026-06-22.* **M0 closed; M1 ✓ SHIPPED** — all build phases (M1.1 chat, M1.2 login, M1.3
 contacts/groups+UX, M1.4 gateway, M1.5 Agent Studio, M1.6 agent replies, **M1.7 per-user
 BYOK**, **M1.8 full multi-provider**) done, and the **build-an-agent → converse-with-your-own-key**
-loop is **verified on-device** vs Maincloud (V-5/V-7/V-8; DEC-029, PRs #29–#31). **Next chunk =
-streaming hardening (OT-004): `M1.9` / pull M2.3 forward** — the one carried defect (long replies
-dangle the streaming cursor; the fix is delta-streaming). Then **M2** (multi-agent groups,
-BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Optional:
-**V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3 done (S-2
-redirect now reverse-DNS); S-4 optional.
+loop is **verified on-device** vs Maincloud (V-5/V-7/V-8; DEC-029, PRs #29–#31). **Current chunk =
+`M1.9` Streaming hardening (fixes OT-004; pulls all of M2.3 forward)** — delta-streaming
+(append-only INSERTs replace cumulative-text UPDATEs) + run lifecycle (backpressure, idle/error
+timeout, cancellation-on-supersede). Built + headless-verified; on-device is V-13/V-14 (DEC-030).
+Then **M2** (multi-agent groups, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
+(durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder
+setup S-1/S-2/S-3 done (S-2 redirect now reverse-DNS); S-4 optional.
 
 ---
 
@@ -159,17 +160,49 @@ user's own BYOK key** (V-7/V-8 after M1.7).
 
 ---
 
-## M2 — Multi-agent group threads + streaming polish
+## M1.9 — Streaming hardening (fixes OT-004; pulls M2.3 forward)
+
+**Acceptance bar:** on-device vs Maincloud, a **long multi-paragraph reply streams
+token-by-token AND settles to `complete` with no dangling cursor**; an interrupting
+message **cancels** the in-flight reply cleanly (cursor clears, run `cancelled`) and the
+new message is answered; **no run is ever left non-terminal** (idle/error timeout). Proven
+headlessly (no key) by the local-STDB integration + orchestrator unit tests. (Founder
+folded all of the old M2.3 in here — DEC-030; harden the substrate before M2 multiplies
+streaming load.)
+
+- **M1.9.1 — Delta-streaming core (OT-004 fix).** ✓ *Done 2026-06-22 — replaced the
+  cumulative-text `message` UPDATE (`agent_reply_append`, O(n²), tail-dropped over Maincloud)
+  with **append-only `reply_delta` INSERTs**: new private `reply_delta` table + `my_reply_deltas`
+  View + `agent_reply_delta(runId, seq, text)` reducer; `agent_reply_finish` writes the
+  authoritative final text + **GCs the run's deltas** (same txn). The `message` row stays empty
+  while `streaming`; the orchestrator emits coalesced deltas (per-flush `seq`); mobile
+  concatenates deltas by `seq` and renders, falling back to `message.text` once not `streaming`.
+  Bindings regenerated + synced ×3. Headless integration proves delta order + concatenation + GC;
+  Android bundle clean. On-device `V-13`.*
+- **M1.9.2 — Run lifecycle & robustness.** ✓ *Done 2026-06-22 — backpressure (coalescing batcher
+  + a soft per-INSERT cap); an **idle/error timeout** (no token for 60s → abort → terminal
+  `failed`) so a stalled provider can't hang a run; **cancellation-on-supersede** (a new human
+  message aborts the in-flight stream via `AbortController` — threaded into the gateway — and
+  finalizes it via `agent_reply_cancel` → message `failed` w/ partial text, run `cancelled`; the
+  new message is then answered). Every run reaches `succeeded|failed|cancelled`. 4 new orchestrator
+  unit tests (happy/timeout/error/cancel) + the integration's cancellation scenario. On-device
+  `V-14`.*
+
+Human verification: `V-13` (long reply settles clean, no dangling cursor) + `V-14`
+(cancellation) on-device vs Maincloud — needs a Maincloud re-publish (`--delete-data`, new table).
+
+---
+
+## M2 — Multi-agent group threads
 
 **Acceptance bar:** a group thread with ≥2 humans and ≥2 agents converses
-coherently in real time, with addressing, agent presence/typing, and robust
-streaming.
+coherently in real time, with addressing and agent presence/typing. (Robust
+streaming is now inherited from **M1.9**.)
 
 - **M2.1** Addressing grammar (@mentions / direct address) + turn arbitration.
 - **M2.2** Agent presence & typing indicators.
-- **M2.3** Streaming hardening: backpressure, cancellation, error/timeout states,
-  run lifecycle (SPEC §agent-run).
-- **M2.4** Multi-agent context isolation per thread.
+- **M2.3** Multi-agent context isolation per thread. *(was M2.4; old M2.3 "Streaming
+  hardening" pulled forward into M1.9 — DEC-030.)*
 
 ---
 

@@ -38,7 +38,17 @@ V-5/V-7/V-8 verified on-device (founder-authorized) and tagged in ROADMAP. **Nex
 streaming hardening (OT-004) as `M1.9`** (delta-streaming; pull M2.3 forward); V-9/V-10/V-11
 optional.
 
-- **Active branch:** `main` (PRs #29, #30, #31 merged 2026-06-22; M1 ship-tag in flight).
+**M1.9 streaming hardening built (DEC-030), headless-verified, on-device pending.** Now on branch
+`feat/m1.9-streaming-hardening`: replaced cumulative-text `message` UPDATEs with **append-only
+`reply_delta` INSERTs** (fixes OT-004 — the long-reply dangling cursor) + pulled all of old M2.3
+forward (backpressure, idle/error timeout → terminal `failed`, cancellation-on-supersede via an
+`AbortController` threaded into the gateway). Coupled across module ↔ bindings ×3 ↔ orchestrator ↔
+mobile. CI 16/16; 24 orchestrator tests; the rewritten local-STDB integration proves delta order +
+GC + cancellation (no key); Android bundle clean (645 modules). **Next:** open the PR (watch CI to
+green, merge), then on-device V-13 (long reply settles clean) / V-14 (cancellation) vs Maincloud
+(needs a `--delete-data` re-publish for the new table).
+
+- **Active branch:** `feat/m1.9-streaming-hardening` (M1 shipped as PR #32; M1.9 PR in flight).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -442,6 +452,35 @@ turns + feed only `complete` messages. **Outcome:** V-5 login, V-7/V-8 "Pirate P
 pirate-speak replies via the user's BYOK Anthropic key — working on the Pixel_8 emulator vs
 Maincloud (founder ticks the V-items). Streaming caveat → updated **OT-004**.
 
+### DEC-030 — Delta-streaming: append-only INSERTs replace cumulative-text UPDATEs (M1.9)
+*2026-06-22.* Resolves **OT-004**. The streaming reply path re-sent the **full cumulative text**
+as a `message` row UPDATE every flush — O(n²) bandwidth whose long, ever-growing burst the client
+subscription **tail-drops** over Maincloud (dangling cursor on long replies; DEC-029). **Fix
+(founder-ratified "full M2.3" scope):** stream via **append-only delta INSERTs**. **Choices:**
+(1) New private **`reply_delta`** table (`runId`/`threadId`/`seq u64`/`text`/`sent`; `by_run` +
+`by_thread` indexes) + a membership-scoped **`my_reply_deltas`** View; reducer
+**`agent_reply_delta(runId, seq, text)`** INSERTs one small chunk (same sender/`streaming` guard as
+the now-**dormant** `agent_reply_append`, deleted next milestone). (2) The `message` row stays
+**empty while `streaming`**; `agent_reply_finish` writes the authoritative final text **and GCs the
+run's deltas in the same transaction** (founder: GC-on-finish — safe, the client gets the
+`complete` row + delta removal atomically). Mobile concatenates deltas by `seq`, falls back to
+`message.text` when not `streaming`. (3) **`seq`** = orchestrator-assigned `u64`, one per **flush**
+(not per token) — gap-free, single-writer, sort-stable. (4) The coalescing batcher flips from
+"latest cumulative snapshot" to "accumulate deltas, flush their concatenation," ~100ms window + a
+soft per-INSERT byte cap (backpressure). **Pulled all of old M2.3 forward** (DEC: harden before M2):
+(5) an **idle/error timeout** (no token 60s → `AbortController`.abort → terminal `failed`) so no run
+hangs; (6) **cancellation-on-supersede** — a newer human message aborts the in-flight stream (signal
+threaded into the gateway: `GatewayRequest.signal` → `streamText.abortSignal`) and finalizes it via
+new **`agent_reply_cancel`** (message `failed` w/ partial — SPEC §1 already defines `failed` as
+"errored *or cancelled* mid-stream", so **no new state**; run `cancelled` — SPEC §2), then answers
+the new message (per-thread in-flight `Map` replaces the old loop-guard `Set`). Coupled change cited
+across `modules/spacetime` ↔ bindings ×3 ↔ orchestrator emitter ↔ mobile assembler (SPEC §1/§2/§6,
+BLUEPRINT §3/§5, CLAUDE §9). Verified **headlessly**: 24 orchestrator unit tests (delta-batcher /
+seq / bounded-flush / happy·timeout·error·cancel finalization) + the rewritten integration proves
+delta order + concatenation + **GC** + cancellation against a real local STDB (no key); Android
+bundle clean (645 modules). On-device vs Maincloud = **V-13** (long reply settles clean) / **V-14**
+(cancellation). ROADMAP re-sequenced: M1.9 inserted; old M2.3 removed (M2.4→M2.3).
+
 ---
 
 ## Session Journal (append-only)
@@ -775,6 +814,27 @@ Maincloud (founder ticks the V-items). Streaming caveat → updated **OT-004**.
 - **Next session (local):** re-sequence ROADMAP (insert M1.9 / pull M2.3 forward) in Plan Mode, then
   build + on-device-verify the delta-streaming fix vs Maincloud. Handoff prompt delivered in chat.
 
+### 2026-06-22 — M1.9 streaming hardening built (delta-streaming + run lifecycle; DEC-030)
+- Plan Mode: mapped the streaming surface with a parallel-readers workflow, re-sequenced ROADMAP
+  (M1.9 absorbs old M2.3; M2.4→M2.3). Founder ratified **full M2.3 scope** + **GC-on-finish**.
+- Built **M1.9.1 delta-streaming** (fixes OT-004): `modules/spacetime` gained a private
+  `reply_delta` table + `my_reply_deltas` View + `agent_reply_delta` reducer; `agent_reply_finish`
+  GCs the run's deltas; the `message` row is empty while `streaming`. Regenerated + synced bindings
+  ×3. Orchestrator `createBatcher` flips to delta-accumulate (~100ms + soft byte cap); `replyLoop`
+  emits `agentReplyDelta` with a per-flush `seq`; mobile `Thread.tsx` concatenates `my_reply_deltas`
+  by `seq`, falls back to `message.text`. And **M1.9.2 lifecycle**: idle/error timeout (60s →
+  terminal `failed`), cancellation-on-supersede (`AbortController` → `GatewayRequest.signal` →
+  `streamText.abortSignal`; new `agent_reply_cancel` → message `failed` + run `cancelled`; per-thread
+  in-flight `Map`).
+- **Verified headlessly:** `pnpm run ci` 16/16; **24 orchestrator tests** (delta-batcher / seq /
+  bounded-flush / happy·timeout·error·cancel via `handleReply`); the rewritten integration ran
+  against a **local STDB** (published with `--delete-data` for the new schema) and proved delta
+  order + concatenation + **GC** + cancellation + BYOK decrypt (no key); Android export clean (645
+  modules). Updated docs in-PR: ROADMAP / SPEC §1·§2·§6 / BLUEPRINT §3·§5 / CLAUDE §9 / VERIFICATION
+  (V-13/V-14) / SETUP.
+- **Next:** open the M1.9 PR → CI green → merge; then on-device V-13 (long reply settles clean, no
+  dangling cursor) + V-14 (cancellation) vs Maincloud (re-publish with `--delete-data`).
+
 ---
 
 ## Open Threads
@@ -790,15 +850,15 @@ Maincloud (founder ticks the V-items). Streaming caveat → updated **OT-004**.
   M0.2b) cleared the build/resolution risk. Sole remaining item: the live
   on-device connect — tracked as **`VERIFICATION.md` V-1** (founder-owned). Not
   blocking forward work.
-- **OT-004** — *Streaming write cadence & cost.* **Concrete on-device finding (2026-06-22,
-  DEC-029):** each `agent_reply_append` re-sends the **full cumulative text**, so a long reply is
-  ~150+ rapidly-growing row UPDATEs; over Maincloud's latency the **client subscription drops the
-  tail of that burst**, freezing the bubble mid-text with a dangling cursor (the reply is always
-  correct in STDB; a fresh subscription shows it complete). Short/medium replies (few updates)
-  settle cleanly. **Mitigated** (flush 50→200ms + a settle-delay before the authoritative finish +
-  feed only `complete` rows). **Full fix = M2.3 streaming hardening:** send **deltas** instead of
-  cumulative text (SpacetimeDB row updates carry the whole row, so cumulative text is O(n²)
-  bandwidth), and/or a reliable final-state delivery + backpressure/cancellation. Unblocks: M2.3.
+- **OT-004** — *Streaming write cadence & cost.* ✅ **Resolved by DEC-030 (M1.9, 2026-06-22).**
+  Root cause: `agent_reply_append` re-sent the **full cumulative text** every flush (~150+ growing
+  row UPDATEs for a long reply), and over Maincloud's latency the client subscription **tail-dropped
+  the burst**, dangling the cursor. Fix: **append-only `reply_delta` INSERTs** (small, constant-
+  size, reliably delivered) — the `message` row takes only an empty begin + a single final
+  `complete` write; client concatenates deltas by `seq`; deltas GC'd on finish. Shipped with the
+  rest of the old M2.3 (idle/error timeout + cancellation-on-supersede). Headless-verified;
+  on-device = V-13/V-14. *(Per-token metering off deltas = M5.3; durable delta retention is N/A —
+  GC'd by design.)*
 - **OT-005** — *Hosting & data stores.* The orchestrator **hosting model is now decided —
   central always-on (DEC-027)**; OT-005 narrows to the **specific** choices: SpacetimeDB host
   (Maincloud Pro vs self-host), the **specific** orchestrator host (Fly/Railway/Render/

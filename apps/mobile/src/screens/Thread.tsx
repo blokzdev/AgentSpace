@@ -31,6 +31,7 @@ export function Thread({
   const [users] = useTable(tables.user);
   const [threads] = useTable(tables.my_threads);
   const [agents] = useTable(tables.my_agents);
+  const [allDeltas] = useTable(tables.my_reply_deltas);
   const sendMessage = useReducer(reducers.sendMessage);
 
   const [text, setText] = useState('');
@@ -49,6 +50,21 @@ export function Thread({
         .sort((a, b) => (a.sent.microsSinceUnixEpoch < b.sent.microsSinceUnixEpoch ? -1 : 1)),
     [allMessages, threadId],
   );
+
+  // M1.9: assemble each in-flight run's live text from its append-only delta rows
+  // (ordered by `seq`, a u64/bigint). The message row carries the authoritative final
+  // text once it flips to `complete`/`failed`, so we read deltas only while `streaming`
+  // and fall back to `message.text` otherwise (deltas are GC'd on finish — OT-004).
+  const deltaTextByRun = useMemo(() => {
+    const map = new Map<string, string>();
+    [...allDeltas]
+      .sort((a, b) => (a.seq < b.seq ? -1 : a.seq > b.seq ? 1 : 0))
+      .forEach((d) => map.set(d.runId, (map.get(d.runId) ?? '') + d.text));
+    return map;
+  }, [allDeltas]);
+
+  const displayText = (m: { streamState: string; runId: string; text: string }): string =>
+    m.streamState === 'streaming' ? (deltaTextByRun.get(m.runId) ?? m.text) : m.text;
 
   useEffect(() => {
     if (messages.length > 0) listRef.current?.scrollToEnd({ animated: true });
@@ -102,7 +118,7 @@ export function Thread({
             return (
               <View style={[styles.bubble, styles.mine]}>
                 <Text style={styles.body}>
-                  {item.text}
+                  {displayText(item)}
                   {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
                 </Text>
                 <Text style={styles.time}>{fmtTime(item.sent)}</Text>
@@ -115,7 +131,7 @@ export function Thread({
               <View style={[styles.bubble, styles.theirs]}>
                 <Text style={styles.sender}>{nameOf(item.sender)}</Text>
                 <Text style={styles.body}>
-                  {item.text}
+                  {displayText(item)}
                   {item.streamState === 'streaming' ? <Text style={styles.cursor}>▍</Text> : null}
                 </Text>
                 <Text style={styles.time}>{fmtTime(item.sent)}</Text>

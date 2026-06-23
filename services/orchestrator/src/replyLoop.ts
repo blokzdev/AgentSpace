@@ -1,22 +1,37 @@
 // Agent reply loop (SPEC §6): when a human posts to a thread the orchestrator is
 // an `agent`-role member of, build context, stream a reply from the Model Gateway,
-// and write it into STDB as a live message row (begin → append* → finish) via
-// batched UPDATEs (BLUEPRINT §5). Correlation is a client-owned runId.
+// and write it into STDB as a live message row. M1.9 streams via append-only delta
+// INSERTs (begin → delta* → finish) instead of cumulative-text UPDATEs — small
+// constant-size rows the subscription delivers reliably (OT-004/DEC-030). Robustness
+// (M1.9.2): backpressure (coalescing batcher), an idle/error timeout that drives a
+// stalled run to a terminal state, and cancellation-on-supersede. Correlation is a
+// client-owned runId.
 import { Identity } from 'spacetimedb';
 import type { ModelGateway } from '@agentspace/gateway';
 import { DbConnection } from '@agentspace/stdb-bindings';
 import { MissingKeyError } from './byok';
 import { buildPrompt, createBatcher, newRunId, selectPersona, type AgentRef, type PromptRow } from './prompt';
 
-// Coalescing window for streamed UPDATEs. Each flush re-sends the full cumulative
-// text, so a too-aggressive cadence floods the subscription over a high-latency
-// host (Maincloud) and the client drops the tail of a long reply, leaving a
-// dangling streaming cursor (OT-004). ~200ms (≈5 updates/s) still reads as live
-// while keeping long replies within the subscription's delivery budget.
-const FLUSH_MS = 200;
+// Coalescing window for streamed deltas. Each flush is now a small append-only
+// INSERT (not a growing cumulative UPDATE), so we can flush ~2× faster than the old
+// cumulative path (was 200ms) for a smoother live feel without the OT-004 bandwidth
+// penalty.
+const FLUSH_MS = 100;
+// No token for this long → the provider is presumed hung; abort to a terminal
+// `failed` so a run never sticks in `running`/`streaming` (SPEC §1/§2). Reset on
+// every token, so a legitimately long-but-active stream never trips it.
+const IDLE_TIMEOUT_MS = 60_000;
 
 export interface ReplyLoopOptions {
   flushMs?: number;
+  idleTimeoutMs?: number;
+}
+
+/** A reply in flight for a thread — the loop guard + the cancellation handle. */
+export interface InFlight {
+  runId: string;
+  /** Mark this reply superseded by a newer human message and abort its stream. */
+  supersede: () => void;
 }
 
 export function startReplyLoop(
@@ -26,7 +41,8 @@ export function startReplyLoop(
   opts: ReplyLoopOptions = {},
 ): void {
   const flushMs = opts.flushMs ?? FLUSH_MS;
-  const active = new Set<bigint>(); // threads with a reply in flight (loop guard)
+  const idleMs = opts.idleTimeoutMs ?? IDLE_TIMEOUT_MS;
+  const inFlight = new Map<bigint, InFlight>(); // threadId → in-flight reply
 
   conn
     .subscriptionBuilder()
@@ -45,9 +61,11 @@ export function startReplyLoop(
     if (msg.sender.isEqual(self)) return; // our own writes
     if (msg.streamState !== 'complete') return; // an in-flight stream
     if (msg.runId !== '') return; // another agent's reply
-    if (active.has(msg.threadId)) return; // already replying in this thread
     if (!isAgentMemberOf(conn, self, msg.threadId)) return; // we're not the agent here
-    void handleReply(conn, self, gateway, flushMs, msg.threadId, active);
+    // Cancellation-on-supersede: a newer human message interrupts the in-flight reply
+    // (which finalizes itself as cancelled) and we answer the new one.
+    inFlight.get(msg.threadId)?.supersede();
+    void handleReply(conn, self, gateway, flushMs, idleMs, msg.threadId, inFlight);
   });
 }
 
@@ -58,21 +76,51 @@ function isAgentMemberOf(conn: DbConnection, self: Identity, threadId: bigint): 
   return false;
 }
 
-async function handleReply(
+// Exported for unit tests (finalization paths: complete / failed / cancelled).
+export async function handleReply(
   conn: DbConnection,
   self: Identity,
   gateway: ModelGateway,
   flushMs: number,
+  idleMs: number,
   threadId: bigint,
-  active: Set<bigint>,
+  inFlight: Map<bigint, InFlight>,
 ): Promise<void> {
-  active.add(threadId);
   const runId = newRunId(self.toHexString());
-  let acc = '';
+  const abort = new AbortController();
+  let superseded = false;
+  let timedOut = false;
+  // Register synchronously (before any await) so a rapid follow-up message sees us.
+  inFlight.set(threadId, {
+    runId,
+    supersede: () => {
+      superseded = true;
+      abort.abort();
+    },
+  });
+
+  let acc = ''; // full cumulative text — only for the authoritative final finish
+  let seq = 0n; // one per flush → strictly increasing delta ordering key
   const batcher = createBatcher({
     intervalMs: flushMs,
-    onFlush: (text) => conn.reducers.agentReplyAppend({ runId, text }),
+    onFlush: (text) => conn.reducers.agentReplyDelta({ runId, seq: seq++, text }),
   });
+
+  // Idle watchdog: re-armed on every token; fires only if the provider goes quiet.
+  let watchdog: ReturnType<typeof setTimeout> | null = null;
+  const armWatchdog = (): void => {
+    if (watchdog) clearTimeout(watchdog);
+    watchdog = setTimeout(() => {
+      timedOut = true;
+      abort.abort();
+    }, idleMs);
+  };
+  const disarmWatchdog = (): void => {
+    if (watchdog) {
+      clearTimeout(watchdog);
+      watchdog = null;
+    }
+  };
 
   try {
     const agents: AgentRef[] = [...conn.db.my_active_personas.iter()].map((a) => ({
@@ -86,8 +134,9 @@ async function handleReply(
     const persona = selectPersona([...conn.db.my_threads.iter()], agents, threadId);
     const rows: PromptRow[] = [];
     for (const m of conn.db.my_thread_messages.iter()) {
-      // Only completed turns are context — skip in-flight streams and failed
-      // agent replies (e.g. an earlier "⚠️ Sorry…") so they aren't fed back.
+      // Only completed turns are context — skip in-flight streams and failed/cancelled
+      // agent replies (e.g. an earlier "⚠️ Sorry…" or a cancelled partial) so they
+      // aren't fed back.
       if (m.threadId === threadId && m.streamState === 'complete') {
         rows.push({ isAgent: m.sender.isEqual(self), text: m.text, sentMicros: m.sent.microsSinceUnixEpoch });
       }
@@ -112,21 +161,26 @@ async function handleReply(
     conn.reducers.agentReplyBegin({ threadId, runId, model: model.model });
 
     let usage = { inputTokens: 0, outputTokens: 0 };
-    for await (const delta of gateway.stream({ model, credentialRef, messages, baseUrl: persona.baseUrl })) {
+    armWatchdog();
+    for await (const delta of gateway.stream({
+      model,
+      credentialRef,
+      messages,
+      baseUrl: persona.baseUrl,
+      signal: abort.signal,
+    })) {
       if (delta.type === 'text') {
         acc += delta.text;
-        batcher.push(acc);
+        batcher.push(delta.text); // append-only delta — not the cumulative text
+        armWatchdog();
       } else if (delta.type === 'finish') {
         usage = delta.usage;
       }
     }
-    batcher.stop();
-    // Let the streaming-update burst drain before the authoritative finish: each
-    // append re-sends the full cumulative text, so on a high-latency host
-    // (Maincloud) the client can drop the tail of a long reply mid-burst. The
-    // subscription recovers once the burst stops, so a briefly-delayed finish
-    // reliably lands the final `complete` state (no dangling cursor) — OT-004.
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    disarmWatchdog();
+    batcher.stop(); // final flush of any pending delta
+    // The message row now gets its single authoritative final UPDATE (full text +
+    // `complete`); the run's deltas are GC'd in that same reducer transaction.
     conn.reducers.agentReplyFinish({
       runId,
       text: acc,
@@ -135,17 +189,29 @@ async function handleReply(
       outputTokens: BigInt(usage.outputTokens),
     });
   } catch (err) {
+    disarmWatchdog();
     batcher.stop();
-    console.warn('[orchestrator] reply failed:', err instanceof Error ? err.message : err);
-    // Surface a missing-key error to the user in-chat; otherwise a generic failure.
-    const text =
-      err instanceof MissingKeyError
-        ? `⚠️ ${err.message}`
-        : acc.length > 0
+    if (superseded) {
+      // A newer human message interrupted this reply: finalize it as cancelled —
+      // message `failed` with the partial text (cursor clears, excluded from future
+      // context), run `cancelled` (SPEC §1/§2). The new message is already being handled.
+      conn.reducers.agentReplyCancel({ runId, text: acc });
+    } else {
+      const text = timedOut
+        ? acc.length > 0
           ? acc
-          : '⚠️ Sorry — I could not generate a reply.';
-    conn.reducers.agentReplyFinish({ runId, text, ok: false, inputTokens: 0n, outputTokens: 0n });
+          : '⚠️ Sorry — the model took too long to respond.'
+        : err instanceof MissingKeyError
+          ? `⚠️ ${err.message}`
+          : acc.length > 0
+            ? acc
+            : '⚠️ Sorry — I could not generate a reply.';
+      console.warn('[orchestrator] reply failed:', err instanceof Error ? err.message : err);
+      conn.reducers.agentReplyFinish({ runId, text, ok: false, inputTokens: 0n, outputTokens: 0n });
+    }
   } finally {
-    active.delete(threadId);
+    // Only clear our own entry — a supersede may have already replaced it.
+    const cur = inFlight.get(threadId);
+    if (cur && cur.runId === runId) inFlight.delete(threadId);
   }
 }

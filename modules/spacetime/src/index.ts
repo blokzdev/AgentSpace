@@ -90,6 +90,30 @@ const run = table(
   }
 );
 
+// Reply deltas — append-only streamed chunks for an in-flight agent reply (M1.9).
+// Each flush is a small, constant-size INSERT (NOT a growing cumulative UPDATE), so
+// the subscription never has to deliver a long burst of ever-larger row updates —
+// the OT-004 tail-drop. The client concatenates a run's deltas by `seq` for live
+// render; `agent_reply_finish` writes the authoritative final text onto the `message`
+// row and GCs these rows (founder: GC-on-finish). Private; read via `my_reply_deltas`.
+const replyDelta = table(
+  {
+    name: 'reply_delta',
+    indexes: [
+      { accessor: 'by_run', algorithm: 'btree', columns: ['runId'] },
+      { accessor: 'by_thread', algorithm: 'btree', columns: ['threadId'] },
+    ],
+  },
+  {
+    id: t.u64().primaryKey().autoInc(),
+    runId: t.string(), // correlation key — matches message.runId / run.runId
+    threadId: t.u64(), // denormalized so the View scopes by thread membership
+    seq: t.u64(), // orchestrator-assigned, monotonic per run — the ordering key
+    text: t.string(), // the INCREMENTAL chunk (not cumulative)
+    sent: t.timestamp(),
+  }
+);
+
 // Agent personas — user-authored configs (M1.5). Config is inline; an immutable
 // version *history* (BLUEPRINT §3) is deferred (BL-013) in favor of a `version`
 // counter. Private; the owner reads via `my_agents`, the orchestrator via
@@ -144,7 +168,7 @@ const providerKey = table(
   }
 );
 
-const spacetimedb = schema({ user, thread, threadMember, message, run, agent, service, providerKey });
+const spacetimedb = schema({ user, thread, threadMember, message, run, replyDelta, agent, service, providerKey });
 export default spacetimedb;
 
 // ── Reducers ─────────────────────────────────────────────────────────────────
@@ -338,10 +362,15 @@ export const send_message = spacetimedb.reducer(
 );
 
 // ── Agent reply streaming (SPEC §6) ──────────────────────────────────────────
-// The orchestrator (an `agent`-role member) writes a reply as a live message row:
-// begin (empty `streaming` row + run) → append* (cumulative text) → finish
-// (`complete`/`failed`). Correlation is the client-owned `runId`, so no row id is
-// round-tripped. Each reducer re-checks `ctx.sender` owns the work.
+// The orchestrator (an `agent`-role member) writes a reply via begin → delta* →
+// finish. `begin` inserts an empty `streaming` `message` row + a `running` `run`;
+// `delta` appends a small constant-size chunk to `reply_delta` (the client renders
+// the per-run concatenation live); `finish` writes the authoritative final text onto
+// the `message` row (`complete`/`failed`) and GCs the run's deltas. `cancel` finalizes
+// a superseded reply (message `failed` w/ partial text, run `cancelled`). Correlation
+// is the client-owned `runId`, so no row id is round-tripped. Each reducer re-checks
+// `ctx.sender` owns the work. (`agent_reply_append` — the old cumulative-text UPDATE —
+// is retained dormant for back-compat and deleted next milestone; OT-004/DEC-030.)
 
 export const agent_reply_begin = spacetimedb.reducer(
   { threadId: t.u64(), runId: t.string(), model: t.string() },
@@ -376,6 +405,9 @@ export const agent_reply_begin = spacetimedb.reducer(
   }
 );
 
+// DORMANT (M1.9): the old cumulative-text UPDATE path. Superseded by agent_reply_delta
+// to fix OT-004; kept for back-compat this milestone, deleted next. Not called by the
+// orchestrator anymore.
 export const agent_reply_append = spacetimedb.reducer(
   { runId: t.string(), text: t.string() },
   (ctx, { runId, text }) => {
@@ -383,6 +415,26 @@ export const agent_reply_append = spacetimedb.reducer(
     if (!msg) throw new SenderError('No streaming reply for this runId');
     if (msg.streamState !== 'streaming') throw new SenderError('Reply already finished');
     ctx.db.message.id.update({ ...msg, text });
+  }
+);
+
+// Append one streamed chunk for an in-flight reply (M1.9). Same sender-ownership +
+// `streaming`-state guard as append, but INSERTs a small delta row instead of
+// rewriting the message — append-only, constant-size, no O(n²) burst (OT-004).
+export const agent_reply_delta = spacetimedb.reducer(
+  { runId: t.string(), seq: t.u64(), text: t.string() },
+  (ctx, { runId, seq, text }) => {
+    const msg = [...ctx.db.message.by_run.filter(runId)].find((m) => m.sender.isEqual(ctx.sender));
+    if (!msg) throw new SenderError('No streaming reply for this runId');
+    if (msg.streamState !== 'streaming') throw new SenderError('Reply already finished');
+    ctx.db.replyDelta.insert({
+      id: 0n,
+      runId,
+      threadId: msg.threadId,
+      seq,
+      text,
+      sent: ctx.timestamp,
+    });
   }
 );
 
@@ -397,7 +449,12 @@ export const agent_reply_finish = spacetimedb.reducer(
   (ctx, { runId, text, ok, inputTokens, outputTokens }) => {
     const msg = [...ctx.db.message.by_run.filter(runId)].find((m) => m.sender.isEqual(ctx.sender));
     if (!msg) throw new SenderError('No streaming reply for this runId');
+    // The message row now carries the authoritative final text (the client falls back
+    // to it once it's no longer `streaming`), so the run's deltas can be GC'd in the
+    // same transaction — the client receives the `complete` row + the delta removal in
+    // one subscription update, so there's no stale-text window (DEC-030, founder: GC).
     ctx.db.message.id.update({ ...msg, text, streamState: ok ? 'complete' : 'failed' });
+    for (const d of [...ctx.db.replyDelta.by_run.filter(runId)]) ctx.db.replyDelta.id.delete(d.id);
     const r = [...ctx.db.run.by_run.filter(runId)].find((x) => x.agent.isEqual(ctx.sender));
     if (r) {
       ctx.db.run.id.update({
@@ -408,6 +465,22 @@ export const agent_reply_finish = spacetimedb.reducer(
         updatedAt: ctx.timestamp,
       });
     }
+  }
+);
+
+// Finalize a superseded reply (the human sent again mid-stream — M1.9). Message →
+// `failed` with the partial text (SPEC §1: `failed` = "errored or cancelled
+// mid-stream"; clears the cursor, excluded from future prompt context); run →
+// `cancelled` (SPEC §2). GCs the run's deltas like finish.
+export const agent_reply_cancel = spacetimedb.reducer(
+  { runId: t.string(), text: t.string() },
+  (ctx, { runId, text }) => {
+    const msg = [...ctx.db.message.by_run.filter(runId)].find((m) => m.sender.isEqual(ctx.sender));
+    if (!msg) throw new SenderError('No streaming reply for this runId');
+    ctx.db.message.id.update({ ...msg, text, streamState: 'failed' });
+    for (const d of [...ctx.db.replyDelta.by_run.filter(runId)]) ctx.db.replyDelta.id.delete(d.id);
+    const r = [...ctx.db.run.by_run.filter(runId)].find((x) => x.agent.isEqual(ctx.sender));
+    if (r) ctx.db.run.id.update({ ...r, status: 'cancelled', updatedAt: ctx.timestamp });
   }
 );
 
@@ -483,6 +556,17 @@ export const my_thread_messages = spacetimedb.view(
   (ctx) =>
     [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => [
       ...ctx.db.message.by_thread.filter(m.threadId),
+    ])
+);
+
+// In-flight reply deltas for the caller's threads (M1.9) — scoped exactly like
+// my_thread_messages. The client concatenates a run's deltas by `seq` for live render.
+export const my_reply_deltas = spacetimedb.view(
+  { name: 'my_reply_deltas', public: true },
+  t.array(replyDelta.rowType),
+  (ctx) =>
+    [...ctx.db.threadMember.by_member.filter(ctx.sender)].flatMap((m) => [
+      ...ctx.db.replyDelta.by_thread.filter(m.threadId),
     ])
 );
 

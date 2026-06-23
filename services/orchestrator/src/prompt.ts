@@ -87,35 +87,48 @@ export function newRunId(selfHex: string): string {
 }
 
 export interface Batcher {
-  /** Record the latest cumulative text; schedules a flush. */
-  push(text: string): void;
-  /** Flush the pending text now (if any). */
+  /** Append a streamed chunk; schedules (or, if the buffer is large, forces) a flush. */
+  push(chunk: string): void;
+  /** Flush the pending delta now (if any). */
   flush(): void;
   /** Flush and stop the timer. */
   stop(): void;
 }
 
+/** Default soft cap on a single coalesced delta — bounds per-INSERT size (backpressure). */
+export const MAX_PENDING_CHARS = 8192;
+
 /**
- * Coalescing batcher: flushes the *latest* cumulative text at most once per
- * `intervalMs` (BLUEPRINT §5 — ~50ms windows), collapsing bursts of token deltas
- * into a single STDB UPDATE.
+ * Coalescing delta batcher (M1.9): accumulates streamed chunks and flushes their
+ * **concatenation** at most once per `intervalMs` — collapsing a burst of token
+ * deltas into one small, append-only INSERT (not a growing cumulative UPDATE; OT-004).
+ * Backpressure: if the LLM out-runs the flush and pending exceeds `maxPendingChars`,
+ * it flushes immediately so no single delta INSERT grows unbounded. `onFlush` is
+ * called once per flush, so the caller can assign a monotonic `seq` per flush.
  */
-export function createBatcher(opts: { onFlush: (text: string) => void; intervalMs: number }): Batcher {
-  let pending: string | null = null;
+export function createBatcher(opts: {
+  onFlush: (text: string) => void;
+  intervalMs: number;
+  maxPendingChars?: number;
+}): Batcher {
+  const maxPending = opts.maxPendingChars ?? MAX_PENDING_CHARS;
+  let pending = '';
   let timer: ReturnType<typeof setInterval> | null = null;
 
   const tick = (): void => {
-    if (pending !== null) {
+    if (pending.length > 0) {
       const text = pending;
-      pending = null;
+      pending = '';
       opts.onFlush(text);
     }
   };
 
   return {
-    push(text: string): void {
-      pending = text;
+    push(chunk: string): void {
+      if (chunk.length === 0) return;
+      pending += chunk;
       timer ??= setInterval(tick, opts.intervalMs);
+      if (pending.length >= maxPending) tick(); // bounded buffer — flush early
     },
     flush(): void {
       tick();

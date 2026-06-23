@@ -27,15 +27,20 @@ A message row moves through a small state machine. Human messages are created
 | State | Meaning | Who writes |
 |-------|---------|-----------|
 | `complete` | final body; no further updates | human send (one insert); agent final flush |
-| `streaming` | body is partial; more updates coming | orchestrator (batched UPDATEs) |
-| `failed` | the run errored or was cancelled mid-stream | orchestrator |
+| `streaming` | `message.text` is empty; live body is the run's `reply_delta` rows | orchestrator (`agent_reply_begin`, then `reply_delta` INSERTs) |
+| `failed` | the run errored, timed out, or was cancelled mid-stream | orchestrator (`agent_reply_finish ok:false` / `agent_reply_cancel`) |
 
-**Contract:** consumers (the mobile client) must render `streaming` bodies as
-live/partial and only treat `complete` as final. The orchestrator MUST end every
-stream it starts in `complete` or `failed` (no dangling `streaming`). Producers:
-`modules/spacetime` reducers `send_message`, `agent_reply_begin`,
-`agent_reply_append`, `agent_reply_finish`. Consumer: `apps/mobile` thread view
-(renders a streaming cursor on `streaming` rows). Cite both sides.
+**Contract:** while a row is `streaming`, `message.text` is empty and the live body is
+the **concatenation of that run's `reply_delta` rows ordered by `seq`** (M1.9/DEC-030 —
+append-only INSERTs, not cumulative `message` UPDATEs, to fix OT-004). Consumers must
+assemble the deltas for `streaming` rows and fall back to `message.text` for any other
+state (it carries the authoritative final text; the deltas are GC'd on finish). The
+orchestrator MUST end every stream it starts in `complete` or `failed` (no dangling
+`streaming`) — guaranteed by an idle/error timeout. Producers: `modules/spacetime`
+reducers `send_message`, `agent_reply_begin`, `agent_reply_delta`, `agent_reply_finish`,
+`agent_reply_cancel` (`agent_reply_append` is dormant — back-compat, deleted next
+milestone). Consumer: `apps/mobile` thread view (`Thread.tsx` — concatenates
+`my_reply_deltas` by `runId`, renders a streaming cursor on `streaming` rows). Cite both sides.
 
 ---
 
@@ -64,6 +69,15 @@ reducers especially). A run is uniquely keyed (e.g. `thread_id + message_id +
 agent_id`, or `workflow_id + scheduled_at`); claiming is a conditional reducer
 that fails if already claimed. Producers/consumers: orchestrator dispatcher +
 `modules/spacetime` run reducers.
+
+**Implemented (M1.9/DEC-030).** A reply run is `running` from `agent_reply_begin`. Terminal
+transitions: `succeeded` (`agent_reply_finish ok:true`); `failed` (`agent_reply_finish
+ok:false` — a gateway error or the **idle/error timeout**: no token for 60s → the
+orchestrator aborts the stream); `cancelled` (`agent_reply_cancel` — **cancellation-on-
+supersede**: a newer human message in the thread aborts the in-flight stream via an
+`AbortController` threaded into the gateway). Every run reaches one terminal state — the
+orchestrator's in-flight `Map` + `finally` guard ensure no run is orphaned. The matching
+`message` row ends `complete` (succeeded) or `failed` (failed/cancelled — SPEC §1).
 
 ---
 
@@ -170,15 +184,21 @@ tool registry + MCP client + the agent loop (cite all).
   `credentialRef = "<ownerHex>:<provider>"` is resolved to the owner's API key by
   decrypting the sealed `provider_key` in-memory (`createByokResolver`). Seeded default
   + interim `envResolver` remain for the gateway smoke only.
-- **Write:** only via reducers. **Implemented (M1.6):** `agent_reply_begin(threadId,
-  runId, model)` (insert a `streaming` message + a `running` `run`),
-  `agent_reply_append(runId, text)` (UPDATE cumulative text), `agent_reply_finish(
-  runId, text, ok, inputTokens, outputTokens)` (final message state + run
-  status/tokens). Correlation is a **client-owned `runId`** (no row-id round-trip);
-  each reducer re-checks `ctx.sender` is the `agent` member / owns the row. No direct
-  table writes.
-- **Streaming cadence:** batched UPDATEs, ~50ms windows (BLUEPRINT §5) — a coalescing
-  batcher flushes the latest cumulative text.
+- **Write:** only via reducers. **Implemented (M1.6 → M1.9/DEC-030):** `agent_reply_begin(
+  threadId, runId, model)` (insert an **empty** `streaming` message + a `running` `run`),
+  `agent_reply_delta(runId, seq, text)` (**append-only** INSERT of one streamed chunk into
+  `reply_delta`), `agent_reply_finish(runId, text, ok, inputTokens, outputTokens)` (write the
+  authoritative final text onto the `message` row + run status/tokens, **GC the run's
+  deltas**), `agent_reply_cancel(runId, text)` (superseded: message → `failed` w/ partial,
+  run → `cancelled`, GC deltas). Correlation is a **client-owned `runId`** (no row-id
+  round-trip); each reducer re-checks `ctx.sender` is the `agent` member / owns the row. No
+  direct table writes. (`agent_reply_append` — the old cumulative-text UPDATE — is retained
+  dormant for back-compat, deleted next milestone.)
+- **Streaming cadence:** a coalescing batcher (`prompt.ts:createBatcher`) accumulates token
+  deltas and flushes their **concatenation** once per ~100ms window (one INSERT, one `seq`),
+  with a soft per-INSERT byte cap for backpressure (BLUEPRINT §5). Because each flush is a
+  small constant-size append (not a growing row UPDATE), the subscription delivers a long
+  reply's burst reliably — the OT-004 fix.
 
 Any change to these reducers is a coupled change across `modules/spacetime` and
 `services/orchestrator` — update and cite both sides.
