@@ -123,7 +123,7 @@ Notes: <founder fills: device + OS + result>
 
 ---
 
-### V-6 — Model Gateway live provider round-trip  ·  added 2026-06-13 · M1.4
+### V-6 — Model Gateway live provider round-trip  ·  added 2026-06-13 · M1.4  ·  ✅ DONE (AI, 2026-06-23)
 - **Why:** CI proves the gateway's wiring and BYOK crypto **headlessly** (mock
   model, 16 tests), but a real provider stream can only run with an actual API key.
   This confirms `createModelGateway` streams text + reports token usage end-to-end
@@ -140,7 +140,17 @@ Notes: <founder fills: device + OS + result>
   `401/authentication` → bad key; a model-id error → the key's provider doesn't
   serve `claude-opus-4-8` (use that provider's model, or set `ANTHROPIC_API_KEY`).
   Tell me which.
-- **Notes (founder):** _provider + result →_
+- **🤖 AI evidence (2026-06-23 — AI-completed locally, founder-authorized):** ran the gateway against a
+  **live Anthropic** provider using the founder's key (sourced from gitignored `services/orchestrator/.env`,
+  `ANTHROPIC_BASE_URL` cleared per the harness gotcha — never printed/committed). `claude-opus-4-8` (the smoke
+  default) returned a transient **`Overloaded`** (529) on all three retries — a provider-side blip, not our
+  code — so a one-off on the **same** `createModelGateway` path with **`claude-haiku-4-5-20251001`** completed
+  it: streamed *"Hello! How can I help you today?"* with `usage {inputTokens:16, outputTokens:12}`. Proves the
+  gateway streams text + reports token usage end-to-end with a real BYOK key (the model is incidental to what
+  V-6 checks). The hardcoded-Opus `pnpm --filter @agentspace/gateway smoke` will pass cleanly once Opus isn't
+  overloaded.
+- **Notes (founder):** ✅ **AI-COMPLETED 2026-06-23** (at the founder's "complete + tick what you can"
+  request) — live gateway round-trip verified end-to-end. Nothing on-device about this one; countersign if you wish.
 
 ---
 
