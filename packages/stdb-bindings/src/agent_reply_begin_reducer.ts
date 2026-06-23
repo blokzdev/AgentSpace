@@ -14,4 +14,6 @@ export default {
   threadId: __t.u64(),
   runId: __t.string(),
   model: __t.string(),
+  agentId: __t.u64(),
+  episodeId: __t.u64(),
 };

@@ -105,6 +105,46 @@ describe('createModelGateway.stream', () => {
     await expect(collect(gateway.stream(baseReq))).rejects.toThrow(/no provider adapter/i);
   });
 
+  function captureModel(captured: { maxOutputTokens?: number; stopSequences?: string[] }): MockLanguageModelV3 {
+    return new MockLanguageModelV3({
+      doStream: (options) => {
+        captured.maxOutputTokens = options.maxOutputTokens;
+        captured.stopSequences = options.stopSequences;
+        return Promise.resolve({
+          stream: simulateReadableStream({
+            chunks: [
+              { type: 'stream-start', warnings: [] },
+              { type: 'finish', finishReason: { unified: 'stop', raw: 'stop' }, usage: USAGE },
+            ],
+            initialDelayInMs: 0,
+            chunkDelayInMs: 0,
+          }),
+        });
+      },
+    });
+  }
+
+  it('forwards maxOutputTokens + stopSequences to the model (M2.1 per-run cap, guard #4)', async () => {
+    const captured: { maxOutputTokens?: number; stopSequences?: string[] } = {};
+    const gateway = createModelGateway({
+      resolveCredential: () => Promise.resolve('k'),
+      providers: { anthropic: () => captureModel(captured) },
+    });
+    await collect(gateway.stream({ ...baseReq, maxOutputTokens: 2000, stopSequences: ['\nBanjo:'] }));
+    expect(captured.maxOutputTokens).toBe(2000);
+    expect(captured.stopSequences).toEqual(['\nBanjo:']);
+  });
+
+  it('omits stopSequences when none are given (empty array → undefined)', async () => {
+    const captured: { maxOutputTokens?: number; stopSequences?: string[] } = {};
+    const gateway = createModelGateway({
+      resolveCredential: () => Promise.resolve('k'),
+      providers: { anthropic: () => captureModel(captured) },
+    });
+    await collect(gateway.stream({ ...baseReq, stopSequences: [] }));
+    expect(captured.stopSequences).toBeUndefined();
+  });
+
   it('embed is deferred to M3.1', async () => {
     const gateway = createModelGateway();
     await expect(gateway.embed(['x'])).rejects.toThrow(/M3\.1/);

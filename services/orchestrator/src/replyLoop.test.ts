@@ -1,23 +1,35 @@
-// Unit tests for handleReply's finalization paths (M1.9): a happy stream finishes
-// `complete`; a stalled provider times out to `failed`; a gateway error finishes
-// `failed`; a superseding human message cancels the in-flight reply. Uses a minimal
-// fake DbConnection + scripted gateways (no SpacetimeDB / network).
+// Unit tests for handleReply's finalization paths (M1.9 + M2.1 tags): a happy
+// stream finishes `complete`; a stalled provider times out to `failed`; a gateway
+// error finishes `failed`; a superseding human message cancels the in-flight reply.
+// Every begin carries the M2.1 agentId/episodeId tags. Uses a minimal fake
+// DbConnection + scripted gateways (no SpacetimeDB / network).
 import { describe, it, expect } from 'vitest';
 import { Identity } from 'spacetimedb';
 import type { GatewayDelta, GatewayRequest, ModelGateway } from '@agentspace/gateway';
 import { DbConnection } from '@agentspace/stdb-bindings';
-import { handleReply, type InFlight } from './replyLoop';
+import { createLoopState, handleReply } from './replyLoop';
 
 type Call = [string, Record<string, unknown>];
 
-/** A DbConnection stub covering only what handleReply touches. */
+const AGENT_ID = 7n;
+const EPISODE_ID = 100n;
+
+/** A DbConnection stub covering only what handleReply reads/writes. */
 function fakeConn(calls: Call[]): DbConnection {
-  const rec = (name: string) => (args: Record<string, unknown>) => calls.push([name, args]);
+  // Reducer calls return a promise (the real SDK rejects it on a reducer error;
+  // handleReply awaits begin and `.catch`es the fire-and-forget calls).
+  const rec = (name: string) => (args: Record<string, unknown>): Promise<void> => {
+    calls.push([name, args]);
+    return Promise.resolve();
+  };
   return {
     db: {
       my_active_personas: { iter: () => [] },
-      my_threads: { iter: () => [{ id: 1n, agentId: 0n }] },
+      my_thread_agents: { iter: () => [] },
+      my_thread_members: { iter: () => [] },
       my_thread_messages: { iter: () => [] },
+      my_threads: { iter: () => [{ id: 1n, agentId: 0n }] },
+      user: { iter: () => [] },
     },
     reducers: {
       agentReplyBegin: rec('begin'),
@@ -30,8 +42,10 @@ function fakeConn(calls: Call[]): DbConnection {
 
 const SELF = { toHexString: () => 'deadbeef0000', isEqual: () => false } as unknown as Identity;
 
+const run = (conn: DbConnection, gateway: ModelGateway, flushMs: number, idleMs: number) =>
+  handleReply(conn, SELF, gateway, flushMs, idleMs, 1n, AGENT_ID, EPISODE_ID, createLoopState());
+
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
-/** Reject as soon as the signal aborts (covers the already-aborted race). */
 const untilAbort = (signal?: AbortSignal): Promise<never> =>
   new Promise((_resolve, reject) => {
     if (signal?.aborted) return reject(new Error('aborted'));
@@ -40,8 +54,8 @@ const untilAbort = (signal?: AbortSignal): Promise<never> =>
 
 const FAST = 5; // flush interval (ms) for tests
 
-describe('handleReply finalization (M1.9.2)', () => {
-  it('streams deltas then finishes `complete` with the full text', async () => {
+describe('handleReply finalization (M1.9.2 + M2.1 tags)', () => {
+  it('streams deltas, finishes `complete`, and tags begin with agentId + episodeId', async () => {
     const calls: Call[] = [];
     const gateway: ModelGateway = {
       async *stream(): AsyncIterable<GatewayDelta> {
@@ -52,15 +66,12 @@ describe('handleReply finalization (M1.9.2)', () => {
       embed: () => Promise.reject(new Error('no')),
     };
 
-    await handleReply(fakeConn(calls), SELF, gateway, FAST, 1000, 1n, new Map<bigint, InFlight>());
+    await run(fakeConn(calls), gateway, FAST, 1000);
 
-    expect(calls.filter((c) => c[0] === 'begin')).toHaveLength(1);
+    const begin = calls.find((c) => c[0] === 'begin');
+    expect(begin?.[1]).toMatchObject({ agentId: AGENT_ID, episodeId: EPISODE_ID });
     const deltas = calls.filter((c) => c[0] === 'delta');
-    expect(deltas.length).toBeGreaterThan(0);
-    // Concatenation of all delta chunks reconstructs the reply, regardless of how the
-    // coalescing batcher split them across flushes.
     expect(deltas.map((c) => c[1].text).join('')).toBe('Hello!');
-    // seq is strictly increasing (0, 1, …), one per flush.
     const seqs = deltas.map((c) => c[1].seq as bigint);
     expect(seqs).toEqual([...seqs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
     expect(new Set(seqs).size).toBe(seqs.length);
@@ -74,15 +85,15 @@ describe('handleReply finalization (M1.9.2)', () => {
     const gateway: ModelGateway = {
       async *stream(req: GatewayRequest): AsyncIterable<GatewayDelta> {
         yield { type: 'text', text: 'thinking' };
-        await untilAbort(req.signal); // hang until the watchdog aborts
+        await untilAbort(req.signal);
       },
       embed: () => Promise.reject(new Error('no')),
     };
 
-    await handleReply(fakeConn(calls), SELF, gateway, FAST, 40, 1n, new Map<bigint, InFlight>());
+    await run(fakeConn(calls), gateway, FAST, 40);
 
     const finish = calls.find((c) => c[0] === 'finish');
-    expect(finish?.[1]).toMatchObject({ ok: false, text: 'thinking' }); // partial kept
+    expect(finish?.[1]).toMatchObject({ ok: false, text: 'thinking' });
     expect(calls.some((c) => c[0] === 'cancel')).toBe(false);
   });
 
@@ -96,7 +107,7 @@ describe('handleReply finalization (M1.9.2)', () => {
       embed: () => Promise.reject(new Error('no')),
     };
 
-    await handleReply(fakeConn(calls), SELF, gateway, FAST, 1000, 1n, new Map<bigint, InFlight>());
+    await run(fakeConn(calls), gateway, FAST, 1000);
 
     const finish = calls.find((c) => c[0] === 'finish');
     expect(finish?.[1]).toMatchObject({ ok: false });
@@ -105,25 +116,25 @@ describe('handleReply finalization (M1.9.2)', () => {
 
   it('cancels the in-flight reply when superseded (run cancelled, partial kept)', async () => {
     const calls: Call[] = [];
-    const inFlight = new Map<bigint, InFlight>();
+    const state = createLoopState();
     const gateway: ModelGateway = {
       async *stream(req: GatewayRequest): AsyncIterable<GatewayDelta> {
         yield { type: 'text', text: 'par' };
-        await untilAbort(req.signal); // wait to be superseded
+        await untilAbort(req.signal);
         yield { type: 'text', text: 'tial' }; // never reached
       },
       embed: () => Promise.reject(new Error('no')),
     };
 
-    const p = handleReply(fakeConn(calls), SELF, gateway, FAST, 5000, 1n, inFlight);
-    expect(inFlight.has(1n)).toBe(true); // registered synchronously
-    await sleep(20); // let the first delta land
-    inFlight.get(1n)?.supersede(); // a newer human message arrives
+    const p = handleReply(fakeConn(calls), SELF, gateway, FAST, 5000, 1n, AGENT_ID, EPISODE_ID, state);
+    expect(state.running.has(1n)).toBe(true); // registered synchronously
+    await sleep(20);
+    state.running.get(1n)?.supersede();
     await p;
 
     const cancel = calls.find((c) => c[0] === 'cancel');
-    expect(cancel?.[1]).toMatchObject({ text: 'par' }); // partial preserved
-    expect(calls.some((c) => c[0] === 'finish')).toBe(false); // not finished, cancelled
-    expect(inFlight.has(1n)).toBe(false); // unwound
+    expect(cancel?.[1]).toMatchObject({ text: 'par' });
+    expect(calls.some((c) => c[0] === 'finish')).toBe(false);
+    expect(state.running.has(1n)).toBe(false); // unwound
   });
 });

@@ -83,7 +83,12 @@ shared  ◀── modules/spacetime
 - `services/orchestrator` may import `gateway`, `shared`, and `stdb-bindings`.
 - `apps/mobile` imports `shared` and the **generated** `module_bindings` only.
 - `modules/spacetime` imports `shared` (for shared enums/string constants) and the
-  SpacetimeDB server SDK; it imports no app/service/gateway code.
+  SpacetimeDB server SDK; it imports no app/service/gateway code. **Exception (M2.1):**
+  the WASM module **cannot** import the `shared` package at all, so the episode-budget
+  dials (`MAX_TURNS_HARD`, `MAX_CONCURRENT`, `EPISODE_TOKEN_CEILING`, `MAX_OUTPUT_TOKENS_PER_RUN`,
+  `STREAM_TTL_MS`, …) and the `evaluateBegin` budget check are **re-declared inline** in
+  `modules/spacetime/src/index.ts` as a **coupled twin** of `packages/shared` (CLAUDE.md §8):
+  the canonical values live in `shared`; the inlined copies must change in the same commit.
 - `examples/` is a reference surface — product code never imports it.
 
 ---
@@ -98,20 +103,49 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | Table | Key fields | Visibility | Notes |
 |-------|-----------|-----------|-------|
 | `users` | `identity` (PK), `display_name`, `avatar`, `online` | View: self + co-members | one row per human Identity |
-| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version`, `base_url` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5); `base_url`≠'' only for `provider='openai-compatible'` (local, M1.8.2) |
+| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version`, `base_url`, `responds_to_agents` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5); `base_url`≠'' only for `provider='openai-compatible'` (local, M1.8.2); `responds_to_agents` (bool, M2.1) — when true the persona may answer another agent's message in a group |
 | `agent_versions` | (deferred — BL-013) | — | v1 inlines config + a `version` counter; immutable history/run-pinning is BL-013 |
 | `service` | `id` (PK = 0), `identity`, `enc_pub_key` | View: `service_info` (public) | singleton: orchestrator identity (M1.5) + its NaCl **box public key** so clients seal BYOK keys to it (M1.7) |
-| `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5) |
+| `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5); **superseded by `thread_agent` in M2.1** — `agent_id` is the legacy singular binding, kept for back-compat while many-agents-per-thread now lives in `thread_agent` |
 | `thread_members` | `(thread_id, member_ref)` , `role` (human\|agent), `member_kind` | View: members only | membership is the authz spine |
-| `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | `text` empty while `streaming` (live body = `reply_delta` rows, §5); set to the final text on finish; `run_id`=`''` for humans (M1.6/M1.9) |
-| `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6); reaches a terminal status (M1.9). `cost`/`error` deferred |
+| `thread_agent` | `id` (PK), `thread_id`, `agent_id`, `is_default_responder` (bool), `added_by`, `added_at`; indexes `by_thread` + composite `by_thread_agent` | View: `my_thread_agents` (caller's threads) | **M2.1** — generalizes `thread.agent_id`: **many personas per thread**. `is_default_responder` answers an unaddressed human send; the first agent added becomes the default. `create_agent_dm` writes a row here too, so **DMs + groups resolve persona through the same path** |
+| `episode` | `id` (PK), `thread_id`, `root_message_id`, `turns_remaining` (u8), `token_budget_remaining` (u64), `opened_at`, `status` (open\|closed); index `by_thread` | private (cost/loop ledger) | **M2.1** — opened **only by a HUMAN `send_message`**; the per-human-turn cost + loop budget. Opened episode-FIRST (episode → message → back-stamp `root_message_id`) so a subscriber sees `episode_id` on insert. `turns_remaining=max(MAX_TURNS_HARD, addressed-count)`, `token_budget_remaining=EPISODE_TOKEN_CEILING`; closed at ≤0 budget or by the reaper |
+| `agent_turn` | `id` (PK), `episode_id`, `agent_id`; indexes `by_episode` + composite `by_episode_agent` | private | **M2.1** — the existential invariant: **once per episode per agent**. Inserted by `agent_reply_begin`; its presence makes a duplicate begin a refusal, structurally bounding any agent↔agent volley to ≤(#agents) replies per human-rooted episode |
+| `reaper_schedule` | `scheduled_id` (PK), `scheduled_at` | scheduled table | **M2.1** — seeded in `init` via `ScheduleAt::interval(60s)`; drives the `reap_stale_runs` reducer (self-heals a crashed orchestrator — §5) |
+| `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id`, `mentions`, `agent_id`, `episode_id` | View: thread members | `text` empty while `streaming` (live body = `reply_delta` rows, §5); set to the final text on finish; `run_id`=`''` for humans (M1.6/M1.9). M2.1 additive cols: `mentions` (`Vec<Mention>`, who this message addresses — validated server-side), `agent_id` (≠0 → authored by that persona; drives no-bleed name/avatar), `episode_id` (the cost/loop ledger this message belongs to) |
+| `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at`, `agent_id`, `episode_id` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6); reaches a terminal status (M1.9). `cost`/`error` deferred. M2.1 additive cols `agent_id`/`episode_id` stamped by `agent_reply_begin`; index `by_thread` (concurrency-cap count of running runs per thread) |
 | `reply_delta` | `id` (PK), `run_id`, `thread_id`, `seq`, `text`, `sent` | View: `my_reply_deltas` (thread members) | append-only streamed chunks for an in-flight reply (M1.9/DEC-030). Each flush is one small INSERT (not a growing UPDATE); client concatenates by `seq`; **GC'd on finish/cancel**. Fixes OT-004 |
 | `attachments` | `id` (PK), `message_id`, `kind`, `uri`, `meta` | View: thread members | blobs out-of-band |
 | `presence` | `identity`/`agent_id`, `state`, `typing_in_thread` | View: co-members | humans + agents |
-| `provider_key` | `id` (PK), `owner`, `provider`, `sealed`, `created_at`, `updated_at` | View: `my_provider_keys` (owner) + `my_persona_keys` (agent member) | per-user BYOK (M1.7). `sealed` = **ciphertext** (box-sealed to the orchestrator's pubkey); raw key never in STDB. Durable Postgres/KMS backing = BL-011 |
+| `provider_key` | `id` (PK), `owner`, `provider`, `sealed`, `created_at`, `updated_at` | View: `my_provider_keys` (owner) + `my_persona_keys` (orchestrator, via `thread_agent` — M2.1) | per-user BYOK (M1.7). `sealed` = **ciphertext** (box-sealed to the orchestrator's pubkey); raw key never in STDB. Durable Postgres/KMS backing = BL-011 |
 | `agent_toolkits` | `(agent_id, toolkit_id)`, `config_ref` | private | per-agent tool scoping |
 | `workflows` | `id` (PK), `agent_id`, `trigger`, `definition_ref`, `enabled` | View: owner | |
 | `workflow_schedules` | `scheduled_id` (PK), `scheduled_at`, `workflow_id` | scheduled table | drives scheduled reducer |
+
+### Mention struct (M2.1)
+
+`message.mentions` is a `Vec<Mention>`; each `Mention` is an embedded object
+(`t.object('Mention', …)`), **not** a table:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `kind` | string (`agent`\|`human`\|`all`) | who is addressed (`all` = `@everyone`; `human` deferred — humans don't auto-respond) |
+| `ref` | u64 | the addressed `agent_id` (or human ref); `0` for `all` |
+| `start` | u32 | UTF-16 offset of the mention token in `text` |
+| `len` | u32 | length of the mention token |
+
+`send_message` takes `mentions` and **sanitizes** them server-side: every
+`kind:'agent'` `ref` must be a current `thread_agent` of the thread (untrusted
+client input — CLAUDE.md §8 defensive boundary).
+
+### View rewrites & new views (M2.1)
+
+- **`my_active_personas`** (orchestrator runtime) and **`my_persona_keys`** (per-thread
+  BYOK) are **rewritten to read `thread_agent`** (deduped by agent / owner) instead of the
+  singular `thread.agent_id` — so a thread with N personas exposes all N.
+- **`my_thread_agents`** (NEW) — scoped to the caller's threads (any role), backs the
+  mobile @mention typeahead + roster.
+- The dormant `agent_reply_append` reducer was **deleted** in M2.1.
 
 Knowledge bases are **not** STDB tables: `knowledge_docs` and `knowledge_chunks`
 (with embeddings) live in **Postgres + pgvector** (DEC-010), referenced from

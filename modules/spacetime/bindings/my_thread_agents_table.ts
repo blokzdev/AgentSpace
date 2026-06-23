@@ -10,7 +10,11 @@ import {
   type Infer as __Infer,
 } from "spacetimedb";
 
-export default {
-  runId: __t.string(),
-  text: __t.string(),
-};
+export default __t.row({
+  id: __t.u64().primaryKey(),
+  threadId: __t.u64().name("thread_id"),
+  agentId: __t.u64().name("agent_id"),
+  isDefaultResponder: __t.bool().name("is_default_responder"),
+  addedBy: __t.identity().name("added_by"),
+  addedAt: __t.timestamp().name("added_at"),
+});

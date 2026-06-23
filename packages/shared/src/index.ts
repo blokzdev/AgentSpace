@@ -168,3 +168,77 @@ export interface ToolSpec {
   sideEffects: ToolSideEffect;
   approval: ToolApproval;
 }
+
+// ── Multi-agent addressing & episode budget (SPEC §3; DEC-031) ────────────────
+// Structured mentions ride on a human message; the orchestrator resolves them to
+// the agents that should reply. MVP addresses agents + the synthetic @everyone;
+// @human is deferred (humans don't auto-respond), so the composer never emits it.
+export const MENTION_KINDS = ['agent', 'human', 'all'] as const;
+export type MentionKind = (typeof MENTION_KINDS)[number];
+
+export interface Mention {
+  kind: MentionKind;
+  /** kind 'agent' → agent.id; 'all' (@everyone) → 0n; 'human' (deferred) → member ref. */
+  ref: bigint;
+  /** UTF-16 offset of the @token in `message.text`. */
+  start: number;
+  /** Length of the @token (so the client can re-style it). */
+  len: number;
+}
+
+// Episode-budget dials (DEC-031 — starting defaults, tune after V-16). This is the
+// CLIENT/orchestrator copy; the SpacetimeDB reducer re-declares the same values
+// inline (`modules/spacetime/src/index.ts`) because the WASM module cannot import
+// this package — the two MUST stay in sync (coupled feature, CLAUDE.md §8).
+/** Hard ceiling on agent turns per human-rooted episode (loop bound). */
+export const MAX_TURNS_HARD = 8;
+/** Max concurrently-`running` agent runs per thread (reducer-side backstop). */
+export const MAX_CONCURRENT = 2;
+/** Per-run output-token cap handed to the gateway (bounds one runaway run). */
+export const MAX_OUTPUT_TOKENS_PER_RUN = 2000;
+/** Episode-wide token budget, summed across runs (u64). */
+export const EPISODE_TOKEN_CEILING = 50_000n;
+/** Per-(agent,thread) cooldown — reserved; enforcement deferred (M2.x). */
+export const AGENT_COOLDOWN_MS = 3000;
+/** Reaper: a `streaming` message / `running` run older than this is failed out. */
+export const STREAM_TTL_MS = 120_000;
+
+/** The episode fields the begin-decision reads (kept binding-free for tests). */
+export interface EpisodeView {
+  status: 'open' | 'closed';
+  turnsRemaining: number; // u8
+  tokenBudgetRemaining: bigint; // u64
+}
+
+export type BeginRejectReason =
+  | 'episode_closed'
+  | 'turns_exhausted'
+  | 'budget_exhausted'
+  | 'already_replied'
+  | 'concurrency_cap';
+
+export type BeginDecision = { ok: true } | { ok: false; reason: BeginRejectReason };
+
+/**
+ * The pre-execution budget gate for an agent reply (DEC-031). The SpacetimeDB
+ * reducer `agent_reply_begin` inlines this exact ordered logic against `ctx.db`;
+ * this pure mirror is what the orchestrator pre-flights with and what CI unit-tests.
+ * Order is deliberate: a closed/exhausted episode short-circuits before the
+ * per-agent and concurrency checks so the rejection reason is the most specific.
+ */
+export function evaluateBegin(args: {
+  episode: EpisodeView | undefined;
+  /** Runs already `running` in this thread (for the concurrency cap). */
+  runningInThread: number;
+  /** True if this agent already took its turn in this episode (once-per-episode). */
+  agentAlreadyReplied: boolean;
+  maxConcurrent?: number;
+}): BeginDecision {
+  const maxConcurrent = args.maxConcurrent ?? MAX_CONCURRENT;
+  if (!args.episode || args.episode.status !== 'open') return { ok: false, reason: 'episode_closed' };
+  if (args.episode.turnsRemaining <= 0) return { ok: false, reason: 'turns_exhausted' };
+  if (args.episode.tokenBudgetRemaining <= 0n) return { ok: false, reason: 'budget_exhausted' };
+  if (args.agentAlreadyReplied) return { ok: false, reason: 'already_replied' };
+  if (args.runningInThread >= maxConcurrent) return { ok: false, reason: 'concurrency_cap' };
+  return { ok: true };
+}

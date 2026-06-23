@@ -32,6 +32,10 @@ export interface GatewayRequest {
   baseUrl?: string;
   /** Abort the in-flight provider request (cancellation / idle-timeout — M1.9.2). */
   signal?: AbortSignal;
+  /** Hard cap on generated tokens for this run (per-run cost guard — M2.1, DEC-031). */
+  maxOutputTokens?: number;
+  /** Stop sequences (multi-agent: cut the stream if the model ventriloquizes another speaker). */
+  stopSequences?: string[];
 }
 
 export interface GatewayUsage {
@@ -122,7 +126,15 @@ export function createModelGateway(options: ModelGatewayOptions = {}): ModelGate
       const model = factory(apiKey, req.model.model, { baseUrl: req.baseUrl });
       const { system, messages } = toModelMessages(req.messages);
 
-      const result = streamText({ model, system, messages, tools: toToolSet(req.tools), abortSignal: req.signal });
+      const result = streamText({
+        model,
+        system,
+        messages,
+        tools: toToolSet(req.tools),
+        abortSignal: req.signal,
+        maxOutputTokens: req.maxOutputTokens,
+        stopSequences: req.stopSequences && req.stopSequences.length > 0 ? req.stopSequences : undefined,
+      });
       for await (const part of result.fullStream) {
         if (part.type === 'error') {
           throw part.error instanceof Error ? part.error : new Error(String(part.error));

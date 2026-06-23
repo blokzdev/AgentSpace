@@ -37,6 +37,7 @@ export function AgentEditor({
   const [provider, setProvider] = useState<string>(existing?.provider ?? DEFAULT_MODEL.provider);
   const [model, setModel] = useState(existing?.model ?? DEFAULT_MODEL.model);
   const [baseUrl, setBaseUrl] = useState(existing?.baseUrl ?? '');
+  const [respondsToAgents, setRespondsToAgents] = useState(existing?.respondsToAgents ?? false);
 
   const info = providerInfo(provider);
   const isLocal = info?.kind === 'baseUrl';
@@ -60,6 +61,7 @@ export function AgentEditor({
       provider,
       model: model.trim(),
       baseUrl: isLocal ? baseUrl.trim() : '',
+      respondsToAgents,
     };
     if (agentId === null) {
       void createAgent(fields);
@@ -159,6 +161,18 @@ export function AgentEditor({
           </View>
         ) : null}
 
+        <Text style={styles.label}>Agent-to-agent (M2)</Text>
+        <Pressable style={styles.toggleRow} onPress={() => setRespondsToAgents((v) => !v)}>
+          <Text style={styles.toggleText}>Reply when another agent @mentions this one</Text>
+          <View style={[styles.toggle, respondsToAgents && styles.toggleOn]}>
+            <Text style={[styles.toggleLabel, respondsToAgents && styles.chipTextOn]}>{respondsToAgents ? 'ON' : 'OFF'}</Text>
+          </View>
+        </Pressable>
+        <Text style={styles.hint}>
+          Off by default. When on, this agent can be drawn into agent↔agent exchanges — always bounded by the
+          per-conversation turn + token budget.
+        </Text>
+
         <Pressable style={[styles.save, !canSave && styles.saveOff]} disabled={!canSave} onPress={onSave}>
           <Text style={styles.saveText}>{agentId === null ? 'Create agent' : 'Save changes'}</Text>
         </Pressable>
@@ -195,6 +209,11 @@ const styles = StyleSheet.create({
   warn: { color: colors.danger, fontSize: 13, marginTop: 8 },
   ok: { color: colors.online, fontSize: 13, marginTop: 8 },
   hint: { color: colors.faint, fontSize: 12, marginTop: 2 },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 4 },
+  toggleText: { color: colors.text, fontSize: 14, flex: 1 },
+  toggle: { backgroundColor: colors.panel, borderColor: colors.border, borderWidth: 1, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, minWidth: 56, alignItems: 'center' },
+  toggleOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  toggleLabel: { color: colors.dim, fontSize: 12, fontWeight: '700' },
   save: { backgroundColor: colors.accent, borderRadius: 10, height: 48, alignItems: 'center', justifyContent: 'center', marginTop: 20 },
   saveOff: { opacity: 0.5 },
   saveText: { color: colors.onAccent, fontWeight: '700', fontSize: 16 },

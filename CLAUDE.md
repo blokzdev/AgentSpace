@@ -236,7 +236,7 @@ committed to `.audit/sweep-<date>.md` so the drift profile is queryable.
 
 ## 9. Code reality — what exists today
 
-> Updated 2026-06-13. Keep this section honest; it is the whole point of a
+> Updated 2026-06-23. Keep this section honest; it is the whole point of a
 > code-reality doc.
 
 ### Repository layout (today)
@@ -251,9 +251,9 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1
 │       · App.tsx · src/auth.ts · src/byok.ts · src/components/Avatar.tsx
-│       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,ApiKeys}.tsx
+│       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,AgentPicker,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
 │   ├── shared/                # typed contracts (lowest layer) — built
@@ -264,13 +264,13 @@ AgentSpace/
 │   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7)
 │       · src/{index,main,replyLoop,prompt,byok,spacetime}.ts · scripts/integration.ts
 ├── modules/
-│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5)
+│   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5; +multi-agent/episode budget M2.1)
 │       · src/index.ts · bindings/ (generated, committed)
 └── examples/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; in M1.9 — streaming hardening).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -386,6 +386,49 @@ passes `credentialRef = "<ownerHex>:<provider>"` (DEC-025). `envResolver`/`.env`
 integration (user seals `sk-test-byok-123` → STDB holds ciphertext → orchestrator
 decrypts the exact key → persona replies) + 14 orchestrator tests; Android bundle clean
 (632 modules, 2.12 MB). Durable Postgres/KMS backing = `BL-011`; on-device is `V-7/V-8`.
+**M2.1 (multi-agent group threads — the MVP; DEC-031/DEC-032):** many agents converse in one thread over
+the **single** orchestrator connection, each agent message **tagged by `agentId`**. `modules/spacetime`
+gains three tables — **`thread_agent`** (many personas/thread, generalizing singular `thread.agentId`; one
+is the `isDefaultResponder`), **`episode`** (the cost/loop ledger, opened **only** by a HUMAN
+`send_message`: `turnsRemaining:u8` + `tokenBudgetRemaining:u64`), **`agent_turn`** (once-per-episode-per-
+agent) — plus a scheduled **`reaper_schedule`** → `reap_stale_runs` (60s sweep; fails out `streaming`/
+`running` older than `STREAM_TTL`=120s, self-healing a crashed orchestrator). Additive cols (appended
+last): `message.{mentions: Vec<Mention>, agentId, episodeId}`, `run.{agentId, episodeId}` + a `run`
+`by_thread` index, `agent.respondsToAgents`. **`agent_reply_begin` is the enforcement boundary** — it
+takes `agentId`/`episodeId` and **refuses a run (throws, no row)** past the episode budget (`status≠open`
+/ turns==0 / tokens≤0 / an `agent_turn` exists / running-in-thread ≥ `MAX_CONCURRENT`); on pass it
+decrements turns, inserts the `agent_turn`, and stamps the run+message. `agent_reply_finish` draws the
+run's tokens down from the ceiling and closes the episode at ≤0; **terminal-absorbing** guards on
+delta/finish/cancel make a late write a no-op (no reaper-vs-finish resurrection). New
+`add_agent_to_thread`/`remove_agent_from_thread`; `create_agent_dm` now also writes a `thread_agent` row,
+so DMs and groups resolve personas/keys through one path; `my_active_personas`/`my_persona_keys` were
+**rewritten off `thread_agent`** + a new `my_thread_agents` view; the dormant `agent_reply_append` is
+deleted. The **structural** safety invariant: `agent_turn` bounds any agent↔agent volley to **≤#agents
+replies** per human-rooted episode (turn counter + token ceiling + per-run cap + concurrency cap are
+belt-and-suspenders). `@agentspace/shared` owns the `Mention` type, the dials (`MAX_TURNS_HARD=8`,
+`MAX_CONCURRENT=2`, `MAX_OUTPUT_TOKENS_PER_RUN=2000`, `EPISODE_TOKEN_CEILING=50_000n`,
+`AGENT_COOLDOWN_MS=3000` (reserved), `STREAM_TTL_MS=120_000`), and a pure `evaluateBegin()`; the WASM
+module **re-declares the dials inline** (coupled twin — it can't import the package). The **gateway**
+gains `maxOutputTokens`/`stopSequences` (forwarded to `streamText`). The **orchestrator**: `prompt.ts`
+computes `isAgent` from the **tag** (`row.agentId===targetAgentId`, never the shared identity — fixes
+persona-bleed), name-tags + same-role-merges + roster-foots a prompt only in GROUP mode (a 1:1 DM keeps
+the pre-M2 prompt), adds a `message.id` sort tiebreak, and resolves addressees
+(`resolveAddressees`/`parseTextMentions`); `replyLoop.ts` is a per-thread **serialized fan-out queue** —
+human triggers on `onInsert`, agent-reply completions on `onUpdate` (agent→agent), one reply per admitted
+agent in mention order, **supersede per-`episodeId`**, an in-memory once-per-episode pre-flight, and it
+**awaits `agent_reply_begin`, skipping cleanly if the reducer refuses** (a budget refusal — surfaced by
+the SDK as a rejected promise — never crashes the loop). Agent→agent is **off by default**
+(`agent.respondsToAgents`). **Mobile** (`Thread.tsx`) derives name/avatar from `message.agentId` (no UI
+bleed), groups the delta fold by `runId`, shows "{name} is thinking…", and has an **`@mention` typeahead**
+(thread agents + a synthetic `@everyone`; `@human` deferred) that passes `mentions` to `send_message`;
+`AgentPicker` + ThreadMembers "+ Add agent" + an AgentEditor `respondsToAgents` toggle + a ThreadList
+group-with-agents badge. Proven **headlessly** by `scripts/integration.ts` Scenarios A–F (DM stream+GC+
+BYOK / supersede / @a@b in mention order / **agent↔agent volley terminates** / @everyone bounded /
+**reducer refuses a duplicate turn**) + 35 orchestrator unit tests; CI 16/16. On-device = founder
+**V-15…V-19** (needs the Maincloud `--delete-data=on-conflict` republish — `SETUP.md` S-6). Deferred:
+per-(agent,thread) cooldown enforcement; other users' agent names in the mobile UI; per-agent identity
+(M2.4/BL-014); NL "Hey {name}," routing (M2.3).
+
 See `BLUEPRINT.md` §2 for the module graph.
 
 **pnpm uses `node-linker=hoisted`** (`.npmrc`) — required so Metro (Expo/RN) can
