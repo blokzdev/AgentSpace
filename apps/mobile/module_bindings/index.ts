@@ -69,6 +69,7 @@ import MyThreadMembersRow from "./my_thread_members_table";
 import MyThreadMessagesRow from "./my_thread_messages_table";
 import MyThreadsRow from "./my_threads_table";
 import ServiceInfoRow from "./service_info_table";
+import ThreadAgentCardsRow from "./thread_agent_cards_table";
 import UserRow from "./user_table";
 
 /** Type-only namespace exports for generated type groups. */
@@ -156,6 +157,13 @@ const tablesSchema = __schema({
     constraints: [
     ],
   }, ServiceInfoRow),
+  thread_agent_cards: __table({
+    name: 'thread_agent_cards',
+    indexes: [
+    ],
+    constraints: [
+    ],
+  }, ThreadAgentCardsRow),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */

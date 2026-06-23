@@ -30,6 +30,7 @@ export function ThreadList({
   const [agents] = useTable(tables.my_agents);
   const [members] = useTable(tables.my_thread_members);
   const [threadAgents] = useTable(tables.my_thread_agents);
+  const [cards] = useTable(tables.thread_agent_cards);
   const [messages] = useTable(tables.my_thread_messages);
   const setDisplayName = useReducer(reducers.setDisplayName);
 
@@ -41,6 +42,12 @@ export function ThreadList({
 
   const nameOf = (id: Identity): string =>
     users.find((u) => u.identity.isEqual(id))?.displayName ?? shortId(id);
+
+  // M2.4: the public agent face — name + avatar visible to all members (fixes BL-021).
+  const cardByAgentId = useMemo(
+    () => new Map(cards.map((c) => [c.agentId, { name: c.name, emoji: c.avatarEmoji }])),
+    [cards],
+  );
 
   // Per-thread view-model: title, subtitle (last message), time, avatar.
   const rows = useMemo(() => {
@@ -56,9 +63,9 @@ export function ThreadList({
         let title: string;
         let avatar: { idKey: string; name?: string; emoji?: string; online?: boolean };
         if (t.agentId !== 0n) {
-          const a = agents.find((x) => x.id === t.agentId);
-          title = a ? a.name : 'Agent';
-          avatar = { idKey: `agent-${t.agentId.toString()}`, emoji: '🤖' };
+          const card = cardByAgentId.get(t.agentId);
+          title = card?.name ?? agents.find((x) => x.id === t.agentId)?.name ?? 'Agent';
+          avatar = { idKey: `agent-${t.agentId.toString()}`, emoji: card?.emoji ?? '🤖' };
         } else if (t.kind === 'dm') {
           const other = members.find((m) => m.threadId === t.id && !(identity && m.member.isEqual(identity)));
           if (other) {
@@ -87,13 +94,13 @@ export function ThreadList({
           const key = m.agentId.toString();
           if (seen.has(key)) continue;
           seen.add(key);
-          thinkingNames.push(agents.find((a) => a.id === m.agentId)?.name ?? 'Agent');
+          thinkingNames.push(cardByAgentId.get(m.agentId)?.name ?? agents.find((a) => a.id === m.agentId)?.name ?? 'Agent');
         }
         const thinking = thinkingLabel(thinkingNames);
         return { id: t.id, title, subtitle, thinking, activity, avatar, when: last ? relativeTime(last.sent) : '' };
       })
       .sort((a, b) => (a.activity < b.activity ? 1 : -1));
-  }, [threads, messages, members, agents, threadAgents, users, identity]);
+  }, [threads, messages, members, agents, threadAgents, cardByAgentId, users, identity]);
 
   return (
     <SafeAreaView style={styles.container}>

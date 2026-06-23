@@ -108,7 +108,7 @@ async function run(): Promise<void> {
     seeded = true;
     user.conn.reducers.setProviderKey({ provider: 'anthropic', sealed: seal(KEY, svc.encPubKey) });
     const mk = (name: string, systemPrompt: string, respondsToAgents: boolean): void => {
-      void user.conn.reducers.createAgent({ name, systemPrompt, provider: 'anthropic', model: MODEL, baseUrl: '', respondsToAgents });
+      void user.conn.reducers.createAgent({ name, systemPrompt, provider: 'anthropic', model: MODEL, baseUrl: '', respondsToAgents, avatarEmoji: '🤖' });
     };
     // V-15 / V-17 — two DISTINCT, non-cross-mentioning voices (so a single @a@b shows no bleed).
     mk('Marina', 'You are Marina, a marine biologist. Always answer in exactly ONE concise, factual sentence. Never rhyme, never use emoji.', false);

@@ -179,12 +179,15 @@ misbehaving or stale orchestrator cannot exceed it.
 
 Each agent message carries an `agentId` tag; the orchestrator computes "is this my own prior turn"
 from the **tag** (`row.agentId === targetAgentId`), never the shared service identity (avoids
-persona-bleed). Per-agent identities / real presence are a later additive upgrade (M2.4 / BL-014);
-the tag demotes to provenance. NL "Hey {name}," routing **shipped in M2.3** (`parseNLVocative`, above;
-stricter than the audited design — DEC-036); full context-isolation (each agent sees only its own
-`systemPrompt`, guaranteed by the once-per-agent `buildPrompt` call) also landed in M2.3. Other
-users' agent names fall back to a generic label in the mobile UI (own agents resolve via
-`my_agents`). Producers/consumers: orchestrator `resolveAddressees`/`parseTextMentions` +
+persona-bleed). Per-agent identities + real presence dots are a later additive upgrade (**M2.4-full**,
+committed post-M2.9 — BL-014); the tag demotes to provenance then. NL "Hey {name}," routing **shipped in
+M2.3** (`parseNLVocative`, above; stricter than the audited design — DEC-036); full context-isolation (each
+agent sees only its own `systemPrompt`, guaranteed by the once-per-agent `buildPrompt` call) also landed in
+M2.3. **M2.4 lean (DEC-038):** an agent's **public face** (real name + `avatarEmoji`) renders for **every**
+member — including **cross-owner** agents — via the public `thread_agent_cards` projection (name + avatar
+only, `by_member`); the mobile render is **card-first** (own agents included, so an emoji edit never renders
+stale). This closes BL-021 with **no** identity change (`message.sender` stays the service identity).
+Producers/consumers: orchestrator `resolveAddressees`/`parseTextMentions` +
 `modules/spacetime` `send_message`/`agent_reply_begin` + mobile composer mention UI (`Thread.tsx`
 typeahead → `Mention[]`) — cite all. Full design: `.audit/m2-research-2026-06-22/`.
 

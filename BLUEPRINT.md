@@ -103,7 +103,7 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | Table | Key fields | Visibility | Notes |
 |-------|-----------|-----------|-------|
 | `users` | `identity` (PK), `display_name`, `avatar`, `online` | View: self + co-members | one row per human Identity |
-| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version`, `base_url`, `responds_to_agents` | View: `my_agents` (owner) + `my_active_personas` (agent member) | persona config **inline** (M1.5); `base_url`≠'' only for `provider='openai-compatible'` (local, M1.8.2); `responds_to_agents` (bool, M2.1) — when true the persona may answer another agent's message in a group |
+| `agent` | `id` (PK), `owner`, `name`, `system_prompt`, `provider`, `model`, `version`, `base_url`, `responds_to_agents`, `avatar_emoji` | View: `my_agents` (owner) + `my_active_personas` (agent member) + `thread_agent_cards` (**public** — name+avatar only) | persona config **inline** (M1.5); `base_url`≠'' only for `provider='openai-compatible'` (local, M1.8.2); `responds_to_agents` (bool, M2.1) — when true the persona may answer another agent's message in a group; **`avatar_emoji`** (M2.4 — appended; default 🤖) is the agent's **public face**, projected with `name` to all thread members via `thread_agent_cards` (closes BL-021 without a per-agent identity) |
 | `agent_versions` | (deferred — BL-013) | — | v1 inlines config + a `version` counter; immutable history/run-pinning is BL-013 |
 | `service` | `id` (PK = 0), `identity`, `enc_pub_key` | View: `service_info` (public) | singleton: orchestrator identity (M1.5) + its NaCl **box public key** so clients seal BYOK keys to it (M1.7) |
 | `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5); **superseded by `thread_agent` in M2.1** — `agent_id` is the legacy singular binding, kept for back-compat while many-agents-per-thread now lives in `thread_agent` |
@@ -146,6 +146,15 @@ client input — CLAUDE.md §8 defensive boundary).
 - **`my_thread_agents`** (NEW) — scoped to the caller's threads (any role), backs the
   mobile @mention typeahead + roster.
 - The dormant `agent_reply_append` reducer was **deleted** in M2.1.
+
+**New view (M2.4 — lean / public agent face; BL-021, DEC-038):**
+- **`thread_agent_cards`** (NEW, **public**) — the agent's **public face**: a *projected* view
+  (`t.row('AgentCard', { thread_id, agent_id, name, avatar_emoji })`, `by_member` predicate) exposing
+  **name + avatar only** for every agent in a thread the caller is a member of. Lets any member render a
+  **cross-owner** agent's real name + avatar (the mobile render is **card-first**) instead of a generic
+  "Agent" — closing BL-021 **without** a per-agent identity (`message.sender` is unchanged). No secret
+  columns (`system_prompt`/`provider`/`model`/`owner`) are projected; the agent's `avatar_emoji` column is
+  appended (default 🤖). The module's **first** projected (`t.row`) view — it binds cleanly (no TS2742).
 
 Knowledge bases are **not** STDB tables: `knowledge_docs` and `knowledge_chunks`
 (with embeddings) live in **Postgres + pgvector** (DEC-010), referenced from

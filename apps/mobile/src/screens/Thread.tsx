@@ -62,6 +62,7 @@ export function Thread({
   const [agents] = useTable(tables.my_agents);
   const [allDeltas] = useTable(tables.my_reply_deltas);
   const [allThreadAgents] = useTable(tables.my_thread_agents);
+  const [allCards] = useTable(tables.thread_agent_cards);
   const sendMessage = useReducer(reducers.sendMessage);
 
   const [text, setText] = useState('');
@@ -69,15 +70,22 @@ export function Thread({
 
   const members = useMemo(() => allMembers.filter((m) => m.threadId === threadId), [allMembers, threadId]);
 
-  // Agents active in this thread. Names resolve via the user's own agents; an agent
-  // owned by another member falls back to a generic label (@everyone still reaches it).
   const agentNameById = useMemo(() => new Map(agents.map((a) => [a.id, a.name])), [agents]);
+  // M2.4: the PUBLIC agent face — name + avatar visible to ALL members (fixes BL-021;
+  // cross-owner agents no longer render as a generic "Agent"). Card-first ALWAYS; my_agents
+  // / 'Agent' / '🤖' are only the warm-up fallback before the card row arrives.
+  const cardByAgentId = useMemo(
+    () => new Map(allCards.map((c) => [c.agentId, { name: c.name, emoji: c.avatarEmoji }])),
+    [allCards],
+  );
+  const agentLabel = (id: bigint): string => cardByAgentId.get(id)?.name ?? agentNameById.get(id) ?? 'Agent';
+  const agentEmoji = (id: bigint): string => cardByAgentId.get(id)?.emoji ?? '🤖';
   const threadAgents = useMemo(
     () =>
       allThreadAgents
         .filter((ta) => ta.threadId === threadId)
-        .map((ta) => ({ agentId: ta.agentId, name: agentNameById.get(ta.agentId) ?? '' })),
-    [allThreadAgents, threadId, agentNameById],
+        .map((ta) => ({ agentId: ta.agentId, name: cardByAgentId.get(ta.agentId)?.name ?? agentNameById.get(ta.agentId) ?? '' })),
+    [allThreadAgents, threadId, agentNameById, cardByAgentId],
   );
 
   const messages = useMemo(
@@ -120,10 +128,10 @@ export function Thread({
       const key = m.agentId.toString();
       if (seen.has(key)) continue;
       seen.add(key);
-      names.push(agentNameById.get(m.agentId) ?? 'Agent');
+      names.push(cardByAgentId.get(m.agentId)?.name ?? agentNameById.get(m.agentId) ?? 'Agent');
     }
     return names;
-  }, [messages, agentNameById]);
+  }, [messages, agentNameById, cardByAgentId]);
   const thinkingHeader = thinkingLabel(streamingAgentNames);
 
   useEffect(() => {
@@ -209,13 +217,13 @@ export function Thread({
               </View>
             );
           }
-          // M2.1: name/avatar from the agentId TAG (not the shared orchestrator identity)
-          // so each persona renders distinctly — no UI persona-bleed.
-          const label = isAgentMsg ? (agentNameById.get(item.agentId) ?? 'Agent') : nameOf(item.sender);
+          // M2.1/M2.4: name/avatar keyed by the agentId TAG (no persona-bleed), resolved
+          // card-first from the public roster so cross-owner agents show their real face (BL-021).
+          const label = isAgentMsg ? agentLabel(item.agentId) : nameOf(item.sender);
           const avatarKey = isAgentMsg ? `agent-${item.agentId.toString()}` : item.sender.toHexString();
           return (
             <View style={styles.theirRow}>
-              <Avatar idKey={avatarKey} name={label} emoji={isAgentMsg ? '🤖' : undefined} size={28} />
+              <Avatar idKey={avatarKey} name={label} emoji={isAgentMsg ? agentEmoji(item.agentId) : undefined} size={28} />
               <View style={[styles.bubble, styles.theirs]}>
                 <Text style={styles.sender}>{label}</Text>
                 {streaming && body.length === 0 ? (

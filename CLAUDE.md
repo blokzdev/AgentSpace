@@ -271,7 +271,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing ✓; M2.3 context-isolation + NL address built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing ✓; M2.3 context-isolation + NL address ✓; M2.4 public agent cards (lean, BL-021) built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -427,8 +427,9 @@ group-with-agents badge. Proven **headlessly** by `scripts/integration.ts` Scena
 BYOK / supersede / @a@b in mention order / **agent↔agent volley terminates** / @everyone bounded /
 **reducer refuses a duplicate turn**) + 35 orchestrator unit tests; CI 16/16. On-device = founder
 **V-15…V-19** (needs the Maincloud `--delete-data=on-conflict` republish — `SETUP.md` S-6). Deferred:
-per-(agent,thread) cooldown enforcement; other users' agent names in the mobile UI; per-agent identity
-(M2.4/BL-014); NL "Hey {name}," routing (M2.3).
+per-(agent,thread) cooldown enforcement; ~~other users' agent names in the mobile UI~~ (**fixed in M2.4 — the
+public `thread_agent_cards` projection**); ~~per-agent identity~~ → **M2.4-full** (per-agent identity +
+presence dots, committed post-M2.9; BL-014); NL "Hey {name}," routing (shipped M2.3).
 
 **M2.5 (on-device connection resilience — auto-reconnect; BL-022/DEC-034):** the SpacetimeDB SDK has
 **no auto-reconnect** — its `ConnectionManager` caches a connection by `(uri, moduleName)` and on disconnect
@@ -456,7 +457,7 @@ affordance — pure mobile, **no schema change** (agent activity is derived clie
 is a dependency-free RN-`Animated` three-dot indicator; `Avatar` gains a pulsing `thinking` halo. Surfaced in
 the **inbox** (`ThreadList.tsx` — "🤖 {who} is thinking…", multi-agent-aware, replacing the bare `▍`), the
 **open thread** (`Thread.tsx` — a header subtitle + the per-row indicator), and the agent avatar. On-device =
-`V-23`. Human typing + per-agent *online* presence are deferred (need a `presence` table) → BL-024 / M2.4.
+`V-23`. Human typing + per-agent *online* presence dots are deferred (need a `presence` table) → BL-024 / **M2.4-full** (post-M2.9).
 
 **M2.3 (multi-party context isolation + NL address):** a 9-agent planning workflow verified that the whole
 per-agent `buildPrompt` recipe (role-flip, name-tags, roster footer, stop sequences, leading-label strip,
@@ -471,6 +472,25 @@ budget are untouched — NL changes only *who* is addressed). The already-true p
 agent B's `systemPrompt`). Intentionally **stricter than the audited `addressing.md` rule** (DEC-036). Pure
 orchestrator — **no schema/mobile/bindings change**; CI 16/16 (49 orchestrator tests). Deferred: selective
 per-agent message VISIBILITY (BL-020), agent-side NL, @human, multi-agent NL.
+
+**M2.4 (public agent face — lean; BL-021/DEC-038):** a 9-agent planning workflow (the critic verified the
+SDK projected-view mechanic) + founder ratification chose the **lean cut** over full per-agent identity —
+the `agentId` tag already renders distinct avatars for the caller's *own* agents; the only real gap was
+**cross-owner** agents showing a generic "Agent" (names resolved via the caller's private `my_agents`).
+`modules/spacetime` appends **`agent.avatarEmoji`** (default 🤖, clamped 16; accepted by `create_agent`/
+`update_agent`) and adds a **public** **`thread_agent_cards`** view — a **projected** view
+(`t.row('AgentCard', { threadId, agentId, name, avatarEmoji })`, **`by_member`** predicate; the **first**
+projected view in the module — it binds cleanly, no TS2742, so the table-fallback wasn't needed) exposing
+**name + avatar only** (never `systemPrompt`/`provider`/`model`/`owner`). Mobile renders **card-first**:
+`Thread.tsx`/`ThreadList.tsx` build a `cardByAgentId` from `thread_agent_cards` and resolve an agent's
+name+emoji from the card (own agents included, so an emoji edit never renders stale), falling back to
+`my_agents`→'Agent'/🤖 only during subscription warm-up; `AgentEditor.tsx` gains an Avatar emoji field.
+**`message.sender` stays the service identity** (the `agentId` tag stays the canonical render key) → zero
+ripple to M1.7/M2.1/M2.5; trivially reversible (additive column + additive view + a render swap, no data
+migration). Proven headless by **`scripts/verify-cards.ts`** (owner A sees owner B's cross-owner card
+"Lyric" 🎵 via the public view; no secret-prompt leak) + integration **A–G** regress clean; CI 16/16.
+On-device = `V-24` (needs the Maincloud `--delete-data` republish — `SETUP.md` S-8). The **full** per-agent
+identity + real presence dots is committed for **after M2.9** (BL-014).
 
 See `BLUEPRINT.md` §2 for the module graph.
 
