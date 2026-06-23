@@ -196,13 +196,68 @@ Human verification: `V-13` (long reply settles clean, no dangling cursor) + `V-1
 ## M2 — Multi-agent group threads
 
 **Acceptance bar:** a group thread with ≥2 humans and ≥2 agents converses
-coherently in real time, with addressing and agent presence/typing. (Robust
-streaming is now inherited from **M1.9**.)
+coherently in real time, with addressing and agent presence/typing; an
+`@everyone` storm and an agent↔agent volley both **terminate within a bounded
+token budget** (no runaway loops/cost). Robust streaming is inherited from **M1.9**.
 
-- **M2.1** Addressing grammar (@mentions / direct address) + turn arbitration.
-- **M2.2** Agent presence & typing indicators.
-- **M2.3** Multi-agent context isolation per thread. *(was M2.4; old M2.3 "Streaming
-  hardening" pulled forward into M1.9 — DEC-030.)*
+**Architecture (DEC-031, ratified 2026-06-22): "Candidate C" — persona-tagged single
+connection now; per-agent SpacetimeDB identity later (M2.4).** The existential risk is
+agent↔agent loops + token cost, not presence realism, and that whole safety system is
+net-new code regardless of identity model — so ship it on the existing single orchestrator
+connection (one in-memory loop ⇒ serialized, coherent turns; zero new infra), with each agent
+message **tagged by `agentId`**, and **enforce the budget in the reducer** (`agent_reply_begin`
+refuses a disallowed run, so agent code cannot start it). Defer per-agent identities/real
+presence to a reversible **M2.4 / BL-014**. Founder dials (configurable, full metering → BACKLOG):
+`MAX_TURNS_HARD≈8`, `MAX_CONCURRENT≈2`, `MAX_OUTPUT_TOKENS_PER_RUN≈2000`, `EPISODE_TOKEN_CEILING≈50k`,
+per-(agent,thread) cooldown ≈3s. Agent→agent addressing **off by default, opt-in per persona**
+(`agent.respondsToAgents`). Full design input + adversarial review: `.audit/m2-research-2026-06-22/`.
+
+**The MVP slice (smallest coherent + cost-safe cut; lands inside M2.1):** one group thread,
+**addressed-only**, ≥2 tagged agents on the single connection. New tables `thread_agent` (many
+agents per thread, generalizing singular `thread.agentId`), `episode` (cost/loop ledger; opened
+ONLY by a human `send_message`), `agent_turn` (once-per-episode-per-agent de-dup). Additive cols
+`message.{mentions[],agentId,episodeId}`, `run.{agentId,episodeId}`, `agent.respondsToAgents`.
+Reducers: `send_message` opens an episode + validates mentions; **`agent_reply_begin` enforces**
+budget/turn-dedup/concurrency; `add_agent_to_thread`/`remove_agent_from_thread`; a streaming
+**reaper**. Rewrite `my_persona_keys` + `my_active_personas` off `thread_agent` (else N−1 agents
+hit `MissingKeyError`). Orchestrator: `inFlight` → `Map<"threadId:agentId">`; addressed-only
+trigger (mention order); **supersede per-`episodeId`** (not per-thread); per-run output cap;
+`PromptRow` gains `agentId`/`senderName`, **`isAgent` from the tag** (the persona-bleed
+showstopper — pulled into the MVP), `message.id` sort tiebreak. Mobile: `@mention` composer +
+"+ Add agent" picker + **delta render grouped by `runId`** + typing from `streaming` rows.
+
+**Must-have guards (gate any ship — all net-new):** (1) episode+turn budget enforced
+pre-execution in `agent_reply_begin`; (2) `episodeId` threaded trigger→reply→next (so agent→agent
+inherits the budget); (3) once-per-episode-per-agent de-dup; (4) per-run output-token cap;
+(5) concurrency cap in the reducer; (6) tag-based `isAgent` (persona-bleed); (7) `message.id`
+sort tiebreak; (8) episode token ceiling summed across runs; (9) module reaper for stuck
+`streaming`/`running`; (10) mobile delta grouping by `runId`; (11) `my_persona_keys` off
+`thread_agent` + coalesced per-agent error replies.
+
+- **M2.1 — Addressing + arbitration (the MVP; existential core).** Structured `@mention`
+  grammar (SPEC §3) + reply-to + a thread **default responder**; addressed-only reply set;
+  the full episode/turn/cost guard system in the reducer; tag-based `isAgent`. *Acceptance:*
+  ≥2 humans + ≥2 agents converse coherently; `@everyone` + an agent↔agent volley terminate
+  within budget. Headless-testable (no key) + orchestrator unit tests + a new `scripts/integration`
+  scenario. On-device → new V-items (below).
+- **M2.2 — Agent presence & typing.** "🤖 {name} is thinking…" derived from `streaming` rows
+  (no new table; self-heals via the reaper). The seam where real `user.online` swaps in at M2.4.
+- **M2.3 — Multi-party context isolation.** Full per-agent `buildPrompt` recipe (role-flip +
+  inline name-tags + roster footer + `stop` sequences + leading-label strip); each agent sees
+  only its own `systemPrompt`. Adds the NL "Hey {name}," soft vocative heuristic (deferred from
+  M2.1). *(M2.3 was "context isolation"; old M2.3 "Streaming hardening" → M1.9 per DEC-030.)*
+- **M2.4 — Per-agent identity & real presence (BL-014).** Mint per-agent STDB identities
+  (service-managed/OIDC), each agent a first-class member with `user.online` presence + distinct
+  avatar; orchestrator drives N identities (connection pool); `agentId` tag demotes to provenance.
+  Closes OT-007 + DEC-022. Reversible to the C MVP. *Pulled in only if real avatars/online-dots
+  become a launch requirement.*
+
+Human verification (on-device, founder-owned; renumbered to avoid the existing V-1…V-14):
+**V-15** multi-agent coherence (`@a @b` reply in order, no persona-bleed); **V-16** loop/cost
+guard (agent↔agent volley terminates within budget — the existential test); **V-17** `@everyone`
+storm bound; **V-18** typing + crash self-heal (kill the orchestrator mid-stream → indicator
+clears via the reaper); **V-19** per-agent BYOK in a group (two agents, two owners' keys); and
+(at M2.4) **V-20** per-agent presence/avatars.
 
 ---
 

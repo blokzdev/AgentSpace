@@ -100,6 +100,9 @@
 - **Promotion:** mint a per-agent STDB identity (service-managed token), make each agent
   a first-class member with presence/avatar; the orchestrator drives N agent identities.
   Ties to OT-007 (orchestrator service-account auth) + hardening `register_service`.
+- **Now scheduled as M2.4 (DEC-031):** M2's MVP ships agents as persona-*tagged* messages on the
+  single connection (Candidate C); this item is the fast-follow that swaps the `agentId` tag for a
+  real per-agent `Identity` + `user.online` presence + distinct avatars. Additive/reversible.
 
 ### BL-015 — Contacts / visibility / blocking model (non-global directory)
 - **Source:** DEC-023 (M1.3 user search reads the *public* `user` table — every user
@@ -147,6 +150,15 @@
   persona+key → LLM → stream reply back → exit) for scale-to-zero / no idle cost; resolve the
   streaming-duration limits (a long reply vs function max-duration) and identity/keypair custody
   in a stateless context.
+
+### BL-020 — M2 multi-agent deferrals (router mode / metering / selective visibility)
+- **Source:** DEC-031 (M2 ships addressed-only, episode-budgeted, single-connection).
+- **Trigger:** post-M2 demand for richer multi-agent UX or finer cost control.
+- **Promotion:** (a) an **LLM coordinator/router** arbitration mode (optional per-thread "let the
+  agents self-organize" setting), always gated behind the episode budget; (b) **per-agent / per-day
+  cost metering + budgets** beyond the per-episode ceiling (intersects BL-011 durable key backing);
+  (c) **selective per-agent message visibility** (an agent sees only messages it was mentioned in) —
+  distinct from M2.3's *instruction* isolation (all agents share the transcript in M2).
 
 ---
 

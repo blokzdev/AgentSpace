@@ -102,6 +102,22 @@ consumers: orchestrator resolver + mobile composer/mention UI (cite both).
 
 Loop safety: a per-thread, per-trigger run budget caps agent→agent cascades.
 
+**M2 mechanics (DEC-031).** Mentions are stored as a **structured sidecar**, not re-parsed from
+text on read (survives persona renames/collisions): `message.mentions: Vec<Mention>` where
+`Mention = { kind: 'agent'|'human'|'all', ref: u64 (agentId; 0 for 'all'), start: u32, len: u32 }`
+— populated by the RN composer at selection time; `text` keeps a readable `@Name` for fallback.
+The candidate reply set = the addressed agents (in mention order); unaddressed agents stay silent
+(except a thread's optional **default responder**). Agent→agent addressing is **off by default,
+opt-in per persona** (`agent.respondsToAgents`). The "run budget" is an **`episode`** ledger opened
+only by a *human* message and **enforced in the reducer** (`agent_reply_begin` rejects a run past
+the budget): `turnsRemaining` (≈`MAX_TURNS_HARD` / addressedCount), an **`episode_token_ceiling`**
+summed across runs, a **per-run output-token cap**, a **concurrency cap**, a per-(agent,thread)
+cooldown, and **once-per-episode-per-agent de-dup** (`agent_turn`). `episodeId` is threaded
+trigger→reply→next so agent→agent inherits (never resets) the budget. Each agent message carries an
+`agentId` tag; the orchestrator computes "is this my own prior turn" from the **tag**, never the
+shared service identity (avoids persona-bleed). Per-agent identities/real presence are a later
+additive upgrade (M2.4 / BL-014); the tag demotes to provenance. Full design: `.audit/m2-research-2026-06-22/`.
+
 ---
 
 ## 4. Model Gateway interface (`packages/gateway`)

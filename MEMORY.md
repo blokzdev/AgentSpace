@@ -11,7 +11,7 @@
 
 ## Snapshot — where we are right now
 
-*Last refreshed: 2026-06-22.*
+*Last refreshed: 2026-06-23.*
 
 **M0 closed; all six M1 build phases shipped; milestone-close in progress.** Merged
 PRs #2–#13. AgentSpace is a working app: sign in (SpacetimeAuth/OIDC, M1.2) → find
@@ -53,6 +53,21 @@ messages, but the **live render tap-through wasn't completed** — Metro dev-cli
 (subscription flapping / reconnects / anonymous-login not persisting) blocked UI automation (env, not
 code). **Next:** founder runs **V-13** (long reply settles clean, no dangling `▍`) + **V-14**
 (cancellation) on-device → tick. Then **M2** (multi-agent groups), **M3** (RAG), **BL-016**, **BL-011**.
+
+**M2 multi-agent group threads — PLANNED & ratified (DEC-031, 2026-06-23); no code yet.** An 8-agent
+research+adversarial workflow (`.audit/m2-research-2026-06-22/`) chose **"Candidate C"**: ship
+multi-agent on the **existing single orchestrator connection**, each agent message **tagged by
+`agentId`**, with the cost/loop safety system **enforced in the reducer** (`agent_reply_begin` refuses
+a run past an **episode** budget) — because the existential risk is agent↔agent loops + token cost, not
+presence; per-agent SpacetimeDB identities/real presence defer to a reversible **M2.4 / BL-014**. New
+tables `thread_agent`/`episode`/`agent_turn`; additive cols `message.{mentions[],agentId,episodeId}` +
+`agent.respondsToAgents`; addressed-only `@mention` arbitration; **tag-based `isAgent`** fixes
+persona-bleed (pulled into the MVP). Founder dials: `MAX_TURNS_HARD≈8`/`MAX_CONCURRENT≈2`/`~2k`
+per-run/`~50k` episode ceiling (configurable; metering→BL-020); agent→agent **off by default**, opt-in
+per persona; `@mention`-only MVP (NL address→M2.3); per-agent identity→M2.4. Phases M2.1 (addressing+
+arbitration = MVP/existential core) → M2.2 (presence from `streaming` rows) → M2.3 (context isolation) →
+M2.4 (per-agent identity). **Next chunk: build M2.1** (recommend a fresh session — handoff prepared).
+New V-15…V-20; SPEC §3 refined; ROADMAP M2 expanded.
 
 - **Active branch:** `main` (M1.9 = PR #33 merged 2026-06-23; a docs evidence PR follows).
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
@@ -487,6 +502,39 @@ delta order + concatenation + **GC** + cancellation against a real local STDB (n
 bundle clean (645 modules). On-device vs Maincloud = **V-13** (long reply settles clean) / **V-14**
 (cancellation). ROADMAP re-sequenced: M1.9 inserted; old M2.3 removed (M2.4→M2.3).
 
+### DEC-031 — M2 multi-agent: "Candidate C" (persona-tagged single connection) + reducer-enforced budget
+*2026-06-22.* The M2 architecture, chosen from an 8-agent research + adversarial-review workflow
+(`.audit/m2-research-2026-06-22/` — codebase map, 4 research angles, candidate designs, adversarial
+critique, synthesis). **Decision (founder-ratified):** ship multi-agent on the **existing single
+orchestrator connection**, each agent message **tagged by `agentId`** (Candidate C); defer per-agent
+SpacetimeDB identities/real presence to a reversible **M2.4 / BL-014**. **Rationale:** M2's existential
+risk is agent↔agent loops + token cost (NOT presence realism), and that entire safety system is
+net-new code regardless of identity model; C ships the cost-safe + **coherent** core on zero new infra
+(one in-memory loop ⇒ serialized ordered turns), derives typing from existing `streaming` rows (no
+crash-fragile presence table), and the arbitration/prompt work is identity-agnostic (survives the A
+upgrade — `agentId` demotes to provenance). Candidate A (per-agent identity first) front-loads an OIDC
+issuer + JWKS + N-connection pool AND has the worst default coherence (N connections stream at once,
+context races). **Enforcement boundary = the reducer:** `agent_reply_begin` refuses a run that exceeds
+the episode budget, so agent code cannot start a disallowed reply — stronger than every framework
+surveyed (all enforce in app code). **Choices:** (1) new tables `thread_agent` (many agents/thread,
+generalizing singular `thread.agentId`), `episode` (cost/loop ledger, opened ONLY by a human
+`send_message`), `agent_turn` (once-per-episode-per-agent de-dup); additive cols
+`message.{mentions[],agentId,episodeId}`, `run.{agentId,episodeId}`, `agent.respondsToAgents`. (2)
+**Addressed-only arbitration** — `@mention`/reply-to/default-responder resolve a candidate reply set;
+the budget guards (episode turns + token ceiling + per-run output cap + concurrency cap + per-agent
+cooldown) are always-on, in the reducer. (3) **Showstopper pulled into the MVP:** under one identity
+`isAgent = sender==self` is true for EVERY agent's message → persona-bleed; `PromptRow` gains `agentId`
+and `isAgent` is computed from the **tag**. (4) **Supersede per-`episodeId`**, not per-thread (per-thread
+cancel-all livelocks a 2-human thread). (5) Multi-party prompt = per-agent role-flip + inline name-tags +
+roster footer + `stop` sequences; each agent sees only its own `systemPrompt`. **Ratified dials**
+(configurable; full per-agent/day metering → BACKLOG): `MAX_TURNS_HARD≈8`, `MAX_CONCURRENT≈2`,
+`MAX_OUTPUT_TOKENS_PER_RUN≈2000`, `EPISODE_TOKEN_CEILING≈50k`, cooldown ≈3s; **agent→agent off by
+default, opt-in per persona**; addressing = `@mention` only in the MVP (NL "Hey {name}," → M2.3);
+**per-agent identity = fast-follow M2.4**. Phasing: M2.1 (addressing+arbitration = the MVP/existential
+core) → M2.2 (presence/typing from `streaming` rows) → M2.3 (full context-isolation recipe + NL address)
+→ M2.4 (per-agent identity, BL-014). Supersedes the agent-participation half of DEC-022. New V-items
+V-15…V-20; SPEC §3 refined (structured `mentions` + episode budget). Doc/plan only — no code yet.
+
 ---
 
 ## Session Journal (append-only)
@@ -862,6 +910,27 @@ bundle clean (645 modules). On-device vs Maincloud = **V-13** (long reply settle
   proven; live render = founder). Cleaned up throwaway scripts + background processes.
 - **Next:** founder ticks V-13/V-14 after the on-device render check. Then **M2** (multi-agent
   groups, BL-014) — the hardened streaming substrate is ready for it. Also **M3** (RAG) / BL-016 / BL-011.
+
+### 2026-06-23 — M2 multi-agent: deep research + comprehensive plan (DEC-031; no code)
+- Founder asked to explore + research + comprehensively plan the next milestone. Discovered M1.9 was
+  already shipped (#33/#34) between sessions, so the target is **M2 (multi-agent group threads)**.
+  Ground-truthed the single-agent model first-hand (singular `thread.agentId`; `my_persona_keys`/
+  `selectPersona`/`my_active_personas` all read it; one `inFlight` per thread; `isAgent` from the shared
+  `self` identity; SPEC §3 already specs `@mention` addressing + a per-trigger run budget; BL-014 = the
+  per-agent-identity backlog).
+- Ran an **8-agent research+adversarial workflow** (codebase map + 4 web-research angles → candidate
+  designs → adversarial review → synthesis; ~785k subagent tokens). Saved all 8 outputs to
+  **`.audit/m2-research-2026-06-22/`**. Verified the synthesis's load-bearing claims against real code
+  (esp. the **persona-bleed showstopper**: shared identity makes `isAgent` true for every agent).
+- **Decision DEC-031 (founder-ratified):** **Candidate C** — persona-tagged single connection +
+  **reducer-enforced episode budget**; defer per-agent identities to **M2.4/BL-014**. Founder set the
+  dials (conservative+configurable), agent→agent **off by default**, `@mention`-only MVP, identity =
+  fast-follow. Persisted the plan: **ROADMAP M2 expanded** (phases + MVP + 11 guards + V-15…V-20),
+  **SPEC §3 refined** (structured `mentions` + episode budget), **BL-014→M2.4** + new **BL-020** (router/
+  metering/visibility deferrals), Snapshot updated. **Doc/plan-only — no module/orchestrator/mobile code.**
+- **Next:** build **M2.1** (the addressed-only, episode-budgeted MVP — the existential core) in a fresh
+  session; tight handoff prepared. Guards 1–11 (the whole safety+correctness system) are all net-new and
+  block any multi-agent ship.
 
 ---
 
