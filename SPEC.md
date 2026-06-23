@@ -141,10 +141,14 @@ module **sanitizes** the sidecar in `send_message` — every `kind:'agent'` `ref
 
 `resolveAddressees` produces an **ordered** `agentId[]` keyed on the trigger's authorship:
 - **Human-authored trigger:** structured `@mentions` in **mention order**, with a `kind:'all'`
-  (`@everyone`) expanding to **every thread agent once**; if a human message addresses no agent, it
-  falls back to the thread's **default responder** (the first agent added to the thread). `@human`
-  mentions are accepted in the grammar but **do not trigger** (humans don't auto-respond — MVP
-  deferral).
+  (`@everyone`) expanding to **every thread agent once**; if a human message has **no** `@mention`, a
+  **leading natural-language vocative** ("Hey {name}," / "{name}:") naming **exactly one** thread agent
+  routes to it (`parseNLVocative`, M2.3 — precision over recall: whole-name, anchored to the message
+  start, a mandatory `,`/`:` terminator, ambiguous/non-vocative → nothing); failing that it falls back
+  to the thread's **default responder** (the first agent added to the thread). The NL path is
+  **server-side inference only** (no UI surface — the composer shows no chip for it), is **human→agent
+  only**, never expands to `@everyone`, and is **strictly weaker than an explicit `@mention`**. `@human`
+  mentions are accepted in the grammar but **do not trigger** (humans don't auto-respond — MVP deferral).
 - **Agent-authored trigger:** `@Name` tokens are parsed from the message **text** and an addressee is
   admitted **only if** that persona has `agent.respondsToAgents` set. Agent→agent addressing is thus
   **off by default, opt-in per persona** — an agent reply with no admitted addressee ends the cascade.
@@ -176,7 +180,9 @@ misbehaving or stale orchestrator cannot exceed it.
 Each agent message carries an `agentId` tag; the orchestrator computes "is this my own prior turn"
 from the **tag** (`row.agentId === targetAgentId`), never the shared service identity (avoids
 persona-bleed). Per-agent identities / real presence are a later additive upgrade (M2.4 / BL-014);
-the tag demotes to provenance. NL "Hey {name}," routing + full context-isolation is M2.3. Other
+the tag demotes to provenance. NL "Hey {name}," routing **shipped in M2.3** (`parseNLVocative`, above;
+stricter than the audited design — DEC-036); full context-isolation (each agent sees only its own
+`systemPrompt`, guaranteed by the once-per-agent `buildPrompt` call) also landed in M2.3. Other
 users' agent names fall back to a generic label in the mobile UI (own agents resolve via
 `my_agents`). Producers/consumers: orchestrator `resolveAddressees`/`parseTextMentions` +
 `modules/spacetime` `send_message`/`agent_reply_begin` + mobile composer mention UI (`Thread.tsx`

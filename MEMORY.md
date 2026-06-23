@@ -82,17 +82,18 @@ Shared full-jitter `nextBackoff` + a pure `reconnectReducer` (`@agentspace/share
 **Scenario G** proves orchestrator self-heal. **No module/schema change → no republish.** CI 16/16 (12 shared +
 38 orchestrator unit tests, incl. 3 supervisor); Android bundle clean (2.18 MB). On-device = founder **V-21/V-22**.
 
-**M2.2 agent presence & typing BUILT, CI-green (DEC-035, 2026-06-23) — pure mobile, no schema change.** The
-minimal M2.1 "{name} is thinking…" became an **animated** presence affordance, derived client-side from
-`streaming` `my_thread_messages` rows (tagged `agentId`) and self-healing via the reaper. `@agentspace/shared`
-adds a unit-tested `thinkingLabel(names)`; `TypingDots.tsx` is an RN-`Animated` indicator; `Avatar` gains a
-pulsing `thinking` halo. Surfaced in the **inbox** ("🤖 {who} is thinking…", multi-agent, replacing the bare
-`▍`), the **open thread** (header subtitle + per-row), and the agent avatar. CI 16/16; Android bundle clean.
-On-device = founder **V-23**. **S-6 (M2.1 Maincloud republish) confirmed done** (founder 2026-06-23; AI-verified
-the live schema) → **V-15…V-19 unblocked**.
+**M2.3 multi-party context isolation + NL address BUILT, CI-green (DEC-036, 2026-06-23) — pure orchestrator,
+no schema change.** A 9-agent planning workflow verified the whole per-agent `buildPrompt` recipe ALREADY
+shipped in M2.1 (the persona-bleed fix), so M2.3 = the **NL soft-vocative** only: `parseNLVocative(text,agents)`
+(`prompt.ts`) detects a leading "Hey {name},"/"{name}:" naming exactly one agent (precision-over-recall —
+whole-name, `^`-anchored, mandatory `,`/`:`, ambiguous→`undefined`), wired into `resolveAddressees`' human
+branch behind `ordered.length===0` (`@mention`/`@everyone` win; NL beats the default responder; agent→agent +
+the episode budget untouched) + a `buildPrompt` isolation regression test. Stricter than the audited
+`addressing.md` by design. CI 16/16 (49 orch tests). *(M2.2 presence/typing shipped just prior — #41; S-6
+Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 
-- **Active branch:** `feat/m2.2-presence-typing` (M2.2 presence/typing — DEC-035). Prior: M2.5 reconnect (#40,
-  DEC-034); M2.1 shipped (#36); Apache-2.0 license (#39, DEC-033). Repo **public**, **Apache-2.0**.
+- **Active branch:** `feat/m2.3-nl-address` (M2.3 NL soft-address — DEC-036). Prior: M2.2 presence (#41,
+  DEC-035); M2.5 reconnect (#40, DEC-034); M2.1 (#36). Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -104,8 +105,8 @@ the live schema) → **V-15…V-19 unblocked**.
 - **On-device verification owed (founder):** **V-13/V-14** (M1.9 long-reply + cancel render); **V-15…V-19**
   (M2.1 multi-agent — needs S-6); **V-21/V-22** (M2.5 reconnect — *no* republish). AI has headless evidence
   for all; the founder ticks the device render. *(OT-004 long-reply cursor is RESOLVED by M1.9 delta-streaming.)*
-- **Next build:** **M2.2** (agent presence/typing) → **M2.3** (context isolation + NL "Hey {name}," address) →
-  **M2.4** (per-agent identity, BL-014) → **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable key backing).
+- **Next build:** **M2.4** (per-agent identity & real presence, BL-014 — first M2 phase needing a schema/identity
+  change) → **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable key backing). *(M2.2/M2.3 shipped.)*
 
 ---
 
@@ -646,6 +647,27 @@ Also this session: **S-6 confirmed done** — the founder re-published M2.1 to M
 live schema (`spacetime describe … --json` shows `thread_agent`/`episode`/`agent_turn`/`reaper_schedule`/
 `responds_to_agents`), so **V-15…V-19 are unblocked**.
 
+### DEC-036 — M2.3 = NL soft-vocative only (the buildPrompt recipe already shipped in M2.1); precision over recall
+*2026-06-23.* A 9-agent planning workflow (4 parallel readers → 3 NL-heuristic designs → synthesis → an
+adversarial critic that **verified every claim against the code**) found that the ROADMAP M2.3 "full per-agent
+`buildPrompt` recipe" (role-flip, name-tags, roster footer, stop sequences, leading-label strip, id-tiebreak,
+skip-non-`complete` rows, **per-agent `systemPrompt` isolation by construction**) **already shipped in M2.1** —
+pulled forward as the persona-bleed *correctness* fix (under one shared identity, `isAgent` must come from the
+`agentId` tag). So **M2.3's sole new behavior is the NL soft-vocative**: `parseNLVocative(text, agents)` in
+`prompt.ts`, wired into `resolveAddressees`' **human** branch behind the existing `ordered.length===0` guard —
+a leading "Hey {name},"/"{name}:" naming exactly one agent routes to it; `@mention`/`@everyone` always win; NL
+beats the default responder; the agent→agent path + the reducer episode budget are untouched (NL changes only
+*who* is addressed — the selected agent still flows through the unchanged `agentReplyBegin` gate). Plus the
+already-true isolation became a documented + regression-tested guarantee (a `buildPrompt` test asserts agent
+A's prompt never contains agent B's `systemPrompt`; **no `buildPrompt` refactor** — already true by
+construction). **Design decision (founder-ratified): precision over recall** — the regex is **deliberately
+STRICTER** than the audited `.audit/…/addressing.md:52` rule (whole-name + a mandatory `,`/`:` terminator;
+drops the bare-`\s*`/`@` alternatives): wrongly routing to an agent is worse than falling back to the default
+responder, and `@mention` stays the exact path. Recorded here per the §1 conflict rule so the audited design
+and the shipped code don't silently diverge. **No schema/mobile/bindings/shared change → no republish.** CI
+16/16 (49 orch tests). Deferred (BL-020): selective per-agent message VISIBILITY, agent-side NL, @human,
+multi-agent NL.
+
 ---
 
 ## Session Journal (append-only)
@@ -1149,6 +1171,21 @@ live schema (`spacetime describe … --json` shows `thread_agent`/`episode`/`age
   VERIFICATION **V-23**, SETUP **S-6 ✓**, DEC-035 + this entry + Snapshot.
 - CI 16/16; Android bundle clean. **Next:** founder runs V-23 (+ the now-unblocked V-15…V-19, V-21/V-22).
   Build: **M2.3** (multi-party context isolation + NL "Hey {name}," address) next.
+
+### 2026-06-23 — M2.3 multi-party context isolation + NL address (DEC-036)
+- **Comprehensive planning via a workflow (ultracode):** a 9-agent run (understand → design → synthesize +
+  critic) verified the M2.3 `buildPrompt` recipe ALREADY shipped in M2.1 — so M2.3 collapsed to the **NL
+  soft-vocative** + an isolation doc/test. The adversarial critic checked every "M2.1 already did X" claim
+  against the code (file:line) before I trusted it.
+- Plan-mode ratified (precision-over-recall regex accepted). Shipped on branch `feat/m2.3-nl-address`:
+  `parseNLVocative` in `prompt.ts` + one branch in `resolveAddressees` (human-only, behind `ordered.length===0`);
+  `prompt.test.ts` NL suite + arbitration precedence + a `buildPrompt` isolation regression. Docs same-commit:
+  ROADMAP M2.3 ✓, SPEC §3 (NL rule + human-trigger arbitration), CLAUDE §9, BACKLOG BL-020 (agent-side NL),
+  DEC-036 + this entry + Snapshot.
+- **No schema/mobile change.** CI 16/16 (orch 38→49). NL is server-side inference (no UI surface; optional
+  founder spot-check folds into V-15 — no new V-item).
+- **Next:** **M2.4** (per-agent identity & real presence, BL-014) — the first M2 phase needing a schema/identity
+  change — or the on-device V-batch (V-15…V-23, all now unblocked).
 
 ---
 
