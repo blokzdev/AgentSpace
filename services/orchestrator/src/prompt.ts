@@ -207,9 +207,36 @@ export function parseTextMentions(text: string, agents: ThreadAgentInfo[]): bigi
 }
 
 /**
+ * Detect a leading natural-language vocative ("Hey Aria," / "Aria:") naming exactly
+ * ONE thread agent, so a human can address an agent without an `@token` (M2.3). It
+ * fires only for a name at the very START of the message (optionally after a
+ * salutation) terminated by a comma or colon; whole-name, case-insensitive; returns
+ * `undefined` on no match OR ambiguity (≥2 names) so the caller falls through to the
+ * default responder. Human→agent only; never `@everyone`; never persisted.
+ *
+ * Precision over recall (DEC-036): deliberately STRICTER than the audited
+ * `addressing.md` rule (whole-name + a MANDATORY `,`/`:` terminator; no bare substring,
+ * no `@` alternative) — wrongly routing to an agent is worse than falling back to the
+ * default responder, and an explicit `@mention` stays the exact path.
+ */
+export function parseNLVocative(text: string, agents: ThreadAgentInfo[]): bigint | undefined {
+  const head = text.trimStart();
+  let match: bigint | undefined;
+  for (const a of agents) {
+    if (a.name.length === 0) continue;
+    const re = new RegExp(`^(?:(?:hey|hi|hello|ok|okay|yo)[ ,]+)?${escapeRe(a.name)}[,:]`, 'i');
+    if (!re.test(head)) continue;
+    if (match !== undefined) return undefined; // ≥2 names match → ambiguous, refuse to guess
+    match = a.agentId;
+  }
+  return match;
+}
+
+/**
  * Resolve which agents should reply to a trigger, in order (DEC-031). A HUMAN
  * message uses its structured mentions (@agent in order; @everyone expands over the
- * roster) and falls back to the thread's default responder when it addresses no one.
+ * roster); with no @mention, a leading NL vocative naming one agent (parseNLVocative,
+ * M2.3) routes to it; otherwise it falls back to the thread's default responder.
  * An AGENT message parses @Name from its text and admits ONLY agents that opted in
  * (`respondsToAgents`) — and there is no default-responder fallback, so unaddressed
  * agent chatter stops. The trigger's own author is never re-addressed.
@@ -229,6 +256,13 @@ export function resolveAddressees(
     for (const m of trigger.mentions) {
       if (m.kind === 'agent') add(m.ref);
       else if (m.kind === 'all') for (const a of agents) add(a.agentId);
+    }
+    // NL soft-vocative (M2.3): a human who typed no @mention but opened with
+    // "Hey {name}," / "{name}:" naming exactly one agent routes to it — strictly weaker
+    // than an @mention, stronger than the default responder.
+    if (ordered.length === 0) {
+      const nl = parseNLVocative(trigger.text, agents);
+      if (nl !== undefined) add(nl);
     }
     if (ordered.length === 0 && opts.defaultResponderId && opts.defaultResponderId !== 0n) {
       add(opts.defaultResponderId);

@@ -271,7 +271,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect ✓; M2.2 agent presence/typing ✓; M2.3 context-isolation + NL address built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -457,6 +457,20 @@ is a dependency-free RN-`Animated` three-dot indicator; `Avatar` gains a pulsing
 the **inbox** (`ThreadList.tsx` — "🤖 {who} is thinking…", multi-agent-aware, replacing the bare `▍`), the
 **open thread** (`Thread.tsx` — a header subtitle + the per-row indicator), and the agent avatar. On-device =
 `V-23`. Human typing + per-agent *online* presence are deferred (need a `presence` table) → BL-024 / M2.4.
+
+**M2.3 (multi-party context isolation + NL address):** a 9-agent planning workflow verified that the whole
+per-agent `buildPrompt` recipe (role-flip, name-tags, roster footer, stop sequences, leading-label strip,
+id-tiebreak, skip-non-`complete` rows, per-agent `systemPrompt` isolation) **already shipped in M2.1** as the
+persona-bleed correctness fix — so M2.3 added only the **NL soft-vocative**: `parseNLVocative(text, agents)`
+(`prompt.ts`, beside `parseTextMentions`) detects a leading "Hey {name}," / "{name}:" naming exactly one thread
+agent (precision over recall — whole-name, `^`-anchored, mandatory `,`/`:`, ambiguous/non-vocative →
+`undefined`) and is wired into `resolveAddressees`' **human branch** behind the existing `ordered.length===0`
+guard (`@mention`/`@everyone` win; NL beats the default responder; the agent→agent path + the reducer episode
+budget are untouched — NL changes only *who* is addressed). The already-true per-agent isolation is now a
+**documented + regression-tested guarantee** (a `buildPrompt` test asserts agent A's prompt never contains
+agent B's `systemPrompt`). Intentionally **stricter than the audited `addressing.md` rule** (DEC-036). Pure
+orchestrator — **no schema/mobile/bindings change**; CI 16/16 (49 orchestrator tests). Deferred: selective
+per-agent message VISIBILITY (BL-020), agent-side NL, @human, multi-agent NL.
 
 See `BLUEPRINT.md` §2 for the module graph.
 

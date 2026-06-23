@@ -5,6 +5,7 @@ import {
   createBatcher,
   mentionStops,
   newRunId,
+  parseNLVocative,
   parseTextMentions,
   resolveAddressees,
   selectPersona,
@@ -169,6 +170,8 @@ describe('resolveAddressees (arbitration; DEC-031)', () => {
   ];
   const human = (mentions: { kind: string; ref: bigint }[]): { agentId: bigint; text: string; mentions: typeof mentions } =>
     ({ agentId: 0n, text: '', mentions });
+  const humanText = (text: string, mentions: { kind: string; ref: bigint }[] = []): { agentId: bigint; text: string; mentions: typeof mentions } =>
+    ({ agentId: 0n, text, mentions });
 
   it('human @a @b → those agents, in mention order', () => {
     expect(resolveAddressees(human([{ kind: 'agent', ref: 9n }, { kind: 'agent', ref: 1n }]), agents)).toEqual([9n, 1n]);
@@ -200,6 +203,86 @@ describe('resolveAddressees (arbitration; DEC-031)', () => {
   it('parseTextMentions matches @Name on a word boundary, case-insensitive', () => {
     expect(parseTextMentions('hey @ARIA and @Cleo!', agents)).toEqual([1n, 5n]);
     expect(parseTextMentions('email ariana@x.com', agents)).toEqual([]); // not an @mention of Aria
+  });
+
+  // NL soft-vocative precedence (M2.3): @mention/@everyone win; NL beats default; agent-branch ignores NL.
+  it('routes a no-@mention human NL vocative to the named agent', () => {
+    expect(resolveAddressees(humanText('Hey Banjo, ping?'), agents, { defaultResponderId: 1n })).toEqual([9n]);
+  });
+  it('an explicit @mention / @everyone always overrides an NL vocative', () => {
+    expect(resolveAddressees(humanText('Aria, ask Cleo', [{ kind: 'agent', ref: 5n }]), agents, { defaultResponderId: 1n })).toEqual([5n]);
+    expect(resolveAddressees(humanText('Aria, hello', [{ kind: 'all', ref: 0n }]), agents)).toEqual([1n, 9n, 5n]);
+  });
+  it('NL vocative beats the default responder; a non-vocative message falls to default', () => {
+    expect(resolveAddressees(humanText('Cleo: status'), agents, { defaultResponderId: 1n })).toEqual([5n]);
+    expect(resolveAddressees(humanText('hey there'), agents, { defaultResponderId: 1n })).toEqual([1n]);
+  });
+  it('the agent-authored branch ignores NL vocatives (only @Name + opt-in)', () => {
+    expect(resolveAddressees({ agentId: 1n, text: 'Banjo, take it', mentions: [] }, agents)).toEqual([]);
+  });
+});
+
+describe('parseNLVocative (M2.3 — leading NL soft-address, precision over recall)', () => {
+  const A = (agentId: bigint, name: string): ThreadAgentInfo => ({ agentId, name, respondsToAgents: false, isDefaultResponder: false });
+  const roster = [A(1n, 'Aria'), A(9n, 'Banjo'), A(5n, 'Cleo')];
+
+  it('routes a leading vocative (with or without a salutation) to the one named agent', () => {
+    expect(parseNLVocative('Hey Aria, can you draft this?', roster)).toBe(1n);
+    expect(parseNLVocative('Aria: status?', roster)).toBe(1n);
+    expect(parseNLVocative('  banjo, thoughts?', roster)).toBe(9n); // leading space + case-insensitive
+    expect(parseNLVocative('yo Cleo: ping', roster)).toBe(5n);
+  });
+
+  it('returns undefined for non-vocative / mid-sentence / possessive / unterminated names', () => {
+    expect(parseNLVocative('hey there, anyone home?', roster)).toBeUndefined();
+    expect(parseNLVocative('thanks, all', roster)).toBeUndefined();
+    expect(parseNLVocative('I talked to Aria yesterday', roster)).toBeUndefined(); // mid-sentence
+    expect(parseNLVocative("Aria's idea was good", roster)).toBeUndefined(); // possessive (no ,/:)
+    expect(parseNLVocative('Aria can you help', roster)).toBeUndefined(); // no terminator
+    expect(parseNLVocative('Aria! help', roster)).toBeUndefined(); // ! is not a vocative signal
+  });
+
+  it('requires a WHOLE-name match (no partial / prefix)', () => {
+    expect(parseNLVocative('Ari, hi', roster)).toBeUndefined();
+    expect(parseNLVocative('Ar, hi', roster)).toBeUndefined();
+    // roster "Ari" alongside "Aria" → "Aria," matches only Aria
+    expect(parseNLVocative('Aria, hi', [A(1n, 'Aria'), A(2n, 'Ari')])).toBe(1n);
+  });
+
+  it('matches a common-word persona name only as a real leading vocative', () => {
+    const r = [A(3n, 'Art')];
+    expect(parseNLVocative('Art, draft the email', r)).toBe(3n);
+    expect(parseNLVocative('I love art, honestly', r)).toBeUndefined();
+  });
+
+  it('matches a persona named after a salutation via the salutation-less branch', () => {
+    expect(parseNLVocative('Yo, ship it', [A(4n, 'Yo')])).toBe(4n);
+  });
+
+  it('treats regex metacharacters in a name literally; refuses ambiguous same-name; skips empty names', () => {
+    expect(parseNLVocative('C++ Bot: build', [A(8n, 'C++ Bot')])).toBe(8n);
+    expect(parseNLVocative('Pete, hi', [A(1n, 'Pete'), A(2n, 'Pete')])).toBeUndefined(); // ≥2 → undefined
+    expect(parseNLVocative('Aria, hi', [A(1n, ''), A(2n, 'Aria')])).toBe(2n);
+  });
+});
+
+describe('per-agent systemPrompt isolation (M2.3 guarantee)', () => {
+  it("buildPrompt for agent A never contains agent B's systemPrompt — each agent sees only its own", () => {
+    const A_SYS = 'You are Aria. Speak in haiku.';
+    const B_SECRET = 'SECRET-B-ONLY-INSTRUCTIONS';
+    const rows: PromptRow[] = [
+      human(1n, 'hi all', 1n, 'Alice'),
+      agentRow(2n, 1n, 'a poem', 2n, 'Aria'),
+      agentRow(3n, 9n, 'a song', 3n, 'Banjo'),
+    ];
+    // Built FOR Aria with ONLY Aria's system — handleReply calls buildPrompt once per
+    // agent with that agent's persona.systemPrompt (replyLoop.ts:317-325), so agent B's
+    // system is never an input here and can never leak into A's prompt.
+    const forA = buildPrompt(rows, { targetAgentId: 1n, system: A_SYS, selfName: 'Aria', roster: ['Banjo', 'Alice'] });
+    const serialized = JSON.stringify(forA);
+    expect(serialized).toContain('You are Aria');
+    expect(serialized).toContain('Other participants:'); // roster footer present
+    expect(serialized).not.toContain(B_SECRET); // B's instructions never appear in A's prompt
   });
 });
 

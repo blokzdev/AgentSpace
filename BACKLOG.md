@@ -158,7 +158,10 @@
   agents self-organize" setting), always gated behind the episode budget; (b) **per-agent / per-day
   cost metering + budgets** beyond the per-episode ceiling (intersects BL-011 durable key backing);
   (c) **selective per-agent message visibility** (an agent sees only messages it was mentioned in) —
-  distinct from M2.3's *instruction* isolation (all agents share the transcript in M2).
+  distinct from M2.3's *instruction* isolation (each agent already sees only its own `systemPrompt`; all
+  agents still share the transcript); (d) **agent-side NL soft-address** — M2.3 (DEC-036) shipped the NL
+  "Hey {name}," vocative for **human** messages only; the audited `addressing.md` also contemplated a
+  server-side fuzzy resolver for agent→agent text mentions — deferred until agent↔agent volleys need it.
 
 ### BL-021 — M2.1 implementation deferrals (cross-owner agent names · cooldown enforcement)
 - **Source:** DEC-032 (M2.1 build).

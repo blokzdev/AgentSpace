@@ -25,8 +25,9 @@ budget; CI 16/16). **M2.1 shipped (#36); M2.5 ✓ built & CI-green** — on-devi
 stranded the app / killed the orchestrator during V-15…V-19 setup. **M2.2 ✓ built & CI-green** — animated agent presence/typing ("🤖 {name} is thinking…") surfaced in the
 inbox + open thread (pure mobile, no schema change). **S-6 DONE** (founder re-published M2.1 to Maincloud
 2026-06-23; AI-verified the live schema has the new tables). **On-device pending:** **V-15…V-19** (M2.1 —
-now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). Then **M2.3** (context isolation
-+ NL address), **M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
+now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). **M2.3 ✓ built & CI-green** — the NL
+"Hey {name}," soft-address + the per-agent isolation guarantee (pure orchestrator, no schema change). Then
+**M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
 (durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup
 S-1/S-2/S-3/S-6 done; S-4 optional, S-7 (key rotation) open.
 
@@ -268,10 +269,18 @@ closes at ≤0) ✓; (9) module reaper for stuck `streaming`/`running` (`reap_st
   multi-agent-aware, replacing the bare `▍`), the **open-thread** header subtitle + per-row indicator, and a
   pulsing `Avatar` halo. No module/schema change. CI 16/16; Android bundle clean. On-device = **V-23**.
   Human typing + per-agent online presence deferred (need a `presence` table) → BL-024 / M2.4.*
-- **M2.3 — Multi-party context isolation.** Full per-agent `buildPrompt` recipe (role-flip +
+- **M2.3 — Multi-party context isolation + NL address.** Full per-agent `buildPrompt` recipe (role-flip +
   inline name-tags + roster footer + `stop` sequences + leading-label strip); each agent sees
   only its own `systemPrompt`. Adds the NL "Hey {name}," soft vocative heuristic (deferred from
   M2.1). *(M2.3 was "context isolation"; old M2.3 "Streaming hardening" → M1.9 per DEC-030.)*
+  ✓ *[done 2026-06-23]: a 9-agent planning workflow verified the whole `buildPrompt` recipe ALREADY shipped in
+  M2.1 (the persona-bleed correctness fix) — so M2.3 = the **NL soft-vocative** only: a pure
+  `parseNLVocative(text, agents)` (precision-over-recall — leading vocative, whole-name, mandatory `,`/`:`,
+  exactly-one-or-`undefined`) wired into `resolveAddressees`' human branch behind `ordered.length===0`
+  (`@mention`/`@everyone` win; NL beats the default responder; the agent→agent path + episode budget are
+  unchanged) + a `buildPrompt` isolation regression test + a documented guarantee. Stricter than the audited
+  `addressing.md` rule by design (DEC-036). No schema/mobile change; CI 16/16 (49 orch tests). Out: selective
+  per-agent VISIBILITY (BL-020), agent-side NL, @human, multi-agent NL.*
 - **M2.4 — Per-agent identity & real presence (BL-014).** Mint per-agent STDB identities
   (service-managed/OIDC), each agent a first-class member with `user.online` presence + distinct
   avatar; orchestrator drives N identities (connection pool); `agentId` tag demotes to provenance.
