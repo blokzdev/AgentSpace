@@ -400,6 +400,10 @@ Notes: <founder fills: device + OS + result>
 > - **Dial numbers are starting defaults** (`MAX_TURNS_HARD=8`, `MAX_CONCURRENT=2`,
 >   `MAX_OUTPUT_TOKENS_PER_RUN=2000`, `EPISODE_TOKEN_CEILING=50_000`, `STREAM_TTL_MS=120_000`) — note
 >   anything that feels too tight/loose during V-16 and we'll tune.
+> - **Emulator-driving harness:** `apps/mobile/scripts/ondevice-verify.md` is the reproducible loop for
+>   driving the Pixel_8 via adb (the reliable path is **local-dev mode** — point the app at a local
+>   `spacetime start` server for an anonymous, stable loopback connection; the render can stall mid-stream
+>   (BL-022), so confirm via `spacetime sql --server local`). `shot.ps1` captures screenshots.
 
 ---
 
