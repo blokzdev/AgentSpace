@@ -22,11 +22,13 @@ guard system **enforced in the reducer** (`agent_reply_begin`); all 11 M2 guards
 headless-proven (integration A–F pass, incl. a terminating agent↔agent volley + reducer-enforced
 budget; CI 16/16). **M2.1 shipped (#36); M2.5 ✓ built & CI-green** — on-device connection resilience
 (auto-reconnect, app + orchestrator; BL-022), **pulled forward** ahead of M2.2 because a dropped socket
-stranded the app / killed the orchestrator during V-15…V-19 setup. **On-device V-15…V-19 pending** (needs
-the Maincloud `--delete-data=on-conflict` republish, S-6) **+ V-21/V-22** (M2.5 reconnect; **no republish**).
-Then **M2.2** (presence/typing), **M2.3** (context isolation), **M2.4** (per-agent identity, BL-014),
-**M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Optional: **V-9/V-10/V-11**.
-Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3 done; S-4 optional, S-7 (key rotation) open.
+stranded the app / killed the orchestrator during V-15…V-19 setup. **M2.2 ✓ built & CI-green** — animated agent presence/typing ("🤖 {name} is thinking…") surfaced in the
+inbox + open thread (pure mobile, no schema change). **S-6 DONE** (founder re-published M2.1 to Maincloud
+2026-06-23; AI-verified the live schema has the new tables). **On-device pending:** **V-15…V-19** (M2.1 —
+now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). Then **M2.3** (context isolation
++ NL address), **M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
+(durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder setup
+S-1/S-2/S-3/S-6 done; S-4 optional, S-7 (key rotation) open.
 
 ---
 
@@ -261,6 +263,11 @@ closes at ≤0) ✓; (9) module reaper for stuck `streaming`/`running` (`reap_st
   enforced cooldown, other-owners' agent names in UI → M2.3/M2.4/BACKLOG.
 - **M2.2 — Agent presence & typing.** "🤖 {name} is thinking…" derived from `streaming` rows
   (no new table; self-heals via the reaper). The seam where real `user.online` swaps in at M2.4.
+  ✓ *[done 2026-06-23]: pure-mobile — an **animated** `TypingDots` indicator + a shared
+  `thinkingLabel(names)` (0/1/2/≥3 arms, unit-tested) surfaced in the **inbox** ("🤖 {who} is thinking…",
+  multi-agent-aware, replacing the bare `▍`), the **open-thread** header subtitle + per-row indicator, and a
+  pulsing `Avatar` halo. No module/schema change. CI 16/16; Android bundle clean. On-device = **V-23**.
+  Human typing + per-agent online presence deferred (need a `presence` table) → BL-024 / M2.4.*
 - **M2.3 — Multi-party context isolation.** Full per-agent `buildPrompt` recipe (role-flip +
   inline name-tags + roster footer + `stop` sequences + leading-label strip); each agent sees
   only its own `systemPrompt`. Adds the NL "Hey {name}," soft vocative heuristic (deferred from

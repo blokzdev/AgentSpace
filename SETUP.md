@@ -173,7 +173,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
-### S-6 — Re-publish the module to Maincloud for M2.1 (multi-agent group threads)  ·  added 2026-06-23 · M2.1  ·  [ ] (required before V-15…V-19)
+### S-6 — Re-publish the module to Maincloud for M2.1 (multi-agent group threads)  ·  added 2026-06-23 · M2.1  ·  [x] (founder 2026-06-23)
+> **DONE (founder 2026-06-23).** Re-published `agentspace-hpm58` to Maincloud with the M2.1 schema; the AI
+> verified the live schema via `spacetime describe --server maincloud agentspace-hpm58 --json` — it contains
+> `thread_agent`, `episode`, `agent_turn`, `reaper_schedule`, `reap_stale_runs`, `agent_reply_begin`, and the
+> `responds_to_agents` column. **V-15…V-19 are now unblocked on-device.**
 > **Heads-up: this DESTROYS existing Maincloud data.** M2.1 adds new tables
 > (`thread_agent`, `episode`, `agent_turn`, `reaper_schedule`) and appends columns to
 > existing ones — a **non-additive** schema change, so the publish needs
@@ -287,6 +291,6 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
    change, so the same `--delete-data=on-conflict` publish + binding regen applies. Required
    before **V-15…V-19** (verified locally first).
 
-*Done: S-1, S-2, **S-3** (module published to Maincloud 2026-06-22). Remaining: **S-6**
-(M2.1 Maincloud re-publish — required before V-15…V-19) + **S-5** (run the orchestrator,
-for any live agent reply) + the on-device V-checklist. S-4 optional (gateway smoke / V-6 only).*
+*Done: S-1, S-2, **S-3** (module published 2026-06-22), **S-6** (M2.1 Maincloud re-publish — founder
+2026-06-23, AI-verified). Remaining: **S-5** (run the orchestrator, for any live agent reply) + **S-7**
+(rotate the Anthropic key) + the on-device V-checklist. S-4 optional (gateway smoke / V-6 only).*

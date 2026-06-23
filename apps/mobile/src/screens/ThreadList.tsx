@@ -4,7 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Identity } from 'spacetimedb';
 import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { reducers, tables } from '../../module_bindings';
+import { thinkingLabel } from '@agentspace/shared';
 import { Avatar } from '../components/Avatar';
+import { TypingDots } from '../components/TypingDots';
 import { colors, radius, relativeTime, shortId, space } from '../chat';
 
 export function ThreadList({
@@ -74,10 +76,21 @@ export function ThreadList({
           avatar = { idKey: `group-${t.id.toString()}`, name: base, emoji: agentCount > 0 ? '🤖' : undefined };
         }
 
-        const subtitle = last
-          ? `${last.text.length > 0 ? last.text : '…'}${last.streamState === 'streaming' ? ' ▍' : ''}`
-          : 'No messages yet';
-        return { id: t.id, title, subtitle, activity, avatar, when: last ? relativeTime(last.sent) : '' };
+        const subtitle = last ? (last.text.length > 0 ? last.text : '…') : 'No messages yet';
+        // M2.2: agents mid-reply in this thread → an animated presence preview that
+        // replaces the last-message subtitle. Derived from `streaming` rows; self-clears
+        // on complete/failed (incl. the reaper). Cross-owner agents → "Agent" (BL-021).
+        const seen = new Set<string>();
+        const thinkingNames: string[] = [];
+        for (const m of tMessages) {
+          if (m.streamState !== 'streaming' || m.agentId === 0n) continue;
+          const key = m.agentId.toString();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          thinkingNames.push(agents.find((a) => a.id === m.agentId)?.name ?? 'Agent');
+        }
+        const thinking = thinkingLabel(thinkingNames);
+        return { id: t.id, title, subtitle, thinking, activity, avatar, when: last ? relativeTime(last.sent) : '' };
       })
       .sort((a, b) => (a.activity < b.activity ? 1 : -1));
   }, [threads, messages, members, agents, threadAgents, users, identity]);
@@ -142,10 +155,17 @@ export function ThreadList({
         ListEmptyComponent={<Text style={styles.empty}>No conversations yet — start one with “New chat”.</Text>}
         renderItem={({ item }) => (
           <Pressable style={styles.thread} onPress={() => onOpen(item.id)}>
-            <Avatar idKey={item.avatar.idKey} name={item.avatar.name} emoji={item.avatar.emoji} online={item.avatar.online} />
+            <Avatar idKey={item.avatar.idKey} name={item.avatar.name} emoji={item.avatar.emoji} online={item.avatar.online} thinking={!!item.thinking} />
             <View style={styles.threadMain}>
               <Text numberOfLines={1} style={styles.threadTitle}>{item.title}</Text>
-              <Text numberOfLines={1} style={styles.threadSub}>{item.subtitle}</Text>
+              {item.thinking ? (
+                <View style={styles.thinkingRow}>
+                  <Text numberOfLines={1} style={styles.threadThinking}>{item.thinking}</Text>
+                  <TypingDots size={4} />
+                </View>
+              ) : (
+                <Text numberOfLines={1} style={styles.threadSub}>{item.subtitle}</Text>
+              )}
             </View>
             {item.when.length > 0 ? <Text style={styles.when}>{item.when}</Text> : null}
           </Pressable>
@@ -195,5 +215,7 @@ const styles = StyleSheet.create({
   threadMain: { flex: 1 },
   threadTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   threadSub: { color: colors.dim, fontSize: 13, marginTop: 1 },
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 1 },
+  threadThinking: { color: colors.accent, fontSize: 13, fontStyle: 'italic', flexShrink: 1 },
   when: { color: colors.faint, fontSize: 11 },
 });

@@ -82,8 +82,17 @@ Shared full-jitter `nextBackoff` + a pure `reconnectReducer` (`@agentspace/share
 **Scenario G** proves orchestrator self-heal. **No module/schema change → no republish.** CI 16/16 (12 shared +
 38 orchestrator unit tests, incl. 3 supervisor); Android bundle clean (2.18 MB). On-device = founder **V-21/V-22**.
 
-- **Active branch:** `feat/m2.5-reconnect-resilience` (M2.5 auto-reconnect — DEC-034). Prior: M2.1 shipped
-  (#36); on-device harness + local-dev (#38); Apache-2.0 license (#39, DEC-033). Repo **public**, **Apache-2.0**.
+**M2.2 agent presence & typing BUILT, CI-green (DEC-035, 2026-06-23) — pure mobile, no schema change.** The
+minimal M2.1 "{name} is thinking…" became an **animated** presence affordance, derived client-side from
+`streaming` `my_thread_messages` rows (tagged `agentId`) and self-healing via the reaper. `@agentspace/shared`
+adds a unit-tested `thinkingLabel(names)`; `TypingDots.tsx` is an RN-`Animated` indicator; `Avatar` gains a
+pulsing `thinking` halo. Surfaced in the **inbox** ("🤖 {who} is thinking…", multi-agent, replacing the bare
+`▍`), the **open thread** (header subtitle + per-row), and the agent avatar. CI 16/16; Android bundle clean.
+On-device = founder **V-23**. **S-6 (M2.1 Maincloud republish) confirmed done** (founder 2026-06-23; AI-verified
+the live schema) → **V-15…V-19 unblocked**.
+
+- **Active branch:** `feat/m2.2-presence-typing` (M2.2 presence/typing — DEC-035). Prior: M2.5 reconnect (#40,
+  DEC-034); M2.1 shipped (#36); Apache-2.0 license (#39, DEC-033). Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -622,6 +631,21 @@ cross-referenced across the docs; founder accepted at ratification. On-device = 
 republish). Promotes **BL-022**; deferred follow-ups stay in BL-022 (deep nav-state across reconnect; aborting
 in-flight gateway streams on drop; a revoked-but-present refresh token → immediate Login).
 
+### DEC-035 — Agent presence & typing (M2.2): animated, derived from streaming rows, no schema change
+*2026-06-23.* M2.1 left a *minimal* "{name} is thinking…" hint; M2.2 makes **agent presence/typing** a real,
+**animated** affordance. Two Explore sweeps confirmed it's **pure mobile with no module/schema change** —
+agent activity is fully derivable client-side from existing `streaming` `my_thread_messages` rows (tagged
+`agentId`) + `my_reply_deltas`, and **self-heals** because the reaper (`reap_stale_runs`, STREAM_TTL 120s)
+flips a stale `streaming` row → `failed`. Human typing + per-agent *online* presence are **out** (they'd need
+a `presence` table) → **BL-024 / M2.4**. **Built:** `@agentspace/shared` `thinkingLabel(names)` (0→null /
+1 / 2 / ≥3 arms, unit-tested); `apps/mobile/src/components/TypingDots.tsx` (dependency-free RN-`Animated`
+three-dot indicator); `Avatar` pulsing `thinking` halo; **inbox** (`ThreadList.tsx`) shows "🤖 {who} is
+thinking…" (multi-agent, replacing the bare `▍`) — the main gap M2.1 left; **open thread** (`Thread.tsx`)
+gets a header subtitle + an animated per-row indicator. CI 16/16; Android bundle clean. On-device = **V-23**.
+Also this session: **S-6 confirmed done** — the founder re-published M2.1 to Maincloud; the AI verified the
+live schema (`spacetime describe … --json` shows `thread_agent`/`episode`/`agent_turn`/`reaper_schedule`/
+`responds_to_agents`), so **V-15…V-19 are unblocked**.
+
 ---
 
 ## Session Journal (append-only)
@@ -1111,6 +1135,20 @@ in-flight gateway streams on drop; a revoked-but-present refresh token → immed
   loops (reminder: rotate → **S-7**).
 - **Next:** founder runs **V-21/V-22** (reconnect — *no* republish) + the pending **V-15…V-19** (needs S-6).
   Build: **M2.2** (presence/typing) next.
+
+### 2026-06-23 — M2.2 agent presence & typing (DEC-035) + S-6 confirmed
+- Founder reported the **S-6** Maincloud republish done + asked to verify → ran `spacetime describe --server
+  maincloud agentspace-hpm58 --json`; the live schema has `thread_agent`/`episode`/`agent_turn`/
+  `reaper_schedule`/`reap_stale_runs`/`responds_to_agents`. **S-6 ✓ (founder-done, AI-verified); V-15…V-19
+  unblocked.** Folded the S-6 tick into this PR's docs.
+- Planned M2.2 thoroughly: 2 Explore sweeps confirmed it's **pure mobile, no schema change** (M2.1 already
+  shipped a minimal "{name} is thinking…"; the real gap was the inbox + animation). Plan-mode ratified.
+- Shipped on branch `feat/m2.2-presence-typing`: shared `thinkingLabel`; mobile `TypingDots` + `Avatar`
+  pulse; `Thread.tsx` header subtitle + animated per-row; `ThreadList.tsx` inbox "🤖 {who} is thinking…".
+  Docs same-commit: ROADMAP M2.2 ✓, CLAUDE §9, BACKLOG **BL-024** (human typing / per-agent presence),
+  VERIFICATION **V-23**, SETUP **S-6 ✓**, DEC-035 + this entry + Snapshot.
+- CI 16/16; Android bundle clean. **Next:** founder runs V-23 (+ the now-unblocked V-15…V-19, V-21/V-22).
+  Build: **M2.3** (multi-party context isolation + NL "Hey {name}," address) next.
 
 ---
 
