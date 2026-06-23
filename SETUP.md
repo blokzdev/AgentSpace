@@ -217,6 +217,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 2. **S-5** (run the orchestrator against Maincloud) + add your key in 🔑 **Keys** →
    unblocks **V-7/V-8** (your agent replies with your key — the real BYOK path).
 3. **S-4** is **optional** — only for the standalone gateway smoke (**V-6**).
+4. **M1.9 (delta-streaming) needs a Maincloud re-publish** — the `reply_delta` table is new, so
+   `spacetime publish agentspace-hpm58 -p modules\spacetime --server maincloud --delete-data=on-conflict --yes`
+   (fresh test DB; nothing lost). Unblocks **V-13** (long reply settles clean) + **V-14**
+   (cancellation). *(The AI can run this re-publish during a local session; bindings are already
+   regenerated + committed.)*
 
 *Done: S-1, S-2, **S-3** (module published to Maincloud 2026-06-22). Remaining: **S-5**
 (run the orchestrator) + on-device V-checklist (V-5 / V-7 / V-8) → I tag `M1 [shipped]`.

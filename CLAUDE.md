@@ -270,7 +270,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; in M1).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; in M1.9 — streaming hardening).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -324,20 +324,30 @@ and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.
 16 gateway tests cover the BYOK crypto + stream normalization (AI SDK
 `MockLanguageModelV3`); a real provider round-trip is the founder smoke (`V-6`, key
-via `SETUP.md` S-4). **M1.6:** the orchestrator now **streams real agent replies
-into STDB**. `modules/spacetime` gained a private **`run`** table + `message.runId`
-+ three reducers — `agent_reply_begin`/`agent_reply_append`/`agent_reply_finish`
-(write a `streaming` message row that flips to `complete`/`failed`, keyed by a
-client-owned `runId`; each re-checks the sender is the `agent` member). The
-orchestrator's `replyLoop.ts` reacts to a human's `complete` message in a thread it's
-an `agent` member of, builds the prompt (`prompt.ts`: `buildPrompt`/`newRunId`/a
-~50ms coalescing `createBatcher`), calls `gateway.stream`, and flushes batched
-`agent_reply_append` UPDATEs, then `agent_reply_finish` with token usage. Mobile
-renders a streaming cursor (`▍`) on `streaming` rows — partial text already arrives
-live via `useTable`. Proven **headlessly end-to-end** by the rewritten
-`scripts/integration.ts` — no key needed; a real LLM reply on-device is `V-7`. The
-publish script uses `spacetime publish agentspace -p .` (`--project-path` was wrong
-for CLI 2.5.0). **M1.5 (Agent Studio):** users author **personas**. `modules/spacetime`
+via `SETUP.md` S-4). **M1.6 (+ M1.9 delta-streaming, DEC-030):** the orchestrator
+**streams real agent replies into STDB**. `modules/spacetime` has a private **`run`**
+table + `message.runId` + the streaming reducers `agent_reply_begin` (insert an *empty*
+`streaming` message + `running` run) / **`agent_reply_delta(runId, seq, text)`** (append-
+only INSERT into a private **`reply_delta`** table) / `agent_reply_finish` (write the
+authoritative final text onto the message → `complete`/`failed` + **GC the run's deltas**) /
+**`agent_reply_cancel`** (superseded → message `failed` + run `cancelled` + GC), all keyed by
+a client-owned `runId` and re-checking the sender is the `agent` member. (`agent_reply_append`
+— the **dormant** old cumulative-UPDATE path — is kept for back-compat, deleted next
+milestone.) The orchestrator's `replyLoop.ts` reacts to a human's `complete` message in a
+thread it's an `agent` member of, builds the prompt (`prompt.ts`: `buildPrompt`/`newRunId`/a
+~100ms coalescing+bounded `createBatcher`), calls `gateway.stream` (with an `AbortSignal`),
+and flushes coalesced **`agent_reply_delta`** INSERTs (one `seq` per flush), then
+`agent_reply_finish` with token usage. An **idle/error timeout** (no token 60s → abort →
+`failed`) makes every run terminal; a newer human message **cancels** the in-flight reply
+(`AbortController` → `agent_reply_cancel`) and is then answered (the in-flight `Map` loop
+guard). Mobile (`Thread.tsx`) subscribes to **`my_reply_deltas`**, concatenates a run's deltas
+by `seq` for the live body, renders a streaming cursor (`▍`) on `streaming` rows, and falls
+back to `message.text` once `complete`. **Why deltas:** the old cumulative-text UPDATE was
+O(n²) and its long burst was tail-dropped over Maincloud (dangling cursor — OT-004);
+append-only constant-size INSERTs deliver reliably. Proven **headlessly end-to-end** by
+`scripts/integration.ts` (delta order + concatenation + GC + cancellation; no key) + 24
+orchestrator unit tests; on-device is `V-13/V-14` (real reply `V-7`). The publish script uses
+`spacetime publish agentspace -p .` (`--project-path` was wrong for CLI 2.5.0). **M1.5 (Agent Studio):** users author **personas**. `modules/spacetime`
 gained an **`agent`** table (owner-scoped: name/systemPrompt/provider/model + a
 `version` counter — immutable version *history* deferred to BL-013), a **`service`**
 singleton (the orchestrator registers its identity so reducers can add it as the

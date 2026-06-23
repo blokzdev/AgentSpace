@@ -321,3 +321,47 @@ Notes: <founder fills: device + OS + result>
   model access in its console; Azure: the model is your **deployment** name, not the base id;
   Vertex: the Vertex AI API is enabled for the project). Capture the orchestrator logs.
 - **Notes (founder):** _provider + result →_
+
+---
+
+### V-13 — A LONG reply streams and settles clean (no dangling cursor)  ·  added 2026-06-22 · M1.9
+- **Why:** this is the **OT-004 acceptance bar**. M1.9 replaced cumulative-text `message` UPDATEs
+  (whose long burst the client tail-dropped over Maincloud, freezing the bubble mid-text) with
+  **append-only `reply_delta` INSERTs**. Headless integration proves delta order + GC; this proves
+  a *long* reply renders live AND lands `complete` over real Maincloud latency. This is the bug that
+  the prior session saw on-device (V-7/V-8 long-reply caveat).
+- **Setup:**
+  1. **Re-publish the module to Maincloud** (the `reply_delta` table is new):
+     `spacetime publish agentspace-hpm58 -p modules\spacetime --server maincloud --delete-data=on-conflict --yes`
+     (a fresh test DB loses nothing; bindings are already regenerated + committed).
+  2. Build, then run the orchestrator vs Maincloud (S-5; **clear `ANTHROPIC_BASE_URL` first**), with
+     your Anthropic key entered in-app (🔑 Keys). Use the **Pirate Pete** persona (or any anthropic
+     persona) on the Pixel_8 dev build.
+- **Steps:** in the persona DM, send a prompt that forces a **long, multi-paragraph** reply — e.g.
+  *“Tell me a long pirate tale, at least six paragraphs.”*
+- **Pass when:** the bubble **streams token-by-token** for the whole reply and then **settles to a
+  final `complete` message with the `▍` cursor gone** — no freezing mid-text, no dangling cursor.
+  Repeat 2–3× (incl. a very long one) to be confident.
+- **If it fails (cursor still dangles / text freezes):** capture the orchestrator logs + a screen
+  recording + the thread; note the approximate reply length. The reply is always correct in STDB, so
+  a failure here is a delivery/render issue (tell me — we may need to tune the flush window or the
+  client assembly).
+- **Notes (founder):** _device + reply length + result →_
+
+---
+
+### V-14 — Interrupting a reply cancels it cleanly  ·  added 2026-06-22 · M1.9
+- **Why:** M1.9.2 added **cancellation-on-supersede** — a new message sent while an agent is
+  mid-reply aborts that reply (run `cancelled`, message `failed`/cursor cleared) and answers the new
+  message. Proven headlessly; this is the on-device UX. (Before M1.9 a mid-reply message was
+  silently dropped.)
+- **Setup:** same as V-13 (orchestrator vs Maincloud, key in 🔑 Keys, an anthropic persona).
+- **Steps:**
+  1. Ask for a **long** reply (as in V-13) so it streams for a few seconds.
+  2. **While it is still streaming**, send a **second message** (e.g. *“actually, stop — what’s 2+2?”*).
+- **Pass when:** the first (interrupted) bubble **stops growing and its cursor clears** (it does not
+  hang as `streaming`), and the **second message gets its own fresh reply** that streams in and
+  completes. No dangling cursor on either.
+- **If it fails:** the first bubble keeps a dangling cursor → the cancel didn’t finalize; the second
+  message gets no reply → capture the orchestrator logs. Tell me which.
+- **Notes (founder):** _device + result →_

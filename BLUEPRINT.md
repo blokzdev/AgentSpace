@@ -103,8 +103,9 @@ ordering — use timestamps/sequences). Vectors live in Postgres, not STDB.
 | `service` | `id` (PK = 0), `identity`, `enc_pub_key` | View: `service_info` (public) | singleton: orchestrator identity (M1.5) + its NaCl **box public key** so clients seal BYOK keys to it (M1.7) |
 | `threads` | `id` (PK), `kind` (dm\|group), `title`, `created_by`, `agent_id` | View: members only | `agent_id`≠0 → an agent DM bound to that persona (M1.5) |
 | `thread_members` | `(thread_id, member_ref)` , `role` (human\|agent), `member_kind` | View: members only | membership is the authz spine |
-| `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | streamed via UPDATE (§5); `run_id`=`''` for humans (M1.6) |
-| `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6). `cost`/`error` deferred |
+| `messages` | `id` (PK), `thread_id`, `sender`, `text`, `stream_state`, `sent`, `run_id` | View: thread members | `text` empty while `streaming` (live body = `reply_delta` rows, §5); set to the final text on finish; `run_id`=`''` for humans (M1.6/M1.9) |
+| `runs` | `id` (PK), `run_id` (client key), `thread_id`, `agent`, `model`, `status`, `input_tokens`, `output_tokens`, `started_at`, `updated_at` | private (orchestrator-owned) | one agent turn; keyed by client `run_id` (M1.6); reaches a terminal status (M1.9). `cost`/`error` deferred |
+| `reply_delta` | `id` (PK), `run_id`, `thread_id`, `seq`, `text`, `sent` | View: `my_reply_deltas` (thread members) | append-only streamed chunks for an in-flight reply (M1.9/DEC-030). Each flush is one small INSERT (not a growing UPDATE); client concatenates by `seq`; **GC'd on finish/cancel**. Fixes OT-004 |
 | `attachments` | `id` (PK), `message_id`, `kind`, `uri`, `meta` | View: thread members | blobs out-of-band |
 | `presence` | `identity`/`agent_id`, `state`, `typing_in_thread` | View: co-members | humans + agents |
 | `provider_key` | `id` (PK), `owner`, `provider`, `sealed`, `created_at`, `updated_at` | View: `my_provider_keys` (owner) + `my_persona_keys` (agent member) | per-user BYOK (M1.7). `sealed` = **ciphertext** (box-sealed to the orchestrator's pubkey); raw key never in STDB. Durable Postgres/KMS backing = BL-011 |
@@ -254,14 +255,28 @@ OT-005/OT-007/BL-011).
 
 ---
 
-## 5. Streaming model
+## 5. Streaming model (M1.9/DEC-030 — append-only deltas)
 
-Agent tokens arrive ~10–100ms apart from the provider. The orchestrator buffers
-and flushes to STDB on a sliding window: **flush when ≥N tokens or every ~50ms**,
-whichever first, by UPDATEing the in-progress `message` row (`stream_state =
-streaming`), then a final UPDATE sets `complete`. Event tables are *not* used for
-streaming (their rows are transient). Clients render partial `body` live via the
-subscription. Cadence/cost to be validated (OT-004).
+Agent tokens arrive ~10–100ms apart from the provider. The orchestrator buffers and
+flushes to STDB on a coalescing window (~100ms, or sooner if a soft byte-cap is hit for
+backpressure), **INSERTing each coalesced batch as one `reply_delta` row** (`run_id`, a
+per-flush monotonic `seq`, the incremental `text`). The in-progress `message` row stays
+`streaming` with **empty `text`**; `agent_reply_finish` writes the authoritative final
+text onto it (`complete`) and GCs the run's deltas in the same transaction. Clients
+concatenate a run's deltas by `seq` for the live body and fall back to `message.text` once
+the row is no longer `streaming`.
+
+**Why deltas, not cumulative UPDATEs (OT-004).** The original model re-sent the *full
+cumulative text* as a `message` UPDATE every flush — O(n²) bandwidth whose long, ever-
+growing burst the client subscription **drops the tail of** over a high-latency host
+(Maincloud), freezing the bubble mid-text with a dangling cursor. Append-only INSERTs are
+small and constant-size, so the burst is delivered reliably; the message row now takes just
+two writes (empty begin + final finish). Event tables are still *not* used (their rows are
+transient); `reply_delta` is a real, membership-scoped table that is simply GC'd on finish.
+
+**Run lifecycle.** An idle/error timeout (no token for 60s → abort) guarantees every run
+reaches a terminal state; a newer human message **cancels** the in-flight reply
+(`AbortController` → `agent_reply_cancel`). See SPEC §1/§2/§6.
 
 ---
 
