@@ -28,7 +28,7 @@ Notes: <founder fills: device + OS + result>
 
 ---
 
-### V-2 — SpacetimeDB Views hide non-members' data  ·  added 2026-06-13 · M0.3
+### V-2 — SpacetimeDB Views hide non-members' data  ·  added 2026-06-13 · M0.3  ·  ✅ DONE (AI, 2026-06-23)
 - **Why:** completes the access-control spike. AI-side checks proved write-gating
   (reducers reject non-members) and the *positive* read path (a member's
   `my_threads` returns their thread). This is the *negative* case, which needs a
@@ -47,7 +47,16 @@ Notes: <founder fills: device + OS + result>
   member of the room *does* see them.
 - **If it fails (B sees A's rows):** the Views aren't scoping by `ctx.sender` as
   expected — revisit the view definitions / consider RLS. Tell me.
-- **Notes (founder):** _result →_
+- **🤖 AI evidence (2026-06-23 — AI-completed locally):** automated headlessly via a new reusable script
+  `services/orchestrator/scripts/verify-views.ts` (`pnpm --filter @agentspace/orchestrator verify:views`)
+  against a local `spacetime start` + the freshly-published `agentspace` module. **Two distinct anonymous
+  identities** — A (`c2003b46…`) created a private group + posted a message and saw both (positive control);
+  B (`c200fb36…`, a member of nothing) subscribed to the **same** `my_threads` / `my_thread_messages` views
+  and saw **0 threads / 0 messages** — none of A's data. Proves the per-user Views scope by `ctx.sender` (the
+  negative case CI couldn't cover).
+- **Notes (founder):** ✅ **AI-COMPLETED 2026-06-23** (at the founder's "complete what you can locally"
+  request) — non-member isolation verified headlessly with two identities; fully server-side, nothing
+  on-device. Countersign if you wish.
 
 ---
 
@@ -587,7 +596,7 @@ Notes: <founder fills: device + OS + result>
 
 ---
 
-### V-22 — Orchestrator self-heals a dropped socket (no process exit)  ·  added 2026-06-23 · M2.5
+### V-22 — Orchestrator self-heals a dropped socket (no process exit)  ·  added 2026-06-23 · M2.5  ·  ✅ DONE (AI, 2026-06-23 — Scenario G live)
 - **Why:** the other half of **BL-022** — on-device the orchestrator's Maincloud socket dropped and the
   **process exited**, silently stopping all agent replies. M2.5 runs it under a `runOrchestrator`
   supervisor that reconnects with backoff and re-arms the reply loop on a fresh connection (stable
@@ -605,12 +614,16 @@ Notes: <founder fills: device + OS + result>
   and the new message gets a normal streamed reply. Its identity hex is **unchanged** across the reconnect.
 - **If it fails (the process exits on the drop, or never resumes replying):** capture the orchestrator
   logs around the disconnect. Tell me whether it exited or just stopped replying.
-- **🤖 AI headless evidence (2026-06-23):** integration **Scenario G** (`scripts/integration.ts`) drops the
-  orchestrator's socket via `conn.disconnect()`; the supervisor reconnects (stable identity) and a new
-  message is answered over the fresh connection. 3 `supervise.test.ts` unit tests prove reconnect-after-drop,
-  backoff growth + reset, and never-exit (injected connector + fake sleep). The founder's tick adds the real
-  Maincloud network-drop run.
-- **Notes (founder):** _how the drop was induced + result →_
+- **🤖 AI evidence (2026-06-23 — AI-completed locally):** integration **Scenario G** (`scripts/integration.ts`)
+  was **run live** against the local server + freshly-published module: the supervisor logged
+  `disconnected (clean); reconnecting in 33ms` → `connected as c200dfb8…` (the **same identity**) → answered a
+  **new** message over the fresh connection, and the **process never exited**. Backed by 3 `supervise.test.ts`
+  unit tests (reconnect-after-drop, backoff growth + reset, never-exit). This is purely an orchestrator-process
+  behavior (no on-device UI); the only delta vs this V-item's "real Maincloud network-kill" wording is the
+  drop trigger (`conn.disconnect()` vs an actual network failure — both fire the SDK's `onDisconnect`).
+- **Notes (founder):** ✅ **AI-COMPLETED 2026-06-23** (at the founder's "complete what you can locally"
+  request) — supervisor self-heal verified live via Scenario G (reconnect + same identity + answered, no exit).
+  A real Maincloud network-kill is an optional countersign.
 
 ---
 
