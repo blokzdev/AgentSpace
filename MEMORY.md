@@ -71,24 +71,32 @@ Dials at DEC-031 defaults (tune after V-16). **Next:** PR → merge → founder 
 the Maincloud `--delete-data` republish, new SETUP S-6) → **M2.2** (presence/typing) → M2.3 (context
 isolation + NL address) → M2.4 (per-agent identity, BL-014).
 
-- **Active branch:** `chore/apache-2.0-license` (license/visibility doc commit — DEC-033). M2.1 shipped (#36);
-  on-device harness + local-dev (#38). Repo **public**, **Apache-2.0**.
+**M2.5 on-device connection resilience (auto-reconnect) BUILT, CI-green + headless (BL-022/DEC-034,
+2026-06-23) — pulled forward ahead of M2.2.** The SpacetimeDB SDK has no auto-reconnect, so a dropped
+Maincloud socket stranded the app on "Connecting…" and **killed the orchestrator process** (hit during
+V-15…V-19 setup). The app now wraps the provider in a **`ConnectionGate`** (`reconnect.tsx`) that unmounts the
+provider on a drop (forcing the SDK manager to evict the dead socket), refreshes the id token, and remounts
+with backoff (foreground-aware; revoked token → Login); the orchestrator runs under a **`runOrchestrator`**
+supervisor that reconnects with backoff + re-arms the reply loop on the fresh connection, **never exiting**.
+Shared full-jitter `nextBackoff` + a pure `reconnectReducer` (`@agentspace/shared`), unit-tested; integration
+**Scenario G** proves orchestrator self-heal. **No module/schema change → no republish.** CI 16/16 (12 shared +
+38 orchestrator unit tests, incl. 3 supervisor); Android bundle clean (2.18 MB). On-device = founder **V-21/V-22**.
+
+- **Active branch:** `feat/m2.5-reconnect-resilience` (M2.5 auto-reconnect — DEC-034). Prior: M2.1 shipped
+  (#36); on-device harness + local-dev (#38); Apache-2.0 license (#39, DEC-033). Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
   pnpm `node-linker=hoisted` (DEC-014). Autonomous loop (DEC-013/016).
-- **Open founder work:** S-1/S-2/S-3 done; **S-2 updated** — register
-  `com.agentspace.probe://redirect` (reverse-DNS) on the SpacetimeAuth client (founder did this
-  live; the old `agentspace://redirect` must be removed). **S-5** (run orchestrator vs Maincloud)
-  was driven this session and works. Android: a dev build runs on the Pixel_8 emulator (JDK =
-  Android Studio JBR 21). **S-4** optional (gateway smoke / V-6 only).
-- **Next:** founder ticks **V-5/V-7/V-8** (evidence captured) → **tag `M1 [shipped]`**. Remaining
-  V-tests (optional/founder-driven): **V-10** (a free-tier cloud provider — needs a key) and
-  **V-11** (local Ollama — `ollama pull llama3.2`). Known issue **OT-004**: long replies dangle
-  the streaming cursor on-device (delivery drops the tail of cumulative-text UPDATEs over
-  Maincloud; mitigated 50→200ms + settle-delay; full delta-streaming fix = **M2.3**). Build-wise:
-  **M2** (multi-agent groups, BL-014) / **M3** (RAG) / **BL-016** (chat polish) / **BL-011**
-  (durable key backing).
+- **Open founder work:** **S-6** (Maincloud `--delete-data` republish for M2.1's new tables) — required
+  before **V-15…V-19**. **S-5** (run orchestrator vs Maincloud) works. **S-7** new — rotate the shared
+  Anthropic key (security hygiene; AI keeps using it for local test loops meanwhile). S-1/S-2/S-3 done;
+  S-4 optional (gateway smoke / V-6).
+- **On-device verification owed (founder):** **V-13/V-14** (M1.9 long-reply + cancel render); **V-15…V-19**
+  (M2.1 multi-agent — needs S-6); **V-21/V-22** (M2.5 reconnect — *no* republish). AI has headless evidence
+  for all; the founder ticks the device render. *(OT-004 long-reply cursor is RESOLVED by M1.9 delta-streaming.)*
+- **Next build:** **M2.2** (agent presence/typing) → **M2.3** (context isolation + NL "Hey {name}," address) →
+  **M2.4** (per-agent identity, BL-014) → **M3** (RAG) / **BL-016** (chat polish) / **BL-011** (durable key backing).
 
 ---
 
@@ -593,6 +601,27 @@ license. Copyright holder: **blokzdev**. **"Going private" is NOT a committed ac
 **BL-023** (trigger: pre-GA / first paying users / clone signal → a launch-gate decision). The
 `examples/chat-react-ts` reference keeps its upstream template license. License/doc-only — no code change.
 
+### DEC-034 — On-device connection resilience (auto-reconnect) shipped as M2.5; pulled ahead of M2.2
+*2026-06-23.* On-device M2.1 verification hit **BL-022**: the SpacetimeDB SDK has **no auto-reconnect** (its
+`ConnectionManager` caches a connection by `(uri, moduleName)` and on disconnect only flips `isActive=false`),
+so a dropped Maincloud socket left the app stuck on "Connecting…" and the **orchestrator process exited**.
+Because that strands every V-15…V-19 session, reconnect-resilience was **pulled forward ahead of M2.2** (the
+M1.9 "harden the substrate first" precedent) and shipped as **M2.5**. **Approach (two runtimes, one shared
+util):** `@agentspace/shared` gains a full-jitter `nextBackoff(attempt)` + a pure `reconnectReducer` phase
+machine (both unit-tested). **App:** `App.tsx` mounts `Root` under a new `ConnectionGate`
+(`apps/mobile/src/reconnect.tsx`); on a drop it **unmounts the provider** for a backoff interval — the *only*
+way to make the ref-counted manager evict + `disconnect()` the dead socket (a same-tick remount reuses it; the
+StrictMode-survival feature working against us) — then refreshes the id token (transient failure → keep
+retrying; `invalid_grant`-class → Login) and remounts with a fresh builder; foreground-aware via `AppState`.
+**Orchestrator:** new `supervise.ts` `runOrchestrator` reconnects with backoff + re-arms the reply loop on the
+fresh connection, **never exiting** (stable persisted-token identity). **No module/schema/bindings change → no
+Maincloud republish.** Proven by shared + 3 `supervise.test.ts` unit tests + integration **Scenario G**
+(`conn.disconnect()` → reconnect → a new message answered over the fresh connection); CI 16/16; Android bundle
+clean. **Numbering:** chose **M2.5** (not renumbering M2.2–M2.4) because "M2.4 = per-agent identity" is
+cross-referenced across the docs; founder accepted at ratification. On-device = founder **V-21/V-22** (no
+republish). Promotes **BL-022**; deferred follow-ups stay in BL-022 (deep nav-state across reconnect; aborting
+in-flight gateway streams on drop; a revoked-but-present refresh token → immediate Login).
+
 ---
 
 ## Session Journal (append-only)
@@ -1064,6 +1093,24 @@ license. Copyright holder: **blokzdev**. **"Going private" is NOT a committed ac
   tree entry. `examples/chat-react-ts` left under its upstream template license. `pnpm run ci` green; PR → merge.
 - **Next (founder's call):** **BL-022** (auto-reconnect on-device hardening) · **M2.2** (presence/typing) ·
   or the remaining on-device **V-15…V-19** ticks. (Founder still to **rotate** the shared Anthropic key.)
+
+### 2026-06-23 — M2.5 on-device connection resilience (auto-reconnect; BL-022 → DEC-034)
+- Founder said "lead the way" after the license ship. Led with **BL-022** over M2.2/V-ticks because it's a
+  **verified on-device defect** (a dropped socket stranded the app / killed the orchestrator) that gates every
+  V-15…V-19 session — harden the substrate first.
+- Plan-mode ratified (M2.5 numbering accepted). Verified the SDK has **no auto-reconnect** by reading its
+  source (`ConnectionManager` caches by `(uri,moduleName)`; a same-tick remount reuses the dead socket) — which
+  dictated the **unmount-to-evict** gate design.
+- Shipped on branch `feat/m2.5-reconnect-resilience`: shared `nextBackoff` + `reconnectReducer`; orchestrator
+  `supervise.ts` (`runOrchestrator`, never exits) + `spacetime.ts` `onDisconnect`; mobile `reconnect.tsx`
+  (`ConnectionGate`/`ConnectionWatch`/`AppState`) + `auth.ts` `refresh()`; integration **Scenario G**. Docs
+  same-commit: ROADMAP M2.5 box, BACKLOG BL-022 promoted, CLAUDE §9, VERIFICATION V-21/V-22, SETUP **S-7**
+  (rotate Anthropic key), README Status refresh, DEC-034 + this entry + Snapshot.
+- **No module/schema change → no republish.** CI 16/16 (12 shared + 38 orchestrator unit tests incl. 3
+  supervisor); Android bundle clean (2.18 MB). Founder authorized using the real Anthropic key in local test
+  loops (reminder: rotate → **S-7**).
+- **Next:** founder runs **V-21/V-22** (reconnect — *no* republish) + the pending **V-15…V-19** (needs S-6).
+  Build: **M2.2** (presence/typing) next.
 
 ---
 

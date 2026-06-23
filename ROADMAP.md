@@ -20,11 +20,13 @@ V-13/V-14). **Just shipped = `M2.1` multi-agent group threads (MVP; DEC-031 "Can
 persona-tagged single connection, structured `@mention` addressing, and the full episode/turn/cost
 guard system **enforced in the reducer** (`agent_reply_begin`); all 11 M2 guards met. Built +
 headless-proven (integration A–F pass, incl. a terminating agent↔agent volley + reducer-enforced
-budget; CI 16/16). **On-device V-15…V-19 pending** (founder re-publishes to Maincloud with
-`--delete-data=on-conflict` for the new tables). Then **M2.2** (presence/typing), **M2.3** (context
-isolation), **M2.4** (per-agent identity, BL-014), **M3** (RAG), **BL-016** (chat polish), **BL-011**
-(durable key backing). Optional: **V-9/V-10/V-11**. Autonomous build loop (CLAUDE.md §4); founder
-setup S-1/S-2/S-3 done (S-2 redirect now reverse-DNS); S-4 optional.
+budget; CI 16/16). **M2.1 shipped (#36); M2.5 ✓ built & CI-green** — on-device connection resilience
+(auto-reconnect, app + orchestrator; BL-022), **pulled forward** ahead of M2.2 because a dropped socket
+stranded the app / killed the orchestrator during V-15…V-19 setup. **On-device V-15…V-19 pending** (needs
+the Maincloud `--delete-data=on-conflict` republish, S-6) **+ V-21/V-22** (M2.5 reconnect; **no republish**).
+Then **M2.2** (presence/typing), **M2.3** (context isolation), **M2.4** (per-agent identity, BL-014),
+**M3** (RAG), **BL-016** (chat polish), **BL-011** (durable key backing). Optional: **V-9/V-10/V-11**.
+Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3 done; S-4 optional, S-7 (key rotation) open.
 
 ---
 
@@ -268,6 +270,19 @@ closes at ≤0) ✓; (9) module reaper for stuck `streaming`/`running` (`reap_st
   avatar; orchestrator drives N identities (connection pool); `agentId` tag demotes to provenance.
   Closes OT-007 + DEC-022. Reversible to the C MVP. *Pulled in only if real avatars/online-dots
   become a launch requirement.*
+- **M2.5 — On-device connection resilience (auto-reconnect; BL-022, DEC-034).** *Built **next**,
+  pulled forward ahead of M2.2–M2.4 — a verified on-device defect gating V-15…V-19.* The SpacetimeDB
+  SDK has no auto-reconnect, so a dropped Maincloud socket left the app stuck on "Connecting…" and
+  **killed the orchestrator process**. Now: the app wraps the provider in a **`ConnectionGate`** that, on
+  a drop, **unmounts the provider** (the only way to make the SDK's ref-counted manager evict + disconnect
+  the dead socket), refreshes the id token, and remounts with backoff (foreground-aware; a revoked token →
+  Login); the orchestrator runs under a **`runOrchestrator`** supervisor that reconnects with backoff and
+  re-arms the reply loop on the fresh connection (**never exits**). A shared full-jitter `nextBackoff` + a
+  pure `reconnectReducer` (both in `@agentspace/shared`) are unit-tested; integration **Scenario G** proves
+  the orchestrator self-heals a `conn.disconnect()`. **No module/schema change → no republish.** *Acceptance:*
+  a dropped socket self-heals on both sides.
+  ✓ *[done 2026-06-23]: CI 16/16; shared + supervisor + reducer unit tests; Android bundle clean; on-device
+  V-21/V-22 pending.*
 
 Human verification (on-device, founder-owned; renumbered to avoid the existing V-1…V-14).
 **V-15…V-19 are now the gating on-device items for M2.1** (built + headless-proven A–F; founder
@@ -276,7 +291,8 @@ re-publishes to Maincloud with `--delete-data=on-conflict` for the new tables, t
 guard (agent↔agent volley terminates within budget — the existential test); **V-17** `@everyone`
 storm bound; **V-18** typing + crash self-heal (kill the orchestrator mid-stream → indicator
 clears via the reaper); **V-19** per-agent BYOK in a group (two agents, two owners' keys); and
-(at M2.4) **V-20** per-agent presence/avatars.
+(at M2.4) **V-20** per-agent presence/avatars. **M2.5** adds **V-21** (app auto-reconnect after a
+dropped socket) + **V-22** (orchestrator self-heals a drop, no process exit) — **no republish needed**.
 
 ---
 

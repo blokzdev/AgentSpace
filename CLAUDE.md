@@ -252,18 +252,18 @@ AgentSpace/
 ├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
-│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1
-│       · App.tsx · src/auth.ts · src/byok.ts · src/components/Avatar.tsx
+│   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5
+│       · App.tsx · src/auth.ts · src/byok.ts · src/reconnect.tsx · src/components/Avatar.tsx
 │       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,AgentPicker,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
-│   ├── shared/                # typed contracts (lowest layer) — built
+│   ├── shared/                # typed contracts (lowest layer) — built (+ reconnect backoff/reducer M2.5)
 │   ├── gateway/               # Model Gateway — AI SDK adapters + BYOK (M1.4)
 │   │   · src/{index,providers,credentials}.ts · scripts/smoke.ts
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
-│   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7)
-│       · src/{index,main,replyLoop,prompt,byok,spacetime}.ts · scripts/integration.ts
+│   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7) + reconnect supervisor (M2.5)
+│       · src/{index,main,replyLoop,prompt,byok,spacetime,supervise}.ts · scripts/integration.ts
 ├── modules/
 │   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5; +multi-agent/episode budget M2.1)
 │       · src/index.ts · bindings/ (generated, committed)
@@ -271,7 +271,7 @@ AgentSpace/
     └── chat-react-ts/         # SpacetimeDB chat reference app (not product code)
 ```
 
-**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
+**Status (M0 closed; M1 ✓ shipped; M1.9 ✓; M2.1 multi-agent group threads ✓; M2.5 on-device auto-reconnect built — CI-green + headless-verified).** Monorepo + CI green (16/16). `modules/spacetime`
 (M0.3) is the realtime-core module — reducers gate writes, per-user **Views** gate
 reads (`.audit/spike-stdb-access-control-…`; negative case `V-2`).
 `services/orchestrator` (M0.4) connects as a stable identity, subscribes to
@@ -429,6 +429,25 @@ BYOK / supersede / @a@b in mention order / **agent↔agent volley terminates** /
 **V-15…V-19** (needs the Maincloud `--delete-data=on-conflict` republish — `SETUP.md` S-6). Deferred:
 per-(agent,thread) cooldown enforcement; other users' agent names in the mobile UI; per-agent identity
 (M2.4/BL-014); NL "Hey {name}," routing (M2.3).
+
+**M2.5 (on-device connection resilience — auto-reconnect; BL-022/DEC-034):** the SpacetimeDB SDK has
+**no auto-reconnect** — its `ConnectionManager` caches a connection by `(uri, moduleName)` and on disconnect
+only flips `isActive=false`, so a dropped Maincloud socket stranded the app on "Connecting…" and the
+orchestrator process **exited**. Fixed in **two runtimes** sharing one pure util. `@agentspace/shared` adds a
+full-jitter **`nextBackoff(attempt)`** + a pure **`reconnectReducer`** phase machine
+(`connecting`/`up`/`reconnecting`/`authLost`) — both unit-tested. **Mobile:** `App.tsx` mounts `Root` under a
+new **`ConnectionGate`** (`apps/mobile/src/reconnect.tsx`); an inner `ConnectionWatch` (inside the provider)
+reports active↔inactive transitions, and on a drop the gate **unmounts the provider** for a backoff interval
+— the *only* way to make the ref-counted manager evict + `disconnect()` the dead entry (a same-tick remount
+reuses it) — then `auth.refresh()`es the id token (new `refresh()` on the hook; a transient failure keeps
+retrying, an `invalid_grant`-class error → Login) and remounts with a fresh builder; an `AppState` listener
+reconnects promptly on foreground. **Orchestrator:** `spacetime.ts` gains an `onDisconnect` option; new
+**`supervise.ts`** `runOrchestrator({connect,onReady,backoff})` loops connect → `onReady` (registerService +
+a gateway bound to *that* conn's `my_persona_keys` + `startReplyLoop`) → await disconnect → backoff →
+reconnect, **never exiting**; `index.ts` `main()` drives it (the stable persisted-token identity survives
+reconnects). **No module/schema/bindings change.** Proven by shared + 3 `supervise.test.ts` unit tests +
+integration **Scenario G** (`conn.disconnect()` → reconnect → a new message answered over the fresh
+connection); on-device = `V-21/V-22`.
 
 See `BLUEPRINT.md` §2 for the module graph.
 

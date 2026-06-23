@@ -12,6 +12,11 @@ import {
   EPISODE_TOKEN_CEILING,
   evaluateBegin,
   type EpisodeView,
+  RECONNECT,
+  nextBackoff,
+  reconnectReducer,
+  INITIAL_RECONNECT,
+  type ReconnectState,
 } from './index';
 
 describe('shared contracts', () => {
@@ -81,5 +86,57 @@ describe('multi-agent episode budget (DEC-031)', () => {
       .toEqual({ ok: false, reason: 'concurrency_cap' });
     expect(evaluateBegin({ episode: open(), runningInThread: 1, agentAlreadyReplied: false, maxConcurrent: 1 }))
       .toEqual({ ok: false, reason: 'concurrency_cap' });
+  });
+});
+
+describe('reconnect backoff (BL-022 / M2.5)', () => {
+  it('returns a whole-ms delay within [0, ceiling] and grows then plateaus at the cap', () => {
+    const opts = { baseMs: 1000, factor: 2, capMs: 30_000, rand: () => 0.5 };
+    // ceiling = min(cap, base·2^attempt); delay = floor(0.5 · ceiling)
+    expect(nextBackoff(0, opts)).toBe(500); // min(30k, 1000)·0.5
+    expect(nextBackoff(1, opts)).toBe(1000); // 2000·0.5
+    expect(nextBackoff(2, opts)).toBe(2000); // 4000·0.5
+    expect(nextBackoff(5, opts)).toBe(15_000); // 1000·2^5=32000 → capped to 30000, ·0.5
+    // monotonic non-decreasing under a fixed rand
+    let prev = -1;
+    for (let a = 0; a < 12; a++) {
+      const d = nextBackoff(a, opts);
+      expect(d).toBeGreaterThanOrEqual(prev);
+      prev = d;
+    }
+  });
+
+  it('never exceeds the cap even for a huge attempt (overflow-safe)', () => {
+    expect(nextBackoff(1000, { rand: () => 0.999999 })).toBeLessThanOrEqual(RECONNECT.capMs);
+    expect(nextBackoff(0, { rand: () => 0 })).toBe(0); // rand 0 → no delay
+  });
+
+  it('walks the gate phase machine: drop → backoff → reconnect → up resets attempt', () => {
+    let s: ReconnectState = INITIAL_RECONNECT;
+    expect(s).toEqual({ phase: 'connecting', attempt: 0, nonce: 0 });
+    s = reconnectReducer(s, 'connected');
+    expect(s.phase).toBe('up');
+    s = reconnectReducer(s, 'dropped');
+    expect(s.phase).toBe('reconnecting');
+    s = reconnectReducer(s, 'backoffElapsed'); // refresh OK → remount
+    expect(s).toEqual({ phase: 'connecting', attempt: 1, nonce: 1 });
+    s = reconnectReducer(s, 'dropped'); // remount didn't stick
+    expect(s.phase).toBe('reconnecting');
+    s = reconnectReducer(s, 'backoffElapsed');
+    expect(s).toEqual({ phase: 'connecting', attempt: 2, nonce: 2 });
+    s = reconnectReducer(s, 'connected'); // sticks → attempt resets
+    expect(s).toEqual({ phase: 'up', attempt: 0, nonce: 2 });
+  });
+
+  it('routes a failed token refresh to authLost, and a foreground to an immediate reset retry', () => {
+    const reconnecting = reconnectReducer(reconnectReducer(INITIAL_RECONNECT, 'connected'), 'dropped');
+    expect(reconnecting.phase).toBe('reconnecting');
+    expect(reconnectReducer(reconnecting, 'refreshFailed').phase).toBe('authLost');
+    // foreground from reconnecting → connecting, attempt reset, nonce bumped
+    expect(reconnectReducer({ phase: 'reconnecting', attempt: 5, nonce: 3 }, 'appForegrounded'))
+      .toEqual({ phase: 'connecting', attempt: 0, nonce: 4 });
+    // duplicate drop while authLost is ignored; foreground while up is a no-op
+    expect(reconnectReducer({ phase: 'authLost', attempt: 2, nonce: 1 }, 'dropped').phase).toBe('authLost');
+    expect(reconnectReducer({ phase: 'up', attempt: 0, nonce: 0 }, 'appForegrounded').phase).toBe('up');
   });
 });

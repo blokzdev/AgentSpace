@@ -171,17 +171,23 @@
   + the module dials but not yet checked in `agent_reply_begin`; add it to the enforcement boundary if
   rapid-fire agent turns need throttling beyond the episode budget.
 
-### BL-022 — On-device connection resilience (auto-reconnect, app + orchestrator)
+### BL-022 — On-device connection resilience (auto-reconnect, app + orchestrator) — ✅ promoted to M2.5 (DEC-034)
+- **Status:** **promoted + shipped (2026-06-23, M2.5).** App: `ConnectionGate` (`apps/mobile/src/reconnect.tsx`)
+  unmounts the provider on a drop (forcing the SDK manager to evict the dead socket), refreshes the id token,
+  remounts with backoff, and is foreground-aware. Orchestrator: `runOrchestrator` supervisor
+  (`services/orchestrator/src/supervise.ts`) reconnects with backoff + re-arms the reply loop on the fresh
+  connection, never exiting. Shared full-jitter `nextBackoff` + pure `reconnectReducer` (`@agentspace/shared`),
+  unit-tested; integration Scenario G proves orchestrator self-heal. No schema change. On-device = V-21/V-22.
 - **Source:** 2026-06-23 on-device verification — the app's Maincloud WebSocket dropped mid-session and
   got stuck on "Connecting to AgentSpace…" (no auto-reconnect); the orchestrator's Maincloud socket also
   dropped and the process exited.
 - **Trigger:** on-device reliability, or any always-on deployment (OT-005 / DEC-027) — a dropped socket
   must self-heal rather than strand the app or kill the service.
-- **Promotion:** (a) **App** — on the SDK's `disconnect` (`isActive=false`), rebuild the `DbConnection`
-  with backoff and refresh the SpacetimeAuth id token (the provider currently builds the connection once
-  via `useMemo` and never retries). (b) **Orchestrator** — reconnect-with-backoff on a dropped Maincloud
-  socket instead of exiting (intersects OT-007 real service-account auth + DEC-027 always-on hosting).
-  Promotable to an **M2.x on-device-hardening phase**.
+- **Deferred follow-ups (not in M2.5):** preserving deep navigation state across an app reconnect (MVP lands
+  on the inbox); aborting in-flight orchestrator gateway streams on disconnect (the reaper + idle timeout
+  already finalize stuck runs); a "revoked refresh token while present" → immediate Login (M2.5 keeps retrying
+  on a transient failure, only `invalid_grant`-class errors route to Login). Intersects OT-007 (real
+  service-account auth) + DEC-027 (always-on hosting).
 
 ### BL-023 — Revisit license / repo-visibility / commercial posture (pre-launch)
 - **Source:** DEC-033 (founder Q on monetization + "going private"; repo stays public under Apache-2.0 now).

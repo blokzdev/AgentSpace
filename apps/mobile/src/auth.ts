@@ -28,6 +28,11 @@ export interface AuthClaims {
   preferred_username?: string;
 }
 
+/** Result of a reconnect-time token refresh (M2.5/BL-022). `refreshed` → a new id
+ *  token is available (`token`); `kept` → a transient failure, keep retrying with the
+ *  existing token; `reauth` → the session is invalid, fall back to Login. */
+export type RefreshResult = { outcome: 'refreshed' | 'kept' | 'reauth'; token?: string };
+
 export interface SpacetimeAuth {
   status: AuthStatus;
   idToken: string | null;
@@ -36,6 +41,9 @@ export interface SpacetimeAuth {
   error: string | null;
   login: () => void;
   logout: () => void;
+  /** Re-mint a fresh id token from the stored refresh token (used by the reconnect
+   *  gate when a long drop may have expired the current token). */
+  refresh: () => Promise<RefreshResult>;
 }
 
 // Decode the JWT payload for display only (never trusted for authz — the server
@@ -61,6 +69,31 @@ async function persist(tokens: { idToken?: string; refreshToken?: string }): Pro
 async function clearTokens(): Promise<void> {
   await SecureStore.deleteItemAsync(REFRESH_KEY);
   await SecureStore.deleteItemAsync(ID_TOKEN_KEY);
+}
+
+// Exchange the stored refresh token for a fresh id token. Returns null when there is
+// no refresh token to use; throws on a refresh failure (the caller distinguishes a
+// definitive auth error from a transient one). Shared by the mount-restore effect and
+// the reconnect-time `refresh()` so both follow the same path.
+async function refreshSession(
+  discovery: AuthSession.DiscoveryDocument,
+): Promise<string | null> {
+  const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
+  if (!refreshToken) return null;
+  const refreshed = await AuthSession.refreshAsync(
+    { clientId: SPACETIMEAUTH_CLIENT_ID, refreshToken },
+    discovery,
+  );
+  await persist({ idToken: refreshed.idToken, refreshToken: refreshed.refreshToken });
+  return refreshed.idToken ?? (await SecureStore.getItemAsync(ID_TOKEN_KEY)) ?? null;
+}
+
+// A refresh that fails with one of these is a *definitive* auth error (the refresh
+// token is revoked/expired) → re-login. Anything else (e.g. a network blip) is treated
+// as transient so a reconnect doesn't wrongly log the user out.
+function isAuthError(e: unknown): boolean {
+  const code = (e as { code?: string }).code ?? (e instanceof Error ? e.message : String(e));
+  return /invalid_grant|invalid_token|unauthorized|invalid_client/i.test(String(code));
 }
 
 export function useSpacetimeAuth(): SpacetimeAuth {
@@ -94,18 +127,7 @@ export function useSpacetimeAuth(): SpacetimeAuth {
     let cancelled = false;
     void (async () => {
       try {
-        const refreshToken = await SecureStore.getItemAsync(REFRESH_KEY);
-        if (!refreshToken) {
-          if (!cancelled) setStatus('signedOut');
-          return;
-        }
-        const refreshed = await AuthSession.refreshAsync(
-          { clientId: SPACETIMEAUTH_CLIENT_ID, refreshToken },
-          discovery,
-        );
-        if (cancelled) return;
-        await persist({ idToken: refreshed.idToken, refreshToken: refreshed.refreshToken });
-        const fresh = refreshed.idToken ?? (await SecureStore.getItemAsync(ID_TOKEN_KEY)) ?? null;
+        const fresh = await refreshSession(discovery);
         if (cancelled) return;
         setIdToken(fresh);
         setStatus(fresh ? 'signedIn' : 'signedOut');
@@ -176,6 +198,33 @@ export function useSpacetimeAuth(): SpacetimeAuth {
     })();
   }, []);
 
+  // Re-mint a fresh id token on demand (the reconnect gate calls this after a drop).
+  // A definitive auth error clears the session → Login; a transient failure keeps the
+  // current token so the gate can keep retrying without logging the user out.
+  const refresh = useCallback(async (): Promise<RefreshResult> => {
+    if (!discovery) return { outcome: 'kept' };
+    try {
+      const fresh = await refreshSession(discovery);
+      if (!fresh) {
+        await clearTokens();
+        setIdToken(null);
+        setStatus('signedOut');
+        return { outcome: 'reauth' };
+      }
+      setIdToken(fresh);
+      setStatus('signedIn');
+      return { outcome: 'refreshed', token: fresh };
+    } catch (e) {
+      if (isAuthError(e)) {
+        await clearTokens();
+        setIdToken(null);
+        setStatus('signedOut');
+        return { outcome: 'reauth' };
+      }
+      return { outcome: 'kept' };
+    }
+  }, [discovery]);
+
   return {
     status,
     idToken,
@@ -184,5 +233,6 @@ export function useSpacetimeAuth(): SpacetimeAuth {
     error,
     login,
     logout,
+    refresh,
   };
 }

@@ -3,7 +3,7 @@
 // until M1.4; agent/persona/run features arrive in M1.
 import { createModelGateway, envResolver, type ModelGateway } from '@agentspace/gateway';
 import { DEFAULT_MODEL, type ModelRef } from '@agentspace/shared';
-import { connectOrchestrator } from './spacetime';
+import { runOrchestrator } from './supervise';
 import { startReplyLoop } from './replyLoop';
 import { createByokResolver, defaultKeyFile, loadOrCreateKeypair, pubKeyB64 } from './byok';
 
@@ -34,20 +34,27 @@ export function createOrchestrator(config?: Partial<OrchestratorConfig>): Orches
 }
 
 export async function main(): Promise<void> {
-  const { conn, identity } = await connectOrchestrator();
-  console.info(`[orchestrator] connected as ${identity.toHexString()}`);
   console.info(createOrchestrator().describe());
 
-  // BYOK (M1.7): publish our box public key so users can seal their provider keys to
-  // us; resolve each reply's key per (persona owner, provider) from `my_persona_keys`.
+  // BYOK (M1.7): one persistent box keypair for the lifetime of the service. We
+  // publish its public key so users can seal their provider keys to us, and rebind
+  // the resolver to each (re)connection's `my_persona_keys` view.
   const keypair = loadOrCreateKeypair(defaultKeyFile());
-  conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
-  const gateway = createModelGateway({
-    resolveCredential: createByokResolver({
-      keys: () => conn.db.my_persona_keys.iter(),
-      secretKey: keypair.secretKey,
-    }),
-  });
 
-  startReplyLoop(conn, identity, gateway);
+  // M2.5/BL-022: supervise the connection. A dropped socket reconnects with backoff
+  // and re-arms the reply loop on the FRESH connection (the gateway resolver + the
+  // loop's subscriptions close over `conn`, so they must be rebuilt each time) — the
+  // process never exits on a drop. Runs until the process is killed.
+  await runOrchestrator({
+    onReady: (conn, identity) => {
+      conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
+      const gateway = createModelGateway({
+        resolveCredential: createByokResolver({
+          keys: () => conn.db.my_persona_keys.iter(),
+          secretKey: keypair.secretKey,
+        }),
+      });
+      startReplyLoop(conn, identity, gateway);
+    },
+  });
 }
