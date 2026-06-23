@@ -40,6 +40,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages (Metro needs @agentspace/shared/dist for the JS bundle)
+        run: pnpm run build
+
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
