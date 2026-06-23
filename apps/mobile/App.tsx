@@ -1,15 +1,16 @@
 // AgentSpace mobile — realtime chat MVP on the AgentSpace SpacetimeDB module.
 // SpacetimeAuth (OIDC) login (M1.2): the id token from the login flow is passed to
 // the connection via .withToken(); the SpacetimeDBProvider only mounts once signed in.
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { SpacetimeDBProvider, useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
+import { useReducer, useSpacetimeDB, useTable } from 'spacetimedb/react';
 import { Identity } from 'spacetimedb';
 import { DbConnection, reducers, tables, type ErrorContext } from './module_bindings';
 import { SPACETIMEDB_DB_NAME, SPACETIMEDB_HOST } from './src/config';
-import { useSpacetimeAuth } from './src/auth';
+import { useSpacetimeAuth, type RefreshResult } from './src/auth';
+import { ConnectionGate } from './src/reconnect';
 import * as SecureStore from 'expo-secure-store';
 import { colors } from './src/chat';
 import { Login } from './src/screens/Login';
@@ -54,16 +55,6 @@ type Screen =
   | { name: 'agents' }
   | { name: 'agentEditor'; agentId: bigint | null }
   | { name: 'apiKeys' };
-
-// Persist the local-dev anonymous token so the identity (and its agents/threads)
-// survives a reload. Lives inside the provider so it can read the live token.
-function LocalDevTokenSync(): null {
-  const { token } = useSpacetimeDB();
-  useEffect(() => {
-    if (LOCAL_DEV && token) void SecureStore.setItemAsync(LOCAL_TOKEN_KEY, token);
-  }, [token]);
-  return null;
-}
 
 function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   const { isActive, identity } = useSpacetimeDB();
@@ -229,6 +220,19 @@ function Root({ onSignOut }: { onSignOut: () => void }): React.JSX.Element {
   }
 }
 
+// Full-screen status while we restore the session or wait on local-dev token load.
+function Splash({ label }: { label: string }): React.JSX.Element {
+  return (
+    <View style={styles.fill}>
+      <SafeAreaView style={styles.center}>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={styles.dim}>{label}</Text>
+      </SafeAreaView>
+      <StatusBar style="light" />
+    </View>
+  );
+}
+
 export default function App(): React.JSX.Element {
   const auth = useSpacetimeAuth();
   const [localToken, setLocalToken] = useState<string | undefined>(undefined);
@@ -241,48 +245,32 @@ export default function App(): React.JSX.Element {
     });
   }, []);
 
-  const connectionBuilder = useMemo(
-    () =>
-      LOCAL_DEV
-        ? localReady
-          ? buildConnection(localToken)
-          : null
-        : auth.idToken
-          ? buildConnection(auth.idToken)
-          : null,
-    [auth.idToken, localReady, localToken],
+  // Local dev has no OIDC refresh — a reconnect reuses the persisted anonymous token.
+  const localRefresh = useCallback(async (): Promise<RefreshResult> => {
+    const t = await SecureStore.getItemAsync(LOCAL_TOKEN_KEY);
+    return { outcome: 'kept', token: t ?? undefined };
+  }, []);
+
+  // The signed-in app, mounted under the ConnectionGate which owns reconnect (M2.5).
+  const app = (
+    <View style={styles.fill}>
+      <Root onSignOut={auth.logout} />
+      <StatusBar style="light" />
+    </View>
   );
 
   let content: React.JSX.Element;
   if (LOCAL_DEV) {
-    content = connectionBuilder ? (
-      <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
-        <LocalDevTokenSync />
-        <View style={styles.fill}>
-          <Root onSignOut={auth.logout} />
-          <StatusBar style="light" />
-        </View>
-      </SpacetimeDBProvider>
+    content = localReady ? (
+      <ConnectionGate makeBuilder={buildConnection} token={localToken} refresh={localRefresh}>
+        {app}
+      </ConnectionGate>
     ) : (
-      <View style={styles.fill}>
-        <SafeAreaView style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-          <Text style={styles.dim}>Connecting (local dev)…</Text>
-        </SafeAreaView>
-        <StatusBar style="light" />
-      </View>
+      <Splash label="Connecting (local dev)…" />
     );
   } else if (auth.status === 'loading') {
-    content = (
-      <View style={styles.fill}>
-        <SafeAreaView style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-          <Text style={styles.dim}>Restoring session…</Text>
-        </SafeAreaView>
-        <StatusBar style="light" />
-      </View>
-    );
-  } else if (auth.status === 'signedOut' || connectionBuilder === null) {
+    content = <Splash label="Restoring session…" />;
+  } else if (auth.status === 'signedOut' || !auth.idToken) {
     content = (
       <View style={styles.fill}>
         <Login onSignIn={auth.login} busy={auth.busy} error={auth.error} />
@@ -291,12 +279,9 @@ export default function App(): React.JSX.Element {
     );
   } else {
     content = (
-      <SpacetimeDBProvider connectionBuilder={connectionBuilder}>
-        <View style={styles.fill}>
-          <Root onSignOut={auth.logout} />
-          <StatusBar style="light" />
-        </View>
-      </SpacetimeDBProvider>
+      <ConnectionGate makeBuilder={buildConnection} token={auth.idToken} refresh={auth.refresh}>
+        {app}
+      </ConnectionGate>
     );
   }
 

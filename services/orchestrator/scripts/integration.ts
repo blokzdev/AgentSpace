@@ -11,6 +11,9 @@
 //   F) a DIRECT reducer assertion: a duplicate agent_reply_begin for an agent that
 //      already took its episode turn is REJECTED (no run/message) — the reducer-side
 //      guard, independent of orchestrator memory.
+//   G) the orchestrator self-heals a dropped socket (M2.5/BL-022): conn.disconnect() →
+//      the supervisor reconnects (stable identity) → a new message is answered over the
+//      fresh connection (the process never exits on a drop).
 // The scheduled reaper (120s TTL) is impractical to time headlessly — it's covered by
 // V-18 (on-device crash + self-heal). Needs a running local server with the
 // `agentspace` module published. Not in CI.  pnpm --filter @agentspace/orchestrator integration
@@ -20,6 +23,7 @@ import { Identity } from 'spacetimedb';
 import type { GatewayDelta, GatewayRequest, ModelGateway } from '@agentspace/gateway';
 import { DbConnection } from '@agentspace/stdb-bindings';
 import { connectOrchestrator } from '../src/spacetime';
+import { runOrchestrator } from '../src/supervise';
 import { startReplyLoop } from '../src/replyLoop';
 import { createByokResolver, loadOrCreateKeypair, pubKeyB64, seal } from '../src/byok';
 
@@ -70,11 +74,15 @@ async function until(label: string, pred: () => boolean, ms = 20_000): Promise<v
 interface MsgState { streamState: string; text: string; agentId: bigint; episodeId: bigint; sent: bigint }
 
 async function run(): Promise<void> {
-  const orch = await connectOrchestrator({
-    tokenFile: join(tmpdir(), `agentspace-orch-int-${Date.now()}.token`),
-  });
+  const tokenFile = join(tmpdir(), `agentspace-orch-int-${Date.now()}.token`);
   const keypair = loadOrCreateKeypair(join(tmpdir(), `agentspace-orch-int-${Date.now()}.boxkey`));
-  orch.conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
+
+  // The orchestrator runs under the reconnect SUPERVISOR (M2.5/BL-022) so Scenario G can
+  // drop its socket and prove it self-heals. `orch` holds the CURRENT connection
+  // (reassigned on every (re)connect; identity stays stable via the persisted token), and
+  // the gateway resolver + reply loop read it lazily so one gateway survives reconnects.
+  let orch!: { conn: DbConnection; identity: Identity };
+  let readyCount = 0;
 
   // Gateway: real BYOK resolve, then scripted per-agent chunks. The agent is identified
   // by the "You are \"X\"" roster line (group mode); a "long" prompt streams slowly so a
@@ -107,7 +115,21 @@ async function run(): Promise<void> {
     },
     embed: () => Promise.reject(new Error('not used')),
   };
-  startReplyLoop(orch.conn, orch.identity, gateway, { flushMs: 20 });
+  const firstReady = new Promise<void>((resolve) => {
+    void runOrchestrator({
+      connect: (onDisconnect) => connectOrchestrator({ tokenFile, onDisconnect }),
+      onReady: (conn, identity) => {
+        orch = { conn, identity };
+        readyCount += 1;
+        conn.reducers.registerService({ encPubKey: pubKeyB64(keypair) });
+        startReplyLoop(conn, identity, gateway, { flushMs: 20 });
+        resolve(); // first ready unblocks the script; later reconnects are no-ops here
+      },
+      backoff: { baseMs: 50, factor: 2, capMs: 200 }, // fast reconnect for the test
+      log: (m) => console.info(`[supervisor] ${m}`),
+    });
+  });
+  await firstReady;
   console.info(`orchestrator identity: ${orch.identity.toHexString()}`);
 
   const user = await connectUser();
@@ -268,7 +290,21 @@ async function run(): Promise<void> {
   }
   console.info('✅ F: reducer REFUSED a duplicate agent turn (no run/message) — the loop bound is enforced server-side');
 
-  console.info('\n✅ M2.1 multi-agent group threads end-to-end OK (tag-based replies, mention order, terminating volley, bounded @everyone, reducer-enforced budget).');
+  // ── Scenario G: orchestrator self-heals a dropped socket (M2.5/BL-022) ───────
+  // Drop the orchestrator's socket; the supervisor must reconnect (stable identity)
+  // and resume serving. Replayed old human messages are refused by the episode budget
+  // (closed/already-took-its-turn), so only the NEW message draws a reply — over the
+  // fresh connection. Proves the process never exits on a drop.
+  const readyBeforeG = readyCount;
+  orch.conn.disconnect();
+  await until('orchestrator reconnected after a drop', () => readyCount > readyBeforeG, 15_000);
+  const seenBeforeG = new Set(completedOrder.map((c) => c.runId));
+  user.conn.reducers.sendMessage({ threadId: dmId, text: 'still there?', mentions: [] });
+  await until('reply G over the fresh connection', () =>
+    completedOrder.some((c) => c.agentId === peteId && !seenBeforeG.has(c.runId) && msgs.get(c.runId)?.streamState === 'complete'));
+  console.info('✅ G: orchestrator reconnected after a dropped socket and resumed replying (no process exit)');
+
+  console.info('\n✅ M2.1 + M2.5 end-to-end OK (tag-based replies, mention order, terminating volley, bounded @everyone, reducer-enforced budget, reconnect self-heal).');
   process.exit(0);
 }
 

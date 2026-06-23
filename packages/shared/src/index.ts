@@ -242,3 +242,101 @@ export function evaluateBegin(args: {
   if (args.runningInThread >= maxConcurrent) return { ok: false, reason: 'concurrency_cap' };
   return { ok: true };
 }
+
+// ── Connection reconnect (BL-022 / M2.5) ─────────────────────────────────────
+// Shared by BOTH runtimes: the mobile ConnectionGate (apps/mobile/src/reconnect.ts)
+// and the orchestrator supervisor (services/orchestrator/src/supervise.ts). The
+// SpacetimeDB SDK has no built-in auto-reconnect (it caches a connection by
+// (uri, moduleName) and on disconnect only flips isActive=false), so each side must
+// rebuild a fresh connection after a drop, pacing retries with this backoff.
+
+/** Exponential-backoff reconnect defaults (ms). */
+export const RECONNECT = {
+  /** Ceiling for the first retry's jittered delay. */
+  baseMs: 1000,
+  /** Growth multiplier per attempt. */
+  factor: 2,
+  /** Hard upper bound on any single delay. */
+  capMs: 30_000,
+} as const;
+
+export interface BackoffOpts {
+  baseMs?: number;
+  factor?: number;
+  capMs?: number;
+  /** Injectable RNG in [0,1) for deterministic tests (defaults Math.random). */
+  rand?: () => number;
+}
+
+/**
+ * Full-jitter exponential backoff: returns a whole-millisecond delay uniformly in
+ * [0, ceiling], where ceiling = min(capMs, baseMs · factor^attempt). `attempt` is
+ * 0-based (0 = the first retry). Full jitter (vs none) de-synchronizes many clients
+ * reconnecting to one server after a shared outage. A large `attempt` is safe — the
+ * exponential overflows to Infinity and the cap clamps it, so the caller need not
+ * bound the attempt counter.
+ */
+export function nextBackoff(attempt: number, opts: BackoffOpts = {}): number {
+  const baseMs = opts.baseMs ?? RECONNECT.baseMs;
+  const factor = opts.factor ?? RECONNECT.factor;
+  const capMs = opts.capMs ?? RECONNECT.capMs;
+  const rand = opts.rand ?? Math.random;
+  const ceiling = Math.min(capMs, baseMs * Math.pow(factor, Math.max(0, attempt)));
+  return Math.floor(rand() * ceiling);
+}
+
+// A tiny phase machine the mobile ConnectionGate drives off the SDK's connection
+// state. Pure so CI can prove the transitions without a React/RN runtime; the gate
+// only owns the side effects (timers, token refresh, provider remount).
+export type ReconnectPhase = 'connecting' | 'up' | 'reconnecting' | 'authLost';
+
+export interface ReconnectState {
+  phase: ReconnectPhase;
+  /** 0-based retry counter; feeds nextBackoff. Reset to 0 on a successful connect. */
+  attempt: number;
+  /** Bumped to force the provider to remount with a fresh connection builder. */
+  nonce: number;
+}
+
+export type ReconnectEvent =
+  | 'connected' // provider reached isActive
+  | 'dropped' // active→inactive transition, or a connect error
+  | 'backoffElapsed' // the reconnecting timer fired + token refresh OK → remount
+  | 'refreshFailed' // token refresh failed → auth is invalid, fall back to Login
+  | 'appForegrounded'; // app returned to foreground → retry immediately
+
+export const INITIAL_RECONNECT: ReconnectState = { phase: 'connecting', attempt: 0, nonce: 0 };
+
+/**
+ * Drives the gate's phase. The component schedules a `nextBackoff(state.attempt)`
+ * timer whenever it enters `reconnecting`; when the timer fires it refreshes the id
+ * token and dispatches `backoffElapsed` (success) or `refreshFailed`. `attempt` grows
+ * across failed remounts (longer gaps) and resets to 0 once a connection sticks.
+ */
+export function reconnectReducer(state: ReconnectState, event: ReconnectEvent): ReconnectState {
+  switch (event) {
+    case 'connected':
+      return { ...state, phase: 'up', attempt: 0 };
+    case 'dropped':
+      // Begin a reconnect from a live/connecting state; ignore a duplicate drop while
+      // already reconnecting or after auth was lost.
+      return state.phase === 'up' || state.phase === 'connecting'
+        ? { ...state, phase: 'reconnecting' }
+        : state;
+    case 'backoffElapsed':
+      // Remount with a fresh builder; grow attempt so the next gap is longer if this
+      // remount also fails to stick.
+      return state.phase === 'reconnecting'
+        ? { phase: 'connecting', attempt: state.attempt + 1, nonce: state.nonce + 1 }
+        : state;
+    case 'refreshFailed':
+      return { ...state, phase: 'authLost' };
+    case 'appForegrounded':
+      // Network is likely back — retry now with a reset backoff.
+      return state.phase === 'reconnecting'
+        ? { phase: 'connecting', attempt: 0, nonce: state.nonce + 1 }
+        : state;
+    default:
+      return state;
+  }
+}

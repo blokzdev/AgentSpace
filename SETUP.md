@@ -213,6 +213,26 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
 
 ---
 
+### S-7 — Rotate the shared Anthropic API key  ·  added 2026-06-23 · M2.5  ·  [ ]
+> **Security hygiene (low urgency, but do it).** A real Anthropic key (`sk-ant-…`) was handed to
+> the AI in an earlier session and currently lives in the **gitignored** `services/orchestrator/.env`
+> (and the repo-root `.env` for the gateway smoke). It is **not** in any committed file — but because
+> it appeared in a chat/session transcript it should be treated as potentially exposed and **rotated**.
+> The founder authorized the AI to keep using the existing key in **local test loops** until then (it
+> never touches a committed file or a log).
+- **Why:** a key that has ever been pasted into a chat/transcript should be cycled, even though it was
+  never committed. Rotating invalidates the old value everywhere.
+- **Where:** **Anthropic Console** (web) — https://console.anthropic.com/settings/keys.
+- **Steps:**
+  1. Create a **new** API key; copy it.
+  2. **Revoke / delete** the old `sk-ant-…` key.
+  3. Update the local **untracked** `.env` files with the new value (never commit):
+     `ANTHROPIC_API_KEY=sk-ant-…` in `services/orchestrator/.env` and/or the repo-root `.env` (S-4).
+- **Give back to the AI:** nothing to paste — **keep the key secret**; just confirm it's rotated.
+  Until then the AI continues using the existing key for local test loops only.
+
+---
+
 ### S-4 — (Optional) provider API key for the gateway *smoke test*  ·  added 2026-06-13 · M1.4  ·  [ ] optional
 - **Scope note:** **per-user BYOK shipped (M1.7)** — for the app, you add your key
   **in-app** (🔑 Keys), *not* `.env`, and the orchestrator no longer reads `.env`. This

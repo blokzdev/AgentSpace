@@ -21,6 +21,11 @@ export interface ConnectOptions {
   db?: string;
   /** File the auth token is cached in, so the service keeps a stable Identity. */
   tokenFile?: string;
+  /** Called when a connection that initially succeeded later drops (M2.5/BL-022).
+   *  The supervisor (`supervise.ts`) uses this to reconnect with backoff instead of
+   *  letting the process exit. Not fired for an initial connect failure (that
+   *  rejects the returned promise via `onConnectError`). */
+  onDisconnect?: (err?: Error) => void;
 }
 
 function defaultTokenFile(db: string): string {
@@ -48,6 +53,9 @@ export function connectOrchestrator(opts: ConnectOptions = {}): Promise<Orchestr
       })
       .onConnectError((_ctx: ErrorContext, err: Error) => {
         reject(err);
+      })
+      .onDisconnect((_ctx: ErrorContext, err?: Error) => {
+        opts.onDisconnect?.(err);
       })
       .build();
   });

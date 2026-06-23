@@ -547,3 +547,57 @@ Notes: <founder fills: device + OS + result>
   keys-per-agent across **two owners** needs the founder's 2-provider on-device run; the single-owner path
   is verified.
 - **Notes (founder):** _agents + providers + owners + result →_
+
+---
+
+> **V-20 is reserved** for M2.4 (per-agent presence / avatars) — not yet built. V-21/V-22 below cover
+> the M2.5 auto-reconnect hardening (BL-022). *(No Maincloud republish needed for M2.5 — no schema change.)*
+
+### V-21 — App auto-reconnect after a dropped socket  ·  added 2026-06-23 · M2.5
+- **Why:** the exact on-device defect that opened **BL-022** — the app's Maincloud WebSocket dropped
+  mid-session and the app got **stuck on "Connecting to AgentSpace…"** forever (the SDK has no
+  auto-reconnect). M2.5 wraps the connection in a `ConnectionGate` that detects the drop, shows
+  **"Reconnecting…"**, refreshes the id token, and re-establishes the connection with backoff (and
+  reconnects promptly on foreground). The reducer/backoff logic is unit-tested; this confirms the real
+  RN render/lifecycle on-device. **No republish needed** (M2.5 changes no schema).
+- **Setup:** the app on the Pixel_8 dev build vs Maincloud (V-7 setup), signed in, in a thread.
+- **Steps:**
+  1. With the app open + connected, **drop the network** mid-session: toggle the emulator/device to
+     **airplane mode** (or disable Wi-Fi) for ~10–20s, then restore it. *(Or: background the app for a
+     minute or two, then return to the foreground.)*
+  2. Watch the app while the network is down and after it returns.
+- **Pass when:** while the socket is down the app shows **"Reconnecting…"** (not a permanent
+  "Connecting…"), and once the network returns it **re-connects on its own** — the thread list/messages
+  come back live **without** killing + relaunching the app. Foreground-resume after a long background also
+  reconnects. *(After a reconnect the app lands on the inbox — expected for MVP.)*
+- **If it fails (stuck on "Connecting…"/"Reconnecting…" after the network is back):** capture a screen
+  recording + the JS logs (`adb logcat`), note how long you waited. If it bounced to **Login**, your
+  SpacetimeAuth session likely expired (re-login is correct then) — tell me which.
+- **Notes (founder):** _device + how the drop was induced + result →_
+
+---
+
+### V-22 — Orchestrator self-heals a dropped socket (no process exit)  ·  added 2026-06-23 · M2.5
+- **Why:** the other half of **BL-022** — on-device the orchestrator's Maincloud socket dropped and the
+  **process exited**, silently stopping all agent replies. M2.5 runs it under a `runOrchestrator`
+  supervisor that reconnects with backoff and re-arms the reply loop on a fresh connection (stable
+  identity), **never exiting** on a drop. Proven headlessly by **integration Scenario G** + supervisor unit
+  tests; this confirms it against real Maincloud. **No republish needed.**
+- **Setup:** the orchestrator running vs Maincloud (S-5), serving a persona DM (V-8); send a message and
+  confirm a normal reply first.
+- **Steps:**
+  1. With the orchestrator running, **briefly cut its network** (disable the host's Wi-Fi/ethernet for
+     ~15–30s, or block it) so its Maincloud socket drops — then restore the network. **Do not** restart
+     the process.
+  2. After the network is back, send a **new** message to the persona in the app.
+- **Pass when:** the orchestrator **logs a disconnect then a reconnect** (`reconnecting in …ms` →
+  `connected as …` → `reply loop subscribed`) and the **process keeps running** (it does **not** exit),
+  and the new message gets a normal streamed reply. Its identity hex is **unchanged** across the reconnect.
+- **If it fails (the process exits on the drop, or never resumes replying):** capture the orchestrator
+  logs around the disconnect. Tell me whether it exited or just stopped replying.
+- **🤖 AI headless evidence (2026-06-23):** integration **Scenario G** (`scripts/integration.ts`) drops the
+  orchestrator's socket via `conn.disconnect()`; the supervisor reconnects (stable identity) and a new
+  message is answered over the fresh connection. 3 `supervise.test.ts` unit tests prove reconnect-after-drop,
+  backoff growth + reset, and never-exit (injected connector + fake sleep). The founder's tick adds the real
+  Maincloud network-drop run.
+- **Notes (founder):** _how the drop was induced + result →_
