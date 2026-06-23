@@ -113,7 +113,9 @@
 
 ### BL-016 — Deep chat-polish pass
 - **Source:** DEC-023 (M1.3 shipped a focused UI/UX pass; deeper polish deferred).
-- **Trigger:** post on-device review (V-9), pre-launch UX bar (M6).
+- **Trigger:** post on-device review (V-9), pre-launch UX bar (M6). *(Scope line — DEC-037: the **M2.9**
+  auth/**login** UX is pulled forward as a foundation beat; this BL-016 **broad** app/chat polish stays at
+  **M6** — don't over-polish before the product is validated.)*
 - **Promotion:** message grouping + day separators, unread badges/read state, typing
   indicators beyond the streaming cursor, animations/skeletons/haptics, light theme,
   swipe actions, image/attachment rendering.

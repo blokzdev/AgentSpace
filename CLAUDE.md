@@ -249,7 +249,7 @@ AgentSpace/
 ├── LICENSE · NOTICE                                   # Apache-2.0 — repo stays public (DEC-033); BL-023 revisits at launch
 ├── package.json · pnpm-workspace.yaml · turbo.json   # monorepo root tooling
 │   · tsconfig.base.json · eslint.config.mjs · .nvmrc · .npmrc
-├── .github/workflows/ci.yml   # CI: lint · typecheck · build · test
+├── .github/workflows/{ci,build-apk}.yml   # CI (lint·typecheck·build·test) + manual debug-signed release APK
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
 │   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5; presence/typing M2.2
@@ -263,7 +263,7 @@ AgentSpace/
 │   └── stdb-bindings/         # generated SDK bindings, consumed as source (BL-009)
 ├── services/
 │   └── orchestrator/          # Agent Orchestrator — gateway→STDB reply loop (M1.6) + BYOK (M1.7) + reconnect supervisor (M2.5)
-│       · src/{index,main,replyLoop,prompt,byok,spacetime,supervise}.ts · scripts/integration.ts
+│       · src/{index,main,replyLoop,prompt,byok,spacetime,supervise}.ts · scripts/{integration,verify-views,verify-reaper,verify-realmodel}.ts
 ├── modules/
 │   └── spacetime/             # AgentSpace SpacetimeDB module (M0.3; +run/streaming M1.6; +agents M1.5; +multi-agent/episode budget M2.1)
 │       · src/index.ts · bindings/ (generated, committed)
