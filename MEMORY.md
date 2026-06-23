@@ -71,7 +71,8 @@ Dials at DEC-031 defaults (tune after V-16). **Next:** PR → merge → founder 
 the Maincloud `--delete-data` republish, new SETUP S-6) → **M2.2** (presence/typing) → M2.3 (context
 isolation + NL address) → M2.4 (per-agent identity, BL-014).
 
-- **Active branch:** `m2.1-multi-agent` (M2.1 built locally; PR to follow). M1.9 = PR #33 (merged 2026-06-23).
+- **Active branch:** `chore/apache-2.0-license` (license/visibility doc commit — DEC-033). M2.1 shipped (#36);
+  on-device harness + local-dev (#38). Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -572,6 +573,26 @@ Maincloud `--delete-data` republish — new SETUP S-item). Deferrals: per-(agent
 reserved-but-unenforced; other users' agent names fall back to a generic label in the mobile UI
 (BL); reaper timed test = V-18; per-agent identity = M2.4.
 
+### DEC-033 — Repo stays public under Apache-2.0; monetization ≠ private; license is the lever
+*2026-06-23.* Founder asked whether to take the repo **private** (free-plan CI-minutes worry) and, on
+clarification, whether a **public** repo can be monetized and where "going private" should be tracked.
+**Findings:** (1) the repo is **public**, so **GitHub Actions is free/unlimited** — the 2,000-min/mo cap is
+private-only; **no cost reason** to go private. (2) On the **Free** plan, **private repos lose branch
+protection / required status checks / rulesets** (a **Pro $4/mo** feature), so going private would
+**silently drop the CLAUDE §6 merge gate**. (3) **Public ≠ unmonetizable:** hosted SaaS / open-core /
+dual-licensing all monetize public code; AgentSpace's moat is the **running service + ops + brand**, not the
+source. (4) **The protective lever is the LICENSE (chosen now), not the visibility toggle (later):** going
+private can't recall already-public commits nor revoke a license already granted on them. **Decision
+(founder-ratified):** **stay public** and **add Apache-2.0** — root `LICENSE` + `NOTICE`, `"license":
+"Apache-2.0"` in every workspace `package.json`, a README badge + **## License** section. **Apache over MIT**
+for the **patent grant + defensive termination**; **over AGPL/BSL** because the **mobile app ships to app
+stores** and copyleft conflicts with App-Store terms (the VLC problem), current clone risk is ~0, and as
+**sole copyright holder** we can tighten the **server** packages later (AGPL-3.0/BSL — dependency-graph-
+correct: keep anything the app imports, e.g. `packages/shared`, permissive) or sell a commercial dual-
+license. Copyright holder: **blokzdev**. **"Going private" is NOT a committed action** — the revisit lives in
+**BL-023** (trigger: pre-GA / first paying users / clone signal → a launch-gate decision). The
+`examples/chat-react-ts` reference keeps its upstream template license. License/doc-only — no code change.
+
 ---
 
 ## Session Journal (append-only)
@@ -1028,6 +1049,21 @@ reserved-but-unenforced; other users' agent names fall back to a generic label i
   [[android-emulator-automation-gotchas]] updated.
 - **Next:** BL-022 (auto-reconnect) is the real reliability fix — promote to an M2.x on-device-hardening phase;
   then the live multi-bubble render + the founder's remaining on-device V-ticks are trivial. Then M2.2.
+
+### 2026-06-23 — License & visibility posture: stay public + Apache-2.0 (DEC-033)
+- Founder weighed going **private** to save CI minutes. Clarified: the repo is **public**, so Actions is
+  **free/unlimited** (the 2,000-min/mo cap is private-only), and on Free a **private** repo would **lose
+  branch protection** (Pro $4/mo) — silently dropping the §6 merge gate. **No cost reason to go private.**
+- Founder then asked whether a **public** repo can be monetized + where to track "going private." Answer:
+  monetization is fully compatible with public (hosted SaaS / open-core / dual-license; the moat is the
+  running service, not the source), and the protective lever is the **license now**, not the visibility
+  toggle later (going private can't recall already-public commits). **Ratified: stay public + Apache-2.0.**
+- Shipped (this commit, branch `chore/apache-2.0-license`): root **`LICENSE`** (Apache-2.0) + **`NOTICE`**
+  (© 2026 blokzdev); `"license": "Apache-2.0"` in all 7 workspace `package.json`s; a README license badge +
+  **## License** section; **DEC-033**; **BL-023** (revisit license/visibility at a launch gate); a CLAUDE §9
+  tree entry. `examples/chat-react-ts` left under its upstream template license. `pnpm run ci` green; PR → merge.
+- **Next (founder's call):** **BL-022** (auto-reconnect on-device hardening) · **M2.2** (presence/typing) ·
+  or the remaining on-device **V-15…V-19** ticks. (Founder still to **rotate** the shared Anthropic key.)
 
 ---
 

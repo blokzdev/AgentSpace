@@ -183,6 +183,20 @@
   socket instead of exiting (intersects OT-007 real service-account auth + DEC-027 always-on hosting).
   Promotable to an **M2.x on-device-hardening phase**.
 
+### BL-023 — Revisit license / repo-visibility / commercial posture (pre-launch)
+- **Source:** DEC-033 (founder Q on monetization + "going private"; repo stays public under Apache-2.0 now).
+- **Decision today:** repo stays **public** under **Apache-2.0**. Monetization is fully compatible with
+  public (hosted SaaS / open-core / dual-licensing) — the moat is the running service + ops + brand, not
+  the source. The protective lever is the **license** (chosen now), **not** the visibility toggle: going
+  private later can't recall already-public commits or revoke a license already granted on them, so it is
+  **not** the default action.
+- **Trigger:** pre-GA, **or** first paying users, **or** first credible competitor-clone signal.
+- **Promotion:** a **launch-gate decision** (an acceptance item under a future GA/launch milestone) — re-decide
+  whether to tighten the **server** packages to **AGPL-3.0 / BSL 1.1** (dependency-graph-correct: keep
+  anything the mobile app imports, e.g. `packages/shared`, permissive to avoid the App-Store ↔ copyleft
+  conflict) and/or sell a commercial dual-license. As sole copyright holder this stays open without going
+  private.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)
