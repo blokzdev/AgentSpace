@@ -11,7 +11,8 @@
     "start": "tsx src/main.ts",
     "integration": "tsx scripts/integration.ts",
     "verify:realmodel": "tsx scripts/verify-realmodel.ts",
-    "verify:reaper": "tsx scripts/verify-reaper.ts"
+    "verify:reaper": "tsx scripts/verify-reaper.ts",
+    "verify:views": "tsx scripts/verify-views.ts"
   },
   "dependencies": {
     "@agentspace/gateway": "workspace:*",
