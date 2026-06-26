@@ -221,6 +221,24 @@
   presence** rides on per-agent identities (**M2.4 / BL-014**). Keep the M2.2 client derivation as the
   agent-thinking path; presence rows augment it.
 
+### BL-025 — Self-host the SpacetimeDB SERVER for data residency / sovereignty (one shared instance)
+- **Source:** DEC-040 (the *legitimate* slice of the founder's local-first question — distinct from
+  local-first, which DEC-040 rejected for the shared-thread data plane).
+- **What:** offer running the **SpacetimeDB server itself** (the single authoritative instance — a single
+  Rust binary, BSL 1.1, `spacetime start` on a VPS or the user's always-on PC / home server) so a
+  power-user/enterprise keeps **all chat data on their own hardware**. The app + orchestrator point at that
+  instance instead of Maincloud. Still **ONE shared authoritative DB** (keeps multiplayer) — **NOT** one DB
+  per device, **NOT** local-first.
+- **Trigger:** data-residency / "nothing leaves my hardware" demand from a power-user or enterprise tier;
+  pairs with **BL-018** (desktop self-host orchestrator) for a full self-host appliance.
+- **Promotion:** an **OT-005** host-axis task — you own TLS / access control / OIDC issuer trust (a self-host
+  accepts any OIDC issuer and mints localhost-issuer tokens, so SpacetimeAuth issuer trust must be
+  configured); single-node only (HA replication is a paid Enterprise cluster feature). Ship a one-command
+  self-host bundle (server + module publish + the app/orchestrator pointed at it).
+- **Related (DEC-040):** the **hybrid local-cache** "feels local" add (optimistic writes / offline reads) is a
+  separate ~1-day spike **gated on offline becoming a ranked need**; **agent-tool sandboxing** (E2B / micro-VM,
+  **not** boxer.dev) is a separate **M3.3** concern.
+
 ---
 
 ## Launch Gates (walked at M6 before tagging v1)

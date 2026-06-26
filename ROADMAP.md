@@ -435,6 +435,11 @@ and per-user usage is metered with quotas.
 - **Orchestrator hosting** — v1 is a single **central always-on** service (DEC-027); the three
   alternative modes (**phone on-device** BL-017 · **desktop self-host** BL-018 · **serverless**
   BL-019) are post-v1. The *specific* v1 host is OT-005.
+- **Local-first / per-device DB** — **rejected as the v1 shared-thread data plane (DEC-040):** SpacetimeDB is
+  a client-server authoritative DB (not a sync engine), and a per-device DB is unreachable by the always-on
+  orchestrator under Android Doze — so it breaks shared multiplayer threads, BYOK sealing, Views, and the
+  reaper. The legit slice (**self-host the SpacetimeDB *server*** — one shared instance — for data residency)
+  is **BL-025**. Re-open only if offline/sovereignty out-ranks realtime multiplayer in the North Star.
 - **iOS** — RN keeps the door open; not a v1 target.
 - **Agent marketplace / sharing** — post-v1.
 - **Voice / video calls** — out of scope for v1.

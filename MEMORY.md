@@ -748,6 +748,42 @@ DEC-037.
 
 ---
 
+### DEC-040 — Local-first / self-hosted SpacetimeDB: keep central authority; reject local-first as the v1 shared-thread data plane
+*2026-06-24.* Founder asked whether AgentSpace should go **local-first** (bundle SpacetimeDB in the app /
+download it at onboarding / run a per-user "sandbox") and whether a **boxer.dev WASM container** applies.
+Researched via a 6-agent workflow (web + repo-grounded, adversarially critiqued). **Decision
+(founder-ratified):** keep the **central hosted SpacetimeDB + single always-on orchestrator**; **reject
+local-first as the v1 SHARED-THREAD DATA PLANE** — not as an idea forever. **The distinction that matters:**
+*local-first* (per-device authoritative DB synced via CRDTs, offline) ≠ *self-hosted* (you run the **same**
+authoritative SpacetimeDB **server** on your own box) ≠ *per-user sandbox DB* (many isolated owner-scoped DBs
+on one host — a tenancy choice). **Why local-first is rejected for shared threads (lead with the CONFIRMED
+reasons — NOT embeddability, which research could not confirm either way):** (1) SpacetimeDB is a
+**single-authoritative client-server DB, not a sync engine** — its docs state the only way to change data is a
+server-validated reducer request and the client cache is a **read-only mirror**; there are **no offline writes
+and no device↔cloud replication** (the Pro "replication" is consensus HA inside one cluster, not multi-master
+/ local sync). (2) AgentSpace's spine is a **central always-on orchestrator** that must reach the DB to stream
+LLM replies and run the **scheduled reaper** — a per-device DB behind mobile NAT + **Android Doze** is
+structurally unreachable (our own **BL-017** "foreground-only" caveat, harder). So per-device DBs break shared
+multiplayer threads, BYOK sealing (DEC-025), per-user Views, and the reaper at once. (CRDT engines like
+Jazz/Zero *can* do scoped authz — it's a **poor fit** for our reducer-enforced episode budgets + service-sealed
+BYOK, not a categorical impossibility.) **Different AXIS, kept open:** everything prior (DEC-027, BL-017/018/019,
+OT-005) relocates the **orchestrator** while keeping ONE central DB; relocating the **DATABASE** is genuinely
+new. The **legitimate slice** = **self-host the SpacetimeDB SERVER** (ONE shared instance; single Rust binary,
+BSL 1.1) for **data residency/sovereignty** → new **BL-025** under OT-005 (a power-user/enterprise option, NOT
+one-DB-per-device). **Cheap path to ~90% of the motive without re-platforming:** SpacetimeDB already IS
+server-authority + client-cache (the Zero/Replicache/ElectricSQL camp), so "feels local" (optimistic local
+writes / offline reads) is an **incremental add → a ~1-day spike gated on offline/privacy becoming a RANKED
+need**; prompt-privacy is the separate, already-deferred **on-device inference** axis (openai-compatible/Ollama,
+BL-017/BL-018). **boxer.dev:** real but **irrelevant** here — a Dockerfile→single-WASM "Box" packager (immature;
+no networking / long-running-process story); it can't embed a DB on a phone, can't host the long-socket
+orchestrator, and the realtime core is **already WASM inside the SpacetimeDB host** (a second container is
+redundant). The ONE place sandboxing matters is the **future M3.3 agent-tool layer** (untrusted code / MCP
+tools) → reach for **E2B / Firecracker microVM** or **V8 isolates (Cloudflare)**, **not Boxer**; revisit at
+M3.3. **Re-open condition (named):** if **offline / solo / data-sovereignty is ever re-ranked ABOVE realtime
+multiplayer in the North Star**, the calculus flips and local-first/hybrid is worth re-opening. Doc-only.
+
+---
+
 ## Session Journal (append-only)
 
 ### 2026-06-13 — Project bootstrap
@@ -1318,6 +1354,23 @@ DEC-037.
 - **Next:** founder does **S-9** (Google OAuth client) → next chunk wires **native Google sign-in + the
   module `aud`/`iss` guard** (M2.9.2). Founder on-device: **V-24** (now ready), **V-25** (new), + the M2.1
   batch. Still owed: **S-7** (rotate Anthropic key).
+
+### 2026-06-24 — Local-first architecture decision (DEC-040) + session-close sweep
+- **Architecture Q (founder):** should AgentSpace go local-first / self-hosted SpacetimeDB, and does
+  **boxer.dev** apply? Researched via a 6-agent workflow (web + repo, adversarial critique). **Founder
+  ratified DEC-040:** keep central hosted SpacetimeDB; **reject local-first as the v1 shared-thread data
+  plane** (not a sync engine; the orchestrator can't reach a Doze'd phone; the reaper can't run on a sleeping
+  phone). The legit slice = **self-host the SERVER** for residency → **BL-025**; boxer.dev irrelevant (the only
+  real sandbox need is M3.3 agent tools → E2B/microVM). Re-open condition named (offline/sovereignty
+  out-ranking multiplayer). Recorded DEC-040 + BL-025 + a ROADMAP §5 strategic-skip.
+- **Session-close sweep (3-agent adversarial):** doc↔code + internal consistency came back **CLEAN** —
+  S-8 done / S-9 open / V-24 ready / V-25 / LG-10 / OT-008 resolved / DEC-039 all consistent; the merged code
+  matches every doc claim; no premature local-first DEC. One `[nice]` drift fixed: CLAUDE §9's orchestrator
+  script list now includes `verify-cards` + `_harness`.
+- **State at handoff:** `main` clean, #50 merged, **no live processes** (founder restarted — emulator + local
+  STDB server down). **Next build = M2.9.2** (native Google sign-in + the module `aud` guard), **gated on
+  founder S-9** (Google OAuth client). Also open: the on-device V-batch (V-24/V-25 + M2.1) and S-7 (key
+  rotation).
 
 ---
 
