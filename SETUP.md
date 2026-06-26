@@ -203,9 +203,11 @@ Give back to the AI: <the exact value/secret/confirmation the AI needs>
   3. **Regenerate + sync the bindings to all 3 surfaces** (the new tables/cols change the
      generated client SDK). From the repo root:
      `pnpm --filter @agentspace/spacetime-module spacetime:generate`, then make sure the
-     regenerated bindings are synced to the **3 consumers** —
-     `apps/mobile/module_bindings`, `packages/stdb-bindings`, and the orchestrator's
-     copy — and rebuild (`pnpm run build`). *(The AI can run the regenerate + sync during a
+     regenerated bindings are synced to the **3 real surfaces** —
+     `modules/spacetime/bindings` (the canonical generated source), `packages/stdb-bindings/src`
+     (the workspace package the orchestrator imports via `@agentspace/stdb-bindings` — it keeps
+     no local copy), and `apps/mobile/module_bindings` (the vendored copy) — and rebuild
+     (`pnpm run build`). *(The AI can run the regenerate + sync during a
      local session and commit it; you only need to do the Maincloud re-publish above.)*
   4. Confirm it's live: `spacetime logs agentspace-hpm58 --server maincloud`, or the
      Maincloud console shows the new tables (`thread_agent`, `episode`, `agent_turn`, …).

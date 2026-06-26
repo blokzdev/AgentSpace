@@ -27,7 +27,9 @@ Dependency rule: lower layers never import higher ones (`BLUEPRINT.md` §2).
 **Status:** `M1` shipped (build your own agents + chat with them on-device, with your own
 provider key) · `M1.9` reliable delta-streaming · `M2.1` multi-agent group threads (the MVP:
 `@mention` addressing + a reducer-enforced episode/turn/cost budget) · `M2.5` on-device
-connection resilience (auto-reconnect). Next: `M2.2` agent presence/typing. See
+connection resilience (auto-reconnect) · `M2.2` agent presence/typing · `M2.3` NL "Hey {name},"
+addressing · `M2.4` (lean) public agent cards · `M2.9` down-payment (branded login + guest path).
+Next: `M2.9.2` native Google sign-in + module aud guard (gated on `SETUP.md` S-9). See
 `ROADMAP.md` / `MEMORY.md`.
 
 ## Develop

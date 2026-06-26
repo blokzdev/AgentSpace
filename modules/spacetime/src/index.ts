@@ -585,8 +585,8 @@ export const send_message = spacetimedb.reducer(
 // the `message` row (`complete`/`failed`) and GCs the run's deltas. `cancel` finalizes
 // a superseded reply (message `failed` w/ partial text, run `cancelled`). Correlation
 // is the client-owned `runId`, so no row id is round-tripped. Each reducer re-checks
-// `ctx.sender` owns the work. (`agent_reply_append` — the old cumulative-text UPDATE —
-// is retained dormant for back-compat and deleted next milestone; OT-004/DEC-030.)
+// `ctx.sender` owns the work. (The old `agent_reply_append` cumulative-text UPDATE path
+// was removed in M2.1; replies now stream via append-only `reply_delta` INSERTs — OT-004/DEC-030.)
 
 export const agent_reply_begin = spacetimedb.reducer(
   { threadId: t.u64(), runId: t.string(), model: t.string(), agentId: t.u64(), episodeId: t.u64() },

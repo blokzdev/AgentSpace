@@ -13,7 +13,7 @@ done when its acceptance bar — something a reviewer can hold us to — is met.
 
 ## Current state
 
-*2026-06-23.* **M0 closed; M1 ✓ SHIPPED; M1.9 ✓ done; M2.1 ✓ built & CI-green** — the
+*2026-06-26.* **M0 closed; M1 ✓ SHIPPED; M1.9 ✓ done; M2.1 ✓ built & CI-green** — the
 **build-an-agent → converse-with-your-own-key** loop is **verified on-device** vs Maincloud
 (V-5/V-7/V-8; DEC-029, PRs #29–#31); M1.9 delta-streaming + run lifecycle landed (on-device
 V-13/V-14). **Just shipped = `M2.1` multi-agent group threads (MVP; DEC-031 "Candidate C")** —
@@ -29,8 +29,9 @@ now unblocked), **V-21/V-22** (M2.5 reconnect), **V-23** (M2.2 presence). **M2.3
 "Hey {name}," soft-address + the per-agent isolation guarantee (pure orchestrator, no schema change). **V-2 /
 V-6 / V-22 AI-completed** (local-stack Views isolation + live gateway round-trip + orchestrator self-heal); a
 manual **`build-apk`** workflow now ships a debug-signed **release** APK (running on-device on a Galaxy S20).
-**M2.4 lean shipped** (public agent cards → cross-owner names/avatars, BL-021; DEC-038). **Next: M2.9**
-(production auth + login UX — native Google sign-in; DEC-037) → **M3** (RAG) → **BL-016** (chat polish, at
+**M2.4 lean shipped** (public agent cards → cross-owner names/avatars, BL-021; DEC-038). **M2.9 down-payment
+shipped** (#50 — branded login + guest path; DEC-039). **Next: M2.9.2** (native Google sign-in + the module
+`aud`/`iss` guard; gated on **S-9**) → **M3** (RAG) → **BL-016** (chat polish, at
 M6) / **BL-011** (durable key backing); **M2.4-full** (per-agent identity + presence dots) committed for
 after M2.9. **M2.9 STARTED (down-payment, 2026-06-23):** the founder-independent slice landed — our own
 branded **login/onboarding UX** + a working **"Continue as guest"** anonymous path on Maincloud + Google
@@ -38,7 +39,9 @@ config scaffolding (inert button) — and **S-9** (the Google OAuth client) is a
 + the module `aud` guard are the next chunk (gated on the founder's Web client ID). **OT-008 closed**
 (verify-reaper hardened). **S-8 done + Maincloud current → V-24 unblocked.** Optional: **V-9/V-10/V-11**.
 Autonomous build loop (CLAUDE.md §4); founder setup S-1/S-2/S-3/S-6/**S-8** done; S-4 optional, **S-7** (key
-rotation) open; **S-9** (Google OAuth client) is the open M2.9 unblock.
+rotation) open; **S-9** (Google OAuth client) is the open M2.9 unblock. **Local-first per-device DB evaluated
+and recorded as a strategic skip** (DEC-040 / BL-025 / §5 — central hosted SpacetimeDB kept; self-hosting the
+shared server is the legitimate slice).
 
 ---
 
