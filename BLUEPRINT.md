@@ -26,7 +26,7 @@ Four cooperating parts plus shared data stores:
                                   │  OIDC auth (ctx.sender = Identity)             │
                                   └──────────────────────────────────────────────┘
                                      ▲ subscribe(work)         │ reducers(write)
-                                     │  (OIDC service identity) ▼
+                                     │  (anon token DEC-017; OIDC svc id → OT-007) ▼
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │  services/orchestrator  (Node/TS; trusted STDB client)                            │
 │   detect agent-addressed messages & triggers → assemble context → run → stream    │
@@ -175,10 +175,11 @@ a View. *(RLS exists but is experimental — prefer Views.)*
 
 A self-hosted Node/TS service (`services/orchestrator`). Responsibilities:
 
-1. **Connect** to SpacetimeDB as a trusted client using an **OIDC client-
-   credentials service identity** (stable `Identity`; DEC-008). Subscribe to the
-   "agent work" surface (new messages in threads an agent belongs to; due
-   `workflow_schedules`).
+1. **Connect** to SpacetimeDB as a trusted client. **Today (DEC-017):** a
+   self-issued **anonymous token cached to a local file** (stable `Identity`); the
+   **OIDC client-credentials service identity** is the **target state — OT-007**
+   (see §8.1). Subscribe to the "agent work" surface (new messages in threads an
+   agent belongs to; due `workflow_schedules`).
 2. **Dispatch**: when an agent is addressed (§SPEC addressing) or a workflow
    fires, create/claim a `run` (idempotent — scheduled reducers are at-least-once;
    guard with a unique key).
@@ -186,12 +187,17 @@ A self-hosted Node/TS service (`services/orchestrator`). Responsibilities:
    model, params) + RAG retrieval (pgvector) + tool specs (MCP + functions).
 4. **Run** the loop via `packages/gateway`, resolving the **BYOK** key from the
    encrypted store (decrypt in-memory only).
-5. **Stream** the reply back into `messages` via **batched row UPDATEs** (~50ms
-   windows; DEC-008/OT-004), flipping `stream_state` to `complete` at the end;
-   finalize the `run` (tokens, cost, status).
+5. **Stream** the reply into a private **`reply_delta`** table via **append-only,
+   constant-size INSERTs** (one per ~100ms coalescing window; M1.9/DEC-030/OT-004 —
+   this replaced the old O(n²) cumulative-text UPDATE that tail-dropped over
+   Maincloud); the `message` row stays `streaming` with empty text until
+   `agent_reply_finish` writes the authoritative final text once (`complete`) and
+   GCs the deltas (see §5); finalize the `run` (tokens, cost, status).
 
-The orchestrator is **stateless per request** (state lives in STDB + Postgres),
-so it can scale horizontally; run-claiming prevents double-processing.
+**Future (post-v1):** make the orchestrator **stateless per request** (state in STDB
++ Postgres) so it can scale horizontally with run-claiming to prevent double-processing.
+**v1 is a single stateful always-on process** (open WS, in-memory NaCl keypair, in-flight
+loop guard, coalescing batchers, file-persisted token) — see §4.1 / DEC-027.
 
 ### packages/gateway (Model Gateway)
 

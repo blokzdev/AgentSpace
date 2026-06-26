@@ -253,7 +253,7 @@ AgentSpace/
 ├── .audit/                    # committed spike / drift-sweep artifacts
 ├── apps/
 │   └── mobile/                # Expo (RN) chat app — M1.1; login M1.2; Agent Studio M1.5; contacts M1.3; BYOK M1.7; multi-agent @mentions M2.1; auto-reconnect M2.5; presence/typing M2.2; branded login + guest path M2.9
-│       · App.tsx · src/auth.ts · src/byok.ts · src/reconnect.tsx · src/components/{Avatar,TypingDots}.tsx
+│       · App.tsx · src/auth.ts · src/byok.ts · src/chat.ts · src/config.ts · src/reconnect.tsx · src/components/{Avatar,TypingDots}.tsx
 │       · src/screens/{Login,ThreadList,Thread,ThreadMembers,UserPicker,AgentList,AgentEditor,AgentPicker,ApiKeys}.tsx
 │       · module_bindings/     # generated from modules/spacetime
 ├── packages/
@@ -317,13 +317,13 @@ provider resolves to `''`); `ProviderFactory` is now `(credential, model, opts?:
 **M1.8.3:** multi-credential **Bedrock/Azure/Vertex** are **live** — the `ProviderFactory`
 parses a **sealed-JSON** credential (the provider's catalog `fields`) into the SDK settings;
 `ApiKeys` renders a multi-field form; **no `provider_key` schema change**. So the gateway now
-spans **16 providers**, all from one `PROVIDER_CATALOG`; getting each key is documented in
+spans **17 providers** (13 single-API-key cloud + 1 local/openai-compatible + 3 multi-credential), all from one `PROVIDER_CATALOG`; getting each key is documented in
 **`PROVIDERS.md`**. Cloud providers are free-form strings (**no STDB change**); the local
 `baseUrl` was the one additive column. **BYOK:** `src/credentials.ts`
 seals provider keys with **AES-256-GCM** under an env KEK (`AGENTSPACE_GATEWAY_KEK`)
 and resolves a request's `credentialRef` via an injected `CredentialResolver`
 (in-memory store v1; Postgres/KMS deferred — OT-005). `embed` is deferred to M3.1.
-16 gateway tests cover the BYOK crypto + stream normalization (AI SDK
+22 gateway tests cover the BYOK crypto + stream normalization + per-provider/catalog coverage (AI SDK
 `MockLanguageModelV3`); a real provider round-trip is the founder smoke (`V-6`, key
 via `SETUP.md` S-4). **M1.6 (+ M1.9 delta-streaming, DEC-030):** the orchestrator
 **streams real agent replies into STDB**. `modules/spacetime` has a private **`run`**
@@ -333,8 +333,8 @@ only INSERT into a private **`reply_delta`** table) / `agent_reply_finish` (writ
 authoritative final text onto the message → `complete`/`failed` + **GC the run's deltas**) /
 **`agent_reply_cancel`** (superseded → message `failed` + run `cancelled` + GC), all keyed by
 a client-owned `runId` and re-checking the sender is the `agent` member. (`agent_reply_append`
-— the **dormant** old cumulative-UPDATE path — is kept for back-compat, deleted next
-milestone.) The orchestrator's `replyLoop.ts` reacts to a human's `complete` message in a
+— the dormant old cumulative-UPDATE path — was kept for back-compat through M1.x and
+**removed in M2.1**.) The orchestrator's `replyLoop.ts` reacts to a human's `complete` message in a
 thread it's an `agent` member of, builds the prompt (`prompt.ts`: `buildPrompt`/`newRunId`/a
 ~100ms coalescing+bounded `createBatcher`), calls `gateway.stream` (with an `AbortSignal`),
 and flushes coalesced **`agent_reply_delta`** INSERTs (one `seq` per flush), then
@@ -367,7 +367,7 @@ the persona's system prompt + model). On-device persona authoring/reply is `V-8`
 DM per pair). The mobile app gets a **searchable user directory** (the `user` table is
 `public`, so `useTable` auto-subscribes to all users — no new View): a reusable
 `UserPicker` powers **New chat** (→ `create_dm`) and group **Add member**; a
-`ThreadMembers` screen lists members and does add/remove/rename/leave. **UI/UX pass:**
+`ThreadMembers` screen lists members and does add/remove/rename/leave (reducers `add_member`/`remove_member`/`set_thread_title`/`leave_thread`; display-name nudge via `set_display_name`, group creation via `create_group`). **UI/UX pass:**
 `ThreadList` is now an inbox (deterministic `Avatar` with presence ring, last-message
 preview, relative time, last-activity sort, "＋ New chat" FAB, first-run name nudge);
 `Thread` has an avatar header → members, auto-scroll, agent-styled bubbles. New

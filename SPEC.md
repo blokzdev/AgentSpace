@@ -70,13 +70,14 @@ One `run` row per agent turn (a reply or a workflow execution).
 | `queued` | a trigger fired (message addressed / schedule due / event) |
 | `running` | an orchestrator instance **claimed** the run (idempotent guard) |
 | `succeeded` | final message flushed `complete`; usage recorded |
-| `failed` | unrecoverable error; `runs.error` set; message → `failed` |
+| `failed` | unrecoverable error; failure text written onto the message row; message → `failed` |
 | `cancelled` | superseded, user-interrupted, or claimed twice |
 
 **Idempotency contract:** triggers may be delivered at-least-once (scheduled
-reducers especially). A run is uniquely keyed (e.g. `thread_id + message_id +
-agent_id`, or `workflow_id + scheduled_at`); claiming is a conditional reducer
-that fails if already claimed. Producers/consumers: orchestrator dispatcher +
+reducers especially). A run is uniquely keyed by a client-owned `runId`; an agent's
+turn is made idempotent by the `agent_turn` `(episode_id, agent_id)` composite. Claiming
+(`agent_reply_begin`) is a conditional reducer that throws (creates no row) if the `runId`
+already exists or the agent already took its episode turn. Producers/consumers: orchestrator dispatcher +
 `modules/spacetime` run reducers.
 
 **Implemented (M1.9/DEC-030).** A reply run is `running` from `agent_reply_begin`. Terminal

@@ -11,7 +11,7 @@
 
 ## Snapshot — where we are right now
 
-*Last refreshed: 2026-06-23.*
+*Last refreshed: 2026-06-26.*
 
 **M0 closed; all six M1 build phases shipped; milestone-close in progress.** Merged
 PRs #2–#13. AgentSpace is a working app: sign in (SpacetimeAuth/OIDC, M1.2) → find
@@ -92,9 +92,9 @@ the episode budget untouched) + a `buildPrompt` isolation regression test. Stric
 `addressing.md` by design. CI 16/16 (49 orch tests). *(M2.2 presence/typing shipped just prior — #41; S-6
 Maincloud republish confirmed done → V-15…V-19 unblocked.)*
 
-- **Active branch:** `feat/m2.9-downpayment-ot008` (M2.9 down-payment + OT-008; DEC-039). Recent merges:
-  M2.3 NL (#42); V-6 (#43); V-2/V-22 (#44); `build-apk` (#45–47); M2.9 auth docs (#48); M2.4 lean (#49).
-  Repo **public**, **Apache-2.0**.
+- **Active branch:** `main` (clean at HEAD c9fad93, #51). Recent merges:
+  `build-apk` (#45–47); M2.9 auth docs (#48); M2.4 lean (#49); M2.9 down-payment + OT-008 (#50);
+  DEC-040 local-first decision + session-close sweep (#51). Repo **public**, **Apache-2.0**.
 - **Stack:** RN + Expo (SDK 52) · SpacetimeDB (TS module) · Node/TS Orchestrator +
   Vercel-AI-SDK v6 Model Gateway (13+ providers via a shared catalog · per-user BYOK) ·
   (Postgres + pgvector for M3 RAG).
@@ -1371,6 +1371,25 @@ multiplayer in the North Star**, the calculus flips and local-first/hybrid is wo
   STDB server down). **Next build = M2.9.2** (native Google sign-in + the module `aud` guard), **gated on
   founder S-9** (Google OAuth client). Also open: the on-device V-batch (V-24/V-25 + M2.1) and S-7 (key
   rotation).
+
+### 2026-06-26 — Doc↔code drift sweep (CLAUDE.md §7); 15 fixes routed + applied
+- **Session (founder, "ultracode"):** ran the bootstrap; confirmed state = `main`@c9fad93 (#51); **M2.9.2 blocked
+  on S-9** (Google Web client ID — verified NOT yet provided in `.env.local` / SETUP). Founder chose a **drift
+  sweep** as the session's work.
+- **Sweep (7-dimension multi-agent workflow + adversarial per-finding verification):** 17 candidates → **15
+  confirmed, 2 filtered** (false positives: per-milestone test-count deltas; SPEC's prescriptive `queued` state).
+  **No critical findings.** Catalog committed to `.audit/sweep-2026-06-26.md`. One verifier hit the StructuredOutput
+  retry cap; its finding (`code-reality-1`, 16→17 providers) was re-verified by hand and reinstated.
+- **Founder routed "fix all 15"** → applied in one doc-only PR: the stale-pointer cluster (MEMORY Snapshot
+  branch/date, README Status "Next: M2.2"→M2.9.2, ROADMAP Next/date), BLUEPRINT §4 (OIDC→anon-token DEC-017/OT-007;
+  batched-UPDATE→`reply_delta` INSERTs; "stateless"→stateful v1), and nice count/naming fixes (providers 16→17,
+  gateway tests 16→22, `agent_reply_append` removed-in-M2.1 incl. the `index.ts:588` comment, SETUP S-6 binding
+  surfaces, §9 mobile tree +`chat.ts`/`config.ts`, 4 unnamed reducers, SPEC `runs.error`/idempotency-key). Doc-only
+  + 1 comment.
+- **Lesson:** the #51 session-close sweep reported "CLEAN" but didn't re-snapshot the three "where are we" nav
+  surfaces (MEMORY Snapshot / README Status / ROADMAP Current-state) — exactly where this deeper sweep found the
+  cluster. A drift sweep must check the navigation pointers, not just the per-topic owner docs.
+- **Next:** still **M2.9.2, gated on S-9.** Meanwhile-actionable (founder): the on-device V-batch + S-7 (key rotation).
 
 ---
 
